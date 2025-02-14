@@ -1317,9 +1317,9 @@
             document.getElementById("m3").style.display = "none";
             document.getElementById("m4").style.display = "none";
             document.getElementById("m11").style.display = "none";
-            setTimeout(() => {
-              menu.close();
-            }, 2000);
+            // setTimeout(() => {
+            //   menu.close();
+            // }, 2000);
 
 
             /* prepare puzzle */
