@@ -259,4 +259,4 @@ function sendGoal(){
 window.sendCheck = sendCheck;
 window.sendGoal = sendGoal;
 
-console.log("0.0.4c")
+console.log("0.1.0")
