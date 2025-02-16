@@ -147,8 +147,19 @@ let puzzlePieceOrder = [];
 
 const connectedListener = (packet) => {
     apstatus = "AP: Connected";
-    connected = true;
+
     window.apseed = packet.slot_data.seed_name;
+    window.slot = packet.slot;
+
+    if(packet.slot_data.ap_world_version){
+        console.log("This apworld version should work", packet.slot_data.ap_world_version)
+    }else{
+        alert("You are using an older apworld. You will be forwarded to a previous version. If you want to also keep your save-file (placement of pieces) for this seed ("+window.apseed+"_"+window.slot+"), please see pins in the discord channel.")
+        window.location.href = "jigsaw-ap-002.netlify.app";
+        return;
+    }
+
+    connected = true;
     document.getElementById("m6").innerText = apstatus;
     
 

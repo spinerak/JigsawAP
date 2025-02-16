@@ -314,6 +314,16 @@
 
     } // twist3
 
+    function twist4(side, ca, cb) {
+      console.log(side.points)
+      side.points[0].x = Math.round(side.points[0].x)
+      side.points[0].y = Math.round(side.points[0].y)
+      side.points[1].x = Math.round(side.points[1].x)
+      side.points[1].y = Math.round(side.points[1].y)
+      side.points = [side.points[0], side.points[1]];
+
+    } // twist3
+
 
     //-----------------------------------------------------------------------------
     class Piece {
@@ -784,7 +794,7 @@
         */
         this.relativeHeight = (this.srcImage.naturalHeight / this.ny) / (this.srcImage.naturalWidth / this.nx);
 
-        this.defineShapes({ coeffDecentr: 0.12, twistf: [twist0, twist1, twist2, twist3][document.getElementById("shape").value - 1] });
+        this.defineShapes({ coeffDecentr: 0.12, twistf: [twist0, twist1, twist2, twist3, twist4][document.getElementById("shape").value - 1] });
 
         this.polyPieces = [];
         let counter = 1;
@@ -858,9 +868,9 @@
         const nx = this.nx, ny = this.ny;
         let np;
 
-        for (let ky = 0; ky <= ny; ++ky) {
+        for (let ky = -1; ky <= ny+1; ++ky) {
           corners[ky] = [];
-          for (let kx = 0; kx <= nx; ++kx) {
+          for (let kx = -1; kx <= nx+1; ++kx) {
             corners[ky][kx] = new Point(kx + alea(-coeffDecentr, coeffDecentr),
               ky + alea(-coeffDecentr, coeffDecentr));
             if (kx == 0) corners[ky][kx].x = 0;
@@ -920,8 +930,8 @@
         // we suppose we want the picture to fill 90% on width or height and less or same on other dimension
         // this 90% might be changed and depend on the number of columns / rows.
 
-        const maxWidth = 0.95 * this.contWidth;
-        const maxHeight = 0.95 * this.contHeight;
+        const maxWidth = 0.90 * this.contWidth;
+        const maxHeight = 0.90 * this.contHeight;
 
         // suppose image fits in height
         this.gameHeight = maxHeight;
@@ -1248,7 +1258,7 @@
           puzzle.getContainerSize();
           if (state == 15 || state > 60) { // resize initial or final picture
             puzzle.getContainerSize();
-            fitImage(tmpImage, puzzle.contWidth * 0.95, puzzle.contHeight * 0.95);
+            fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
           }
           else if (state >= 25) { // resize pieces
             puzzle.prevGameWidth = puzzle.gameWidth;
@@ -1288,7 +1298,7 @@
             tmpImage = document.createElement("img");
             tmpImage.src = puzzle.srcImage.src;
             puzzle.getContainerSize();
-            fitImage(tmpImage, puzzle.contWidth * 0.95, puzzle.contHeight * 0.95);
+            fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
             tmpImage.style.boxShadow = "4px 4px 4px rgba(0, 0, 0, 0.5)";
             puzzle.container.appendChild(tmpImage);
             state = 15;
@@ -1439,30 +1449,32 @@
             break;
 
           case 43:  // automatic load
-            const savedProgress = localStorage.getItem(`progress${window.apseed}`);
-            if (savedProgress) {
-              const lines = savedProgress.split('\n');
-              lines.forEach(line => {
-                if (line.trim() === '') return;
-                const [coords, pieces] = line.split('|');
-                const [x, y] = coords.split(',').map(Number);
-                const pieceIndices = pieces.split(',').map(Number);
+            if(window.apseed){
+              const savedProgress = localStorage.getItem(`progress${window.apseed}_${window.slot}`);
+              if (savedProgress) {
+                const lines = savedProgress.split('\n');
+                lines.forEach(line => {
+                  if (line.trim() === '') return;
+                  const [coords, pieces] = line.split('|');
+                  const [x, y] = coords.split(',').map(Number);
+                  const pieceIndices = pieces.split(',').map(Number);
 
-                const pp1 = findPolyPieceUsingPuzzlePiece(pieceIndices[0]);
-                if (pp1) {
-                  for (let i = 1; i < pieceIndices.length; i++) {
-                    const ppNext = findPolyPieceUsingPuzzlePiece(pieceIndices[i]);
-                    if (ppNext) {
-                    pp1.merge(ppNext);
+                  const pp1 = findPolyPieceUsingPuzzlePiece(pieceIndices[0]);
+                  if (pp1) {
+                    for (let i = 1; i < pieceIndices.length; i++) {
+                      const ppNext = findPolyPieceUsingPuzzlePiece(pieceIndices[i]);
+                      if (ppNext) {
+                      pp1.merge(ppNext);
+                      }
+                    }
+                    if(x > -9999){
+                      pp1.moveTo(x, y);
                     }
                   }
-                  if(x > -9999){
-                    pp1.moveTo(x, y);
-                  }
-                }
-              
-              });
+                
+                });
               }
+            }
             
             state = 45;
             break;
@@ -1549,7 +1561,7 @@
           case 60: // winning
             puzzle.container.innerHTML = "";
             puzzle.getContainerSize();
-            fitImage(tmpImage, puzzle.contWidth * 0.95, puzzle.contHeight * 0.95);
+            fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
             tmpImage.style.boxShadow = "4px 4px 4px rgba(0, 0, 0, 0.5)";
             //              tmpImage.style.top=(puzzle.polyPieces[0].y + puzzle.scaley / 2) / puzzle.contHeight * 100 + 50 + "%" ;
             //              tmpImage.style.left=(puzzle.polyPieces[0].x + puzzle.scalex / 2) / puzzle.contWidth * 100 + 50 + "%" ;
@@ -1640,7 +1652,7 @@
             delete m11.timer;
           }, 5000);
         } else {
-          localStorage.removeItem(`progress${window.apseed}`);
+          localStorage.removeItem(`progress${window.apseed}_${window.slot}`);
           m11.innerText = "Deleted!";
           if (m11.timer) {
             clearTimeout(m11.timer);
@@ -1679,7 +1691,7 @@
               URL.revokeObjectURL(url);
             }
           } else {
-            localStorage.setItem(`progress${window.apseed}`, text);
+            localStorage.setItem(`progress${window.apseed}_${window.slot}`, text);
           }
         }
         
