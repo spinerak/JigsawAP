@@ -1,6 +1,6 @@
 "use strict";
 
-    let puzzle, autoStart;
+    var puzzle, autoStart;
 
     const mhypot = Math.hypot,
       mrandom = Math.random,
@@ -1182,6 +1182,7 @@
 
         reader.addEventListener('load', () => {
           puzzle.srcImage.src = reader.result;
+          document.getElementById("previm").src = puzzle.srcImage.src;
         });
         reader.readAsDataURL(this.files[0]);
 
@@ -1198,6 +1199,7 @@
     var imagePath = "color-icon2.png";
     function loadInitialFile() {
       puzzle.srcImage.src = imagePath;
+      document.getElementById("previm").src = imagePath;
       console.log("loaded!")
     }
     //-----------------------------------------------------------------------------
@@ -1326,6 +1328,8 @@
             document.getElementById("m2").style.display = "none";
             document.getElementById("m3").style.display = "none";
             document.getElementById("m4").style.display = "none";
+            document.getElementById("m5").style.display = "none";
+            document.getElementById("m10b").style.display = "none";
             document.getElementById("m11").style.display = "none";
             // setTimeout(() => {
             //   menu.close();
@@ -1456,7 +1460,7 @@
                 lines.forEach(line => {
                   if (line.trim() === '') return;
                   const [coords, pieces] = line.split('|');
-                  const [x, y] = coords.split(',').map(Number);
+                  let [x, y] = coords.split(',').map(Number);
                   const pieceIndices = pieces.split(',').map(Number);
 
                   const pp1 = findPolyPieceUsingPuzzlePiece(pieceIndices[0]);
@@ -1464,8 +1468,14 @@
                     for (let i = 1; i < pieceIndices.length; i++) {
                       const ppNext = findPolyPieceUsingPuzzlePiece(pieceIndices[i]);
                       if (ppNext) {
-                      pp1.merge(ppNext);
+                        pp1.merge(ppNext);
                       }
+                    }
+                    
+
+                    if(x < -9999 && unlocked_pieces.includes(pieceIndices[0])){
+                      x = alea(0, 0.05*puzzle.gameWidth);
+                      y = alea(0, 0.05*puzzle.gameHeight);
                     }
                     if(x > -9999){
                       pp1.moveTo(x, y);
@@ -1611,6 +1621,7 @@
             document.getElementById("m4").style.display = "block"
             document.getElementById("m5").style.display = "block"
             // document.getElementById("m8").style.display = "block"
+            document.getElementById("m10b").style.display = "block"
             document.getElementById("m11").style.display = "block"
         }
         document.getElementById("m6").style.display = "block"
@@ -1639,6 +1650,24 @@
       document.getElementById("m5").addEventListener("click", () => {
         window.open('credits.html', '_blank');
       });
+
+      const colors = ["#ffd", "#aa9", "886", "#553", "#220", "#725", "#990", "#a31", "#342"];
+      let currentColorIndex = localStorage.getItem("backgroundColorIndex") || 0;
+
+      document.getElementById("m10b").addEventListener("click", () => {
+        const forPuzzleElement = document.getElementById("forPuzzle");
+        currentColorIndex = (currentColorIndex + 1) % colors.length;
+        forPuzzleElement.style.backgroundColor = colors[currentColorIndex];
+        localStorage.setItem("backgroundColorIndex", currentColorIndex);
+      });
+
+      // Set the initial background color from localStorage if available
+      window.addEventListener("load", () => {
+        const savedColorIndex = localStorage.getItem("backgroundColorIndex");
+        if (savedColorIndex !== null) {
+          document.getElementById("forPuzzle").style.backgroundColor = colors[savedColorIndex];
+        }
+      });
       
       document.getElementById("m11").addEventListener("click", () => {
         const m11 = document.getElementById("m11");
@@ -1662,6 +1691,29 @@
             m11.innerText = "Please refresh :)";
           }, 2000);
         }
+      }
+    )
+
+      const widthsOfPreview = ["4vw", "8vw", "16vw", "32vw", "2vw"];
+      document.getElementById("n0").addEventListener("click", () => {
+        const element = document.getElementById("previm");
+        let currentWidth = element.style.width || "4vw";
+        let currentIndex = widthsOfPreview.indexOf(currentWidth);
+        let nextIndex = (currentIndex + 1) % widthsOfPreview.length;
+        element.style.width = widthsOfPreview[nextIndex];
+
+        localStorage.setItem("widthOfPreviewIndex", nextIndex);
+      });
+
+      // Set the initial width from localStorage if available
+      window.addEventListener("load", () => {
+        let savedIndex = localStorage.getItem("widthOfPreviewIndex");
+        if (savedIndex == null) {
+          savedIndex = 0;
+        }
+        const element = document.getElementById("previm");
+        element.style.width = widthsOfPreview[savedIndex];
+        
       });
 
       function saveProgress(save_as_file){
@@ -1731,6 +1783,7 @@ var apny;
 function set_puzzle_dim(x, y){
     apnx = x;
     apny = y;
+    document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
 }
 window.set_puzzle_dim = set_puzzle_dim
 
@@ -1753,8 +1806,9 @@ var unlocked_pieces = [];
 
 function unlockPiece(index) {
     unlocked_pieces.push(index);
+
     if(puzzle_ini){
-        findPolyPieceUsingPuzzlePiece(index).moveTo(0, 0, false, true);
+        findPolyPieceUsingPuzzlePiece(index).moveTo(alea(0, 0.05*puzzle.gameWidth), alea(0, 0.05*puzzle.gameHeight), false, true);
         // puzzle.optimInitial(index);
     }
     
@@ -1788,5 +1842,6 @@ var numberOfMerges = 0;
 function setImagePath(l){
     imagePath = l;
     loadInitialFile();
+    document.getElementById("previm").src = imagePath
 }
 window.setImagePath = setImagePath;

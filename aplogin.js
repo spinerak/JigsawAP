@@ -154,9 +154,9 @@ const connectedListener = (packet) => {
     if(packet.slot_data.ap_world_version){
         console.log("This apworld version should work", packet.slot_data.ap_world_version)
     }else{
-        alert("You are using an older apworld. You will be forwarded to a previous version. If you want to also keep your save-file (placement of pieces) for this seed ("+window.apseed+"_"+window.slot+"), please see pins in the discord channel.")
-        window.location.href = "jigsaw-ap-002.netlify.app";
-        return;
+        alert("You are using an older apworld. This version might still work. If it doesn't, try jigsaw-ap-002.netlify.app. Save file lost (placement of pieces) for this seed ("+window.apseed+"_"+window.slot+"), please see pins in the discord channel.")
+        // window.location.href = "jigsaw-ap-002.netlify.app";
+        // return;
     }
 
     connected = true;
@@ -213,7 +213,7 @@ function openItems(items){
     console.log("let's open item")
     let itemUnlocked = false;
     for (let i = 0; i < items.length; i++) {
-        console.log(items[i], puzzlePieceOrder)
+        // console.log(items[i], puzzlePieceOrder)
         let number_of_pieces = 0;
         if(items[i] == "Puzzle Piece"){
             number_of_pieces = 1;
@@ -224,7 +224,7 @@ function openItems(items){
         for(let c = 0; c < number_of_pieces; c++){
             if(puzzlePieceOrder){
                 let piece = puzzlePieceOrder.shift();
-                console.log("Unlocking piece", piece);
+                // console.log("Unlocking piece", piece);
                 if (piece !== undefined) {
                     window.unlockPiece(piece);
                     itemUnlocked = true;
@@ -259,4 +259,4 @@ function sendGoal(){
 window.sendCheck = sendCheck;
 window.sendGoal = sendGoal;
 
-console.log("0.1.0")
+console.log("0.1.0d")

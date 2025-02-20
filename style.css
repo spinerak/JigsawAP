@@ -7,24 +7,52 @@
       cursor: pointer;
      }
 
-      #menu {
-        position: absolute;
-        top: 0;
-        right: 0;
-        list-style-type: none;
-        padding-right: 5px;
-        z-index: 1000;
-        display: inline-block;
-        text-align: center;
-      }
+    #menu {
+      position: absolute;
+      top: 0;
+      right: 0;
+      list-style-type: none;
+      padding-right: 5px;
+      z-index: 1000;
+      display: inline-block;
+      text-align: center;
+      padding-inline-start: 0; /* Set padding-inline-start to 0 */
+    }
 
-      #menu li {
-        margin: 2px;
-        padding: 4px 10px;
-        border-radius: 5px;
-        background-color: #ffff80;
-        user-select: none;    
-      }
+    #menu li {
+      margin: 2px;
+      padding: 4px 10px;
+      border-radius: 5px;
+      background-color: #ffff80;
+      user-select: none;    
+    }
+    #nenu {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      list-style-type: none;
+      padding-right: 5px;
+      z-index: 1000;
+      display: inline-block;
+      text-align: center;
+      padding-inline-start: 0; /* Set padding-inline-start to 0 */
+    }
+
+    #nenu li {
+      margin: 1px;
+      padding: 4px 1px;
+      border-radius: 5px;
+      background-color: #ffff80;
+      user-select: none;   
+      width: auto;
+      height: auto;
+    }
+
+    #previm {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+    }
 
     
 
