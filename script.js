@@ -1236,7 +1236,7 @@
     let animate;
     let events = []; // queue for events
     let gameStarted = false;
-    let gameplayStarted = false;
+    window.gameplayStarted = false;
     let load_save = false;
 
     { // scope for animate
@@ -1374,6 +1374,7 @@
               pp.canvas.classList.add("moving");
             });
             state = 30;
+            window.playNewGameSound();
             break;
 
           case 30: // launch movement
@@ -1493,7 +1494,12 @@
             // run function after ini
             runAfterIni();
             state = 50;
-            gameplayStarted = true;
+            window.gameplayStarted = true;
+
+            setInterval(() => {
+              saveProgress(false);
+              console.log("Progress saved");
+            }, 100000);
             break;
 
           /* wait for user grabbing a piece or other action */
@@ -1652,13 +1658,16 @@
       });
 
       const colors = ["#ffd", "#aa9", "886", "#553", "#220", "#725", "#990", "#a31", "#342"];
-      let currentColorIndex = localStorage.getItem("backgroundColorIndex") || 0;
+      window.currentColorIndex = localStorage.getItem("backgroundColorIndex") || 0;
 
       document.getElementById("m10b").addEventListener("click", () => {
         const forPuzzleElement = document.getElementById("forPuzzle");
-        currentColorIndex = (currentColorIndex + 1) % colors.length;
-        forPuzzleElement.style.backgroundColor = colors[currentColorIndex];
-        localStorage.setItem("backgroundColorIndex", currentColorIndex);
+        window.currentColorIndex = (window.currentColorIndex + 1) % colors.length;
+        forPuzzleElement.style.backgroundColor = colors[window.currentColorIndex];
+        localStorage.setItem("backgroundColorIndex", window.currentColorIndex);
+
+        const jsonList = [{ type: "text", text: "Example text with new background" }];
+        window.jsonListener("", jsonList);
       });
 
       // Set the initial background color from localStorage if available
@@ -1717,7 +1726,7 @@
       });
 
       function saveProgress(save_as_file){
-        if(gameplayStarted){
+        if(window.gameplayStarted){
           let text = "";
           for (let pp of puzzle.polyPieces) {
             text += `${pp.x},${pp.y}|`;
@@ -1835,6 +1844,7 @@ function newMerge(){
         window.sendGoal();
     }
     document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
+    window.playNewMergeSound();
 }
 
 var numberOfMerges = 0;

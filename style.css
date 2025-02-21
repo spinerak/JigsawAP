@@ -162,3 +162,19 @@
         /* Adjust the margin as needed */
         color: #ffffff;
     }
+
+    #log {
+      /* background-color: rgba(32, 32, 0, 0.5); */
+      position: absolute;
+      bottom: 3vh;
+      left: 3vw;
+      width: 30vw;
+      height: 16vh;
+      font-size: max(1vw, 2vh);
+      color: rgba(0, 0, 0, 0.1);
+      pointer-events: none;
+      overflow-y: hidden; /* Disable vertical scrolling */
+      overflow-x: hidden; /* Disable hor scrolling */
+      display: flex;
+      flex-direction: column; /* Display new messages at the bottom */
+    }

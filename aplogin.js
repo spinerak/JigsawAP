@@ -19,7 +19,9 @@ function pressed_login(){
     login();
 }
 
+let play_solo = false;
 function pressed_solo(){
+    play_solo = true;
     
     window.possible_merges = [0, 0, 0, 0, 0, 0, 1, 3, 5, 5, 5, 6, 8, 9, 11, 13, 15, 16, 16, 18, 19, 20, 21, 22, 23, 24]
 
@@ -62,10 +64,11 @@ function pressed_solo(){
         }
         let val = trans.hasOwnProperty(numberOfMerges) ? trans[numberOfMerges] : -1;
         if(val > 0){
-            window.unlockPiece(val);
+            setTimeout(() => {
+                window.unlockPiece(val);
+                playNewItemSound();
+            }, 300);
         }
-
-
     }
     function sendGoal(){
         console.log("You won!")
@@ -115,6 +118,9 @@ function connectToServer(firsttime = true) {
     client.items.on("itemsReceived", receiveditemsListener);
     client.socket.on("connected", connectedListener);
     client.socket.on("disconnected", disconnectedListener);
+    if(document.getElementById("showTextClient").checked){
+        client.messages.on("message", jsonListener);
+    }
     client
     .login(connectionInfo.hostport, connectionInfo.name, connectionInfo.game, {password: connectionInfo.password})
         .then(() => {
@@ -131,9 +137,7 @@ function connectToServer(firsttime = true) {
 
     // Disconnect from the server when unloading window.
     window.addEventListener("beforeunload", () => {
-        if(connected){
-            window.saveProgress(false);
-        }
+        window.saveProgress(false);
         client.disconnect();
     });
 }
@@ -192,25 +196,26 @@ const disconnectedListener = (packet) => {
 };
 
 var lastindex = 0;
-function newItems(items, index){
-    if (items && items.length) {
-        if (index > lastindex) {
-            console.log("Something strange happened, you should have received more items already... Let's reconnect...");
+function newItems(items, index) {
+    setTimeout(() => {
+        if (items && items.length) {
+            if (index > lastindex) {
+                console.log("Something strange happened, you should have received more items already... Let's reconnect...");
+            }
+            var received_items = [];
+            for (let i = lastindex - index; i < items.length; i++) {
+                const item = items[i]; // Get the current item
+                received_items.push(item.toString()); // Add the item name to the 'items' array
+            }
+            openItems(received_items)
+            lastindex = index + items.length;
+        } else {
+            console.log("No items received in this update...");
         }
-        var received_items = [];
-        for (let i = lastindex - index; i < items.length; i++) {
-            const item = items[i]; // Get the current item
-            received_items.push(item.toString()); // Add the item name to the 'items' array
-        }
-        openItems(received_items)
-        lastindex = index + items.length;
-    } else {
-        console.log("No items received in this update...");
-    }
+    }, 300); // Wait for one second
 }
 
 function openItems(items){
-    console.log("let's open item")
     let itemUnlocked = false;
     for (let i = 0; i < items.length; i++) {
         // console.log(items[i], puzzlePieceOrder)
@@ -238,6 +243,9 @@ function openItems(items){
 }
 
 function playNewItemSound() {
+    if(!window.gameplayStarted && !play_solo){
+        return;
+    }
     const soundSources = ["Sounds/p1.mp3", "Sounds/p2.mp3", "Sounds/p3.mp3", "Sounds/p4.mp3"];
     const randomSound = soundSources[Math.floor(Math.random() * soundSources.length)];
     const newItemSound = new Audio(randomSound);
@@ -247,10 +255,37 @@ function playNewItemSound() {
         console.log("Could not play sound because user hasn't interacted with the website yet");
     });
 }
+function playNewMergeSound() {
+    const soundSources = ["Sounds/m1.mp3", "Sounds/m2.mp3", "Sounds/m3.mp3", "Sounds/m4.mp3", "Sounds/m5.mp3"];
+    const randomSound = soundSources[Math.floor(Math.random() * soundSources.length)];
+    const newItemSound = new Audio(randomSound);
+
+    if (!window.lastMergeSoundTime || Date.now() - window.lastMergeSoundTime > 1000) {
+        newItemSound.play().catch(function(error) {
+            // Handle the error here (e.g., log it or show a warning message)
+            console.log("Could not play sound because user hasn't interacted with the website yet");
+        });
+        window.lastMergeSoundTime = Date.now();
+    }
+}
+window.playNewMergeSound = playNewMergeSound;
+function playNewGameSound() {
+    // const soundSources = ["Sounds/b1.mp3", "Sounds/b2.mp3"];
+    // const randomSound = soundSources[Math.floor(Math.random() * soundSources.length)];
+    // const newItemSound = new Audio(randomSound);
+
+    // newItemSound.play().catch(function(error) {
+    //     // Handle the error here (e.g., log it or show a warning message)
+    //     console.log("Could not play sound because user hasn't interacted with the website yet");
+    // });
+}
+window.playNewGameSound = playNewGameSound;
 
 function sendCheck(numberOfMerges){
     console.log(numberOfMerges);
-    client.check(234782000 + numberOfMerges);
+    if(connected){
+        client.check(234782000 + numberOfMerges);
+    }
 }
 function sendGoal(){
     client.goal();
@@ -259,4 +294,135 @@ function sendGoal(){
 window.sendCheck = sendCheck;
 window.sendGoal = sendGoal;
 
-console.log("0.1.0d")
+function cleanLog() {
+    var logTextarea = document.getElementById("log");
+    
+    // Check if logTextarea has more than 2000 children (assumed to be <span> elements)
+    if (logTextarea.children.length > 2000) {
+        for (var i = 0; i < 1000; i++) {
+            if (logTextarea.children[0]) {
+                logTextarea.removeChild(logTextarea.children[0]); // Remove the first child
+            }
+        }
+    }
+}
+
+var classaddcolor = [
+    "rgba(6, 217, 217, 0.2)",
+    "rgba(168, 147, 228, 0.2)",
+    "rgba(98, 122, 198, 0.2)",
+    "rgba(255, 223, 0, 0.2)",
+    "rgba(211, 113, 102, 0.2)",
+    "rgba(255, 172, 28, 0.2)",
+    "rgba(155, 89, 182, 0.2)",
+    "rgba(128, 255, 128, 0.2)"]
+var classaddtext = ["...", "!!", "!", "!!!", "@#!", "!?!", "@!!", "?!@"]
+var classadddesc = ["Item class: normal", 
+    "Item class: progression", 
+    "Item class: useful", 
+    "Item class: progression, useful", 
+    "Item class: trap", 
+    "Item class: progression, trap", 
+    "Item class: useful, trap", 
+    "progression, useful, trap"]
+var classothercolors = [
+    "rgba(100, 149, 237, 0.5)",
+    "rgba(0, 255, 127, 0.5)",
+    "rgba(238, 0, 238, 0.5)",
+    "rgba(250, 250, 210, 0.5)"
+]
+
+function adjustColorBrightness(color, amount) {
+    const colorParts = color.match(/[\d.]+/g);
+    if (colorParts.length === 4) {
+        // RGBA color
+        let [r, g, b, a] = colorParts.map(Number);
+        r = Math.min(255, Math.max(0, r + amount));
+        g = Math.min(255, Math.max(0, g + amount));
+        b = Math.min(255, Math.max(0, b + amount));
+        return `rgba(${r}, ${g}, ${b}, ${a})`;
+    } else if (colorParts.length === 3) {
+        // RGB color
+        let [r, g, b] = colorParts.map(Number);
+        r = Math.min(255, Math.max(0, r + amount));
+        g = Math.min(255, Math.max(0, g + amount));
+        b = Math.min(255, Math.max(0, b + amount));
+        return `rgb(${r}, ${g}, ${b})`;
+    } else {
+        throw new Error("Invalid color format");
+    }
+}
+
+function jsonListener(text, nodes) {
+    const colors = ["#ffd", "#aa9", "886", "#553", "#220", "#725", "#990", "#a31", "#342"];
+    const currentColor = colors[window.currentColorIndex];
+
+    const adjustColor = (currentColor === "#220" || currentColor === "#553" || currentColor === "#342") ? 100 : -100;
+
+    // Plaintext to console, because why not?
+    const messageElement = document.createElement("div");
+  
+    let is_relevant = false;
+    let contains_player = false;
+
+    for (const node of nodes) {
+        const nodeElement = document.createElement("span");
+        nodeElement.innerText = node.text;
+
+        switch (node.type) {
+            case "entrance":
+                nodeElement.style.color = adjustColorBrightness(classothercolors[0], adjustColor);
+                break;
+
+            case "location":
+                nodeElement.style.color = adjustColorBrightness(classothercolors[1], adjustColor);
+                break;
+
+            case "color":
+                // not really correct, but technically the only color nodes the server returns is "green" or "red"
+                // so it's fine enough for an example.
+                nodeElement.style.color = node.color;
+                break;
+
+            case "player":
+                contains_player = true;
+                nodeElement.style.fontWeight = "bold";
+                if (node.player.slot === client.players.self.slot) {
+                    // It's us!
+                    nodeElement.style.color = adjustColorBrightness(classothercolors[2], adjustColor);
+                    is_relevant = true;
+                } else {
+                    // It's them!
+                    nodeElement.style.color = adjustColorBrightness(classothercolors[3], adjustColor);
+                }
+                nodeElement.innerText = node.player.alias;
+                nodeElement.title = "Game: " + node.player.game;
+                break;
+
+            case "item": {
+                nodeElement.style.fontWeight = "bold";
+                let typenumber = node.item.progression + 2 * node.item.useful + 4 * node.item.trap
+                nodeElement.style.color = adjustColorBrightness(classaddcolor[typenumber], adjustColor);
+                nodeElement.title = classadddesc[typenumber];
+            }
+
+            // no special coloring needed
+            case "text":
+                nodeElement.style.color = adjustColorBrightness("rgba(126,126,126,0.2)", adjustColor);
+            default:
+                break;
+        }
+        messageElement.appendChild(nodeElement);
+    }
+
+    var logTextarea = document.getElementById("log");
+
+    logTextarea.appendChild(messageElement);
+    
+    cleanLog();
+
+    logTextarea.scrollTop = logTextarea.scrollHeight - logTextarea.clientHeight;
+}
+window.jsonListener = jsonListener;
+
+console.log("0.1.0e")
