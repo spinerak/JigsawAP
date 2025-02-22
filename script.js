@@ -946,11 +946,10 @@
         this.gameCanvas.width = this.gameWidth;
         this.gameCanvas.height = this.gameHeight;
         this.gameCtx = this.gameCanvas.getContext("2d");
-        this.gameCtx.drawImage(this.srcImage, 0, 0, this.gameWidth, this.gameHeight);
+        this.gameCtx.drawImage(this.srcImage, 0, 0, this.gameWidth, this.gameHeight); //safe
 
         this.gameCanvas.classList.add("gameCanvas");
         this.gameCanvas.style.zIndex = 500;
-        //    this.container.appendChild(this.gameCanvas)
 
         /* scale pieces */
         this.scalex = this.gameWidth / this.nx;    // average width of pieces
@@ -958,7 +957,7 @@
 
         this.pieces.forEach(row => {
           row.forEach(piece => piece.scale(this));
-        }); // this.pieces.forEach
+        }); // this.pieces.forEach, safe
 
         /* calculate offset for centering image in container */
         this.offsx = (this.contWidth - this.gameWidth) / 2;
@@ -1263,14 +1262,17 @@
             fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
           }
           else if (state >= 25) { // resize pieces
-            puzzle.prevGameWidth = puzzle.gameWidth;
-            puzzle.prevGameHeight = puzzle.gameHeight;
+            console.log(puzzle.contWidth, puzzle.contHeight, puzzle.prevWidth, puzzle.prevHeight, puzzle.scalex, puzzle.scaley);
+            // puzzle.prevGameWidth = puzzle.gameWidth;
+            // puzzle.prevGameHeight = puzzle.gameHeight;
             puzzle.scale();
-            let reScale = puzzle.contWidth / puzzle.prevWidth;
+            // let reScale = puzzle.contWidth / puzzle.prevWidth;
             puzzle.polyPieces.forEach(pp => {
               // compute new position : game centered homothety
-              let nx = puzzle.contWidth / 2 - (puzzle.prevWidth / 2 - pp.x) * reScale;
-              let ny = puzzle.contHeight / 2 - (puzzle.prevHeight / 2 - pp.y) * reScale;
+              // let nx = puzzle.contWidth / 2 - (puzzle.prevWidth / 2 - pp.x) * reScale;
+              // let ny = puzzle.contHeight / 2 - (puzzle.prevHeight / 2 - pp.y) * reScale;
+              let nx = pp.x;
+              let ny = pp.y;
               // enforce pieces to stay in game area
               nx = mmin(mmax(nx, -puzzle.scalex / 2), puzzle.contWidth - 1.5 * puzzle.scalex);
               ny = mmin(mmax(ny, -puzzle.scaley / 2), puzzle.contHeight - 1.5 * puzzle.scaley);
@@ -1568,34 +1570,35 @@
                 // not at its right place
                 puzzle.evaluateZIndex();
                 state = 50;
-                if (puzzle.polyPieces.length == 1) state = 60; // won!
+                // if (puzzle.polyPieces.length == 1) state = 60; // won!
                 return;
             } // switch (event.event)
 
             break;
 
           case 60: // winning
-            puzzle.container.innerHTML = "";
-            puzzle.getContainerSize();
-            fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
-            tmpImage.style.boxShadow = "4px 4px 4px rgba(0, 0, 0, 0.5)";
-            //              tmpImage.style.top=(puzzle.polyPieces[0].y + puzzle.scaley / 2) / puzzle.contHeight * 100 + 50 + "%" ;
-            //              tmpImage.style.left=(puzzle.polyPieces[0].x + puzzle.scalex / 2) / puzzle.contWidth * 100 + 50 + "%" ;
-            tmpImage.style.left = (puzzle.polyPieces[0].x + puzzle.scalex / 2 + puzzle.gameWidth / 2) / puzzle.contWidth * 100 + "%";
-            tmpImage.style.top = (puzzle.polyPieces[0].y + puzzle.scaley / 2 + puzzle.gameHeight / 2) / puzzle.contHeight * 100 + "%";
+            // puzzle.container.innerHTML = "";
+            // puzzle.getContainerSize();
+            // fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+            // tmpImage.style.boxShadow = "4px 4px 4px rgba(0, 0, 0, 0.5)";
+            // //              tmpImage.style.top=(puzzle.polyPieces[0].y + puzzle.scaley / 2) / puzzle.contHeight * 100 + 50 + "%" ;
+            // //              tmpImage.style.left=(puzzle.polyPieces[0].x + puzzle.scalex / 2) / puzzle.contWidth * 100 + 50 + "%" ;
+            // tmpImage.style.left = (puzzle.polyPieces[0].x + puzzle.scalex / 2 + puzzle.gameWidth / 2) / puzzle.contWidth * 100 + "%";
+            // tmpImage.style.top = (puzzle.polyPieces[0].y + puzzle.scaley / 2 + puzzle.gameHeight / 2) / puzzle.contHeight * 100 + "%";
 
-            tmpImage.classList.add("moving");
-            setTimeout(() => tmpImage.style.top = tmpImage.style.left = "50%", 0);
-            puzzle.container.appendChild(tmpImage);
-            state = 65;
-            menu.open();
+            // tmpImage.classList.add("moving");
+            // setTimeout(() => tmpImage.style.top = tmpImage.style.left = "50%", 0);
+            // puzzle.container.appendChild(tmpImage);
+            // state = 65;
+            // menu.open();
+            break;
 
           case 65: // wait for new number of pieces - of new picture
-            if (event && event.event == "nbpieces") {
-              puzzle.nbPieces = event.nbpieces;
-              state = 20;
-              return;
-            }
+            // if (event && event.event == "nbpieces") {
+            //   puzzle.nbPieces = event.nbpieces;
+            //   state = 20;
+            //   return;
+            // }
             break;
 
           case 9999: break;
@@ -1657,12 +1660,13 @@
         window.open('credits.html', '_blank');
       });
 
-      const colors = ["#ffd", "#aa9", "886", "#553", "#220", "#725", "#990", "#a31", "#342"];
+      const colors = ["#ffd", "#aa9", "#886", "#553", "#220", "#725", "#990", "#a31", "#342"];
       window.currentColorIndex = localStorage.getItem("backgroundColorIndex") || 0;
 
       document.getElementById("m10b").addEventListener("click", () => {
         const forPuzzleElement = document.getElementById("forPuzzle");
         window.currentColorIndex = (window.currentColorIndex + 1) % colors.length;
+        console.log(window.currentColorIndex);
         forPuzzleElement.style.backgroundColor = colors[window.currentColorIndex];
         localStorage.setItem("backgroundColorIndex", window.currentColorIndex);
 
@@ -1781,7 +1785,25 @@
       events.push({ event: "resize" });
     });
 
+    // Add zoom functionality
+    let scale = 1;
+    const zoomSensitivity = 0.1;
+
+
+
     puzzle = new Puzzle({ container: "forPuzzle" });
+
+    // puzzle.container.addEventListener("wheel", event => {
+    //   event.preventDefault();
+    //   const delta = Math.sign(event.deltaY) * zoomSensitivity;
+    //   scale = Math.min(Math.max(0.5, scale - delta), 2); // Limit zoom scale between 0.5 and 2
+
+    //   puzzle.container.style.transform = `scale(${scale})`;
+    //   puzzle.container.style.transformOrigin = "center center";
+    // });
+
+
+
     autoStart = isMiniature(); // used for nice miniature in CodePen
 
     loadInitialFile();

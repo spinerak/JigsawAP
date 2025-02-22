@@ -226,6 +226,12 @@ function openItems(items){
         if(items[i] == "2 Puzzle Pieces"){
             number_of_pieces = 2;
         }
+        if(items[i] == "5 Puzzle Pieces"){
+            number_of_pieces = 5;
+        }
+        if(items[i] == "10 Puzzle Pieces"){
+            number_of_pieces = 10;
+        }
         for(let c = 0; c < number_of_pieces; c++){
             if(puzzlePieceOrder){
                 let piece = puzzlePieceOrder.shift();
@@ -337,16 +343,30 @@ function adjustColorBrightness(color, amount) {
     if (colorParts.length === 4) {
         // RGBA color
         let [r, g, b, a] = colorParts.map(Number);
-        r = Math.min(255, Math.max(0, r + amount));
-        g = Math.min(255, Math.max(0, g + amount));
-        b = Math.min(255, Math.max(0, b + amount));
+        if(amount <= 0){
+            amount = -amount;
+            r = r * amount;
+            g = g * amount;
+            b = b * amount;
+        }else{
+            r = 255 - (255 - r) * amount;
+            g = 255 - (255 - g) * amount;
+            b = 255 - (255 - b) * amount;
+        }
         return `rgba(${r}, ${g}, ${b}, ${a})`;
     } else if (colorParts.length === 3) {
         // RGB color
         let [r, g, b] = colorParts.map(Number);
-        r = Math.min(255, Math.max(0, r + amount));
-        g = Math.min(255, Math.max(0, g + amount));
-        b = Math.min(255, Math.max(0, b + amount));
+        if(amount <= 0){
+            amount = -amount;
+            r = r * amount;
+            g = g * amount;
+            b = b * amount;
+        }else{
+            r = 255 - (255 - r) * amount;
+            g = 255 - (255 - g) * amount;
+            b = 255 - (255 - b) * amount;
+        }
         return `rgb(${r}, ${g}, ${b})`;
     } else {
         throw new Error("Invalid color format");
@@ -357,7 +377,7 @@ function jsonListener(text, nodes) {
     const colors = ["#ffd", "#aa9", "886", "#553", "#220", "#725", "#990", "#a31", "#342"];
     const currentColor = colors[window.currentColorIndex];
 
-    const adjustColor = (currentColor === "#220" || currentColor === "#553" || currentColor === "#342") ? 100 : -100;
+    const adjustColor = (currentColor === "#220" || currentColor === "#553" || currentColor === "#342") ? 0.3 : -0.3;
 
     // Plaintext to console, because why not?
     const messageElement = document.createElement("div");
@@ -425,4 +445,4 @@ function jsonListener(text, nodes) {
 }
 window.jsonListener = jsonListener;
 
-console.log("0.1.0e")
+console.log("0.1.1")
