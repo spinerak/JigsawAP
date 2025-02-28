@@ -38,43 +38,33 @@
       padding-inline-start: 0; /* Set padding-inline-start to 0 */
     }
 
-    #n0 {
+    #nenu li {
       margin: 1px;
       padding: 4px 1px;
       border-radius: 5px;
-      background-color: #333333;
-      user-select: none;   
-      width: auto;
-      height: auto;
-    }
-    #n1 {
-      margin: 1px;
-      padding: 4px 1px;
-      border-radius: 5px;
-      background-color: #333333;
+      background-color: #ffff80;
       user-select: none;   
       width: auto;
       height: auto;
     }
 
-    #log {
-      /* background-color: rgba(32, 32, 0, 0.5); */
-      bottom: 3vh;
-      left: 3vw;
-      width: 30vw;
-      height: 16vh;
-      font-size: max(1vw, 2vh);
-      color: rgba(0, 0, 0, 0.1);
-      /* pointer-events: none; */
-      overflow-x: hidden; /* Disable hor scrolling */
-      display: flex;
-      flex-direction: column; /* Display new messages at the bottom */
-      text-align: left;
+    #previm {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
     }
 
+    
 
+    #m9a {
+      display: none;
+    }
 
-    #m7, #m8, #m9, #m9a, #m10 {
+    #m9 {
+      display: none;
+    }
+
+    #m10 {
       display: none;
     }
 
@@ -82,24 +72,17 @@
       display: none;
     }
 
-    :root {
-      --scale-factor: 2; /* Change this to 3, 4, etc., to adjust the size */
-    }
-    
     #forPuzzle {
       position: absolute;
-      width: calc(100% * var(--scale-factor));
-      height: calc(56.25vw * var(--scale-factor)); /* Maintain 16:9 aspect ratio */
-      max-height: calc(100% * var(--scale-factor));
-      max-width: calc(177.78vh * var(--scale-factor)); /* Maintain 16:9 aspect ratio */
+      width: 95vw;
+      height: 95vh;
       top: 50%;
-      left: 0;
-      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%) scale(calc(1 / var(--scale-factor)));    
+      left: 50%;
+      transform: translate(-50%, -50%);
       background-color: #ffffdd;
       overflow: hidden;
     }
-    
-    
+
     .polypiece {
       display: block;
       overflow: hidden;
@@ -180,3 +163,18 @@
         color: #ffffff;
     }
 
+    #log {
+      /* background-color: rgba(32, 32, 0, 0.5); */
+      position: absolute;
+      bottom: 3vh;
+      left: 3vw;
+      width: 30vw;
+      height: 16vh;
+      font-size: max(1vw, 2vh);
+      color: rgba(0, 0, 0, 0.1);
+      pointer-events: none;
+      overflow-y: hidden; /* Disable vertical scrolling */
+      overflow-x: hidden; /* Disable hor scrolling */
+      display: flex;
+      flex-direction: column; /* Display new messages at the bottom */
+    }

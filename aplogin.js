@@ -111,6 +111,7 @@ var connected = false;
 function closeMenus(){
     document.getElementById("login-container").style.display = "none";
     document.getElementById("puzzleDIV").style.display = "block";
+    window.dispatchEvent(new Event("resize"));
 }
 
 function connectToServer(firsttime = true) {
@@ -134,12 +135,11 @@ function connectToServer(firsttime = true) {
             document.getElementById('loginbutton').value  = "Failed: "+error;
             document.getElementById('loginbutton').style.backgroundColor = "red";
         });
-
     // Disconnect from the server when unloading window.
     window.addEventListener("beforeunload", () => {
-        window.saveProgress(false);
         client.disconnect();
     });
+
 }
 
 const receiveditemsListener = (items, index) => {
@@ -155,12 +155,16 @@ const connectedListener = (packet) => {
     window.apseed = packet.slot_data.seed_name;
     window.slot = packet.slot;
 
-    if(packet.slot_data.ap_world_version){
-        console.log("This apworld version should work", packet.slot_data.ap_world_version)
+    let apworld = packet.slot_data.ap_world_version
+    if(!apworld || ["0.0.0", "0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.1.0", "0.1.1"].includes(apworld)){
+        if(!localStorage.getItem("referredTo011")){
+            alert("You are using an older apworld, you will be forwarded to the backup version. You will only see this message once.")
+            localStorage.setItem("referredTo011", true);
+        }
+        window.location.href = "/index011.html";
+        return;
     }else{
-        alert("You are using an older apworld. This version might still work. If it doesn't, try jigsaw-ap-002.netlify.app. Save file lost (placement of pieces) for this seed ("+window.apseed+"_"+window.slot+"), please see pins in the discord channel.")
-        // window.location.href = "jigsaw-ap-002.netlify.app";
-        // return;
+        console.log("This apworld version should work", packet.slot_data.ap_world_version)
     }
 
     connected = true;
@@ -314,14 +318,14 @@ function cleanLog() {
 }
 
 var classaddcolor = [
-    "rgba(6, 217, 217, 0.2)",
-    "rgba(168, 147, 228, 0.2)",
-    "rgba(98, 122, 198, 0.2)",
-    "rgba(255, 223, 0, 0.2)",
-    "rgba(211, 113, 102, 0.2)",
-    "rgba(255, 172, 28, 0.2)",
-    "rgba(155, 89, 182, 0.2)",
-    "rgba(128, 255, 128, 0.2)"]
+    "rgba(6, 217, 217, 1)",
+    "rgba(168, 147, 228, 1)",
+    "rgba(98, 122, 198, 1)",
+    "rgba(255, 223, 0, 1)",
+    "rgba(211, 113, 102, 1)",
+    "rgba(255, 172, 28, 1)",
+    "rgba(155, 89, 182, 1)",
+    "rgba(128, 255, 128, 1)"]
 var classaddtext = ["...", "!!", "!", "!!!", "@#!", "!?!", "@!!", "?!@"]
 var classadddesc = ["Item class: normal", 
     "Item class: progression", 
@@ -332,10 +336,10 @@ var classadddesc = ["Item class: normal",
     "Item class: useful, trap", 
     "progression, useful, trap"]
 var classothercolors = [
-    "rgba(100, 149, 237, 0.5)",
-    "rgba(0, 255, 127, 0.5)",
-    "rgba(238, 0, 238, 0.5)",
-    "rgba(250, 250, 210, 0.5)"
+    "rgba(100, 149, 237, 1)",
+    "rgba(0, 255, 127, 1)",
+    "rgba(238, 0, 238, 1)",
+    "rgba(250, 250, 210, 1)"
 ]
 
 function adjustColorBrightness(color, amount) {
@@ -374,10 +378,7 @@ function adjustColorBrightness(color, amount) {
 }
 
 function jsonListener(text, nodes) {
-    const colors = ["#ffd", "#aa9", "886", "#553", "#220", "#725", "#990", "#a31", "#342"];
-    const currentColor = colors[window.currentColorIndex];
-
-    const adjustColor = (currentColor === "#220" || currentColor === "#553" || currentColor === "#342") ? 0.3 : -0.3;
+    const adjustColor = 0.5;
 
     // Plaintext to console, because why not?
     const messageElement = document.createElement("div");
@@ -428,7 +429,7 @@ function jsonListener(text, nodes) {
 
             // no special coloring needed
             case "text":
-                nodeElement.style.color = adjustColorBrightness("rgba(126,126,126,0.2)", adjustColor);
+                nodeElement.style.color = adjustColorBrightness("rgba(126,126,126,1)", adjustColor);
             default:
                 break;
         }
