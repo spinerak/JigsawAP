@@ -29,22 +29,7 @@
           <input type="submit" value="Solo (same seed every time)" id="solobutton" class="login-submit">
       </div>
 
-      <label for="showTextClient" class="login-label" style="margin-top: 10px">
-        <input type="checkbox" id="showTextClient" name="showTextClient" class="login-input" style="display: inline-block; width: auto;"> Show on-screen text client
-      </label>
-      <script>
-        document.addEventListener('DOMContentLoaded', (event) => {
-          const showTextClientCheckbox = document.getElementById('showTextClient');
-          const showTextClientStatus = localStorage.getItem('showTextClient');
-          if (showTextClientStatus === 'true') {
-            showTextClientCheckbox.checked = true;
-          }
 
-          showTextClientCheckbox.addEventListener('change', () => {
-            localStorage.setItem('showTextClient', showTextClientCheckbox.checked);
-          });
-        });
-      </script>
   </div>
 
 </div>

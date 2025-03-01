@@ -1,5 +1,6 @@
 "use strict";
 
+var downsize_to_fit = 0.85;
 
 var puzzle, autoStart;
 
@@ -781,7 +782,7 @@ class Puzzle {
         /* dimensions of container */
         this.contWidth = parseFloat(styl.width);
         this.contHeight = parseFloat(styl.height);
-        console.log(this.contWidth, this.contHeight)
+        
     }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -959,14 +960,14 @@ class Puzzle {
 
         // this.gameCtx.scale(3,3)
         
-        this.gameCtx.drawImage(this.srcImage, 0, 0, this.gameWidth, this.gameHeight); //safe
+        this.gameCtx.drawImage(this.srcImage, 0, 0, this.gameWidth * downsize_to_fit, this.gameHeight * downsize_to_fit); //safe
 
         this.gameCanvas.classList.add("gameCanvas");
         this.gameCanvas.style.zIndex = 500;
 
         /* scale pieces */
-        this.scalex = 0.85 * this.gameWidth / this.nx;    // average width of pieces
-        this.scaley = 0.85 * this.gameHeight / this.ny;   // average height of pieces
+        this.scalex = downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces
+        this.scaley = downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
         
 
         this.pieces.forEach(row => {
@@ -1126,7 +1127,7 @@ window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue
         // remember dimensions of container before resize
         puzzle.getContainerSize();
         if (state == 15 || state > 60) { // resize initial or final picture
-            fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+            fitImage(tmpImage, puzzle.contWidth * downsize_to_fit, puzzle.contHeight * downsize_to_fit);
         }
         else if (state >= 25) { // resize pieces
             
@@ -1280,7 +1281,7 @@ window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue
         case 40: //remove ununlocked pieces
             puzzle.polyPieces.forEach(pp => {
                 if (pp.pieces.length === 1 && !unlocked_pieces.includes(pp.pieces[0].index)) {
-                    pp.moveTo(-10000, -10000, true);
+                    pp.moveTo(-100 * puzzle.contWidth, -100 * puzzle.contHeight, true);
                 }
             });
             puzzle.evaluateZIndex();
@@ -1303,7 +1304,7 @@ window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue
                     const reader = new FileReader();
                     reader.onload = () => {
                         const lines = reader.result.split('\n');
-                        loadInSave(lines);
+                        loadProgress(lines);
                     };
                     reader.readAsText(file);
                 }
@@ -1320,7 +1321,7 @@ window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue
                 const savedProgress = localStorage.getItem(`prog${window.apseed}_${window.slot}`);
                 if (savedProgress) {
                     const lines = savedProgress.split('\n');
-                    loadInSave(lines);
+                    loadProgress(lines);
                 }
             }
         
@@ -1384,37 +1385,59 @@ window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue
                 case "move":
                     const event2_x = event.position.x * window.scaleFactor;
                     const event2_y = event.position.y * window.scaleFactor;
-                    moving.pp.moveTo(event2_x - moving.xMouseInit + moving.ppXInit,
-                        event2_y - moving.yMouseInit + moving.ppYInit);
+                    let to_x = event2_x - moving.xMouseInit + moving.ppXInit;
+                    let to_y = event2_y - moving.yMouseInit + moving.ppYInit;
+                    to_x = mmin(
+                        mmax(
+                            to_x, 
+                            - (moving.pp.nx-1) * puzzle.scalex
+                        ),
+                        puzzle.contWidth - puzzle.scalex
+                    );
+                    to_y = mmin(
+                        mmax(
+                            to_y, 
+                            - (moving.pp.ny-1) * puzzle.scaley
+                        ),
+                        puzzle.contHeight - puzzle.scaley
+                    );
+
+                    
+                    moving.pp.moveTo(to_x, to_y);
+                    // console.log(
+                    //     to_x, to_y,
+                    //     puzzle.scalex, puzzle.scaley, window.scaleFactor,
+                    //     puzzle.contWidth, puzzle.contHeight
+                    // )
                     break;
                 case "leave":
-                // check if moved polypiece is close to a matching other polypiece
-                // check repeatedly since polypieces moved by merging may come close to other polypieces
-                let doneSomething;
-                do {
-                    doneSomething = false;
-                    for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
-                        let pp = puzzle.polyPieces[k];
-                        if (pp == moving.pp) continue; // don't match with myself
-                        if (moving.pp.ifNear(pp)) { // a match !
-                            // compare polypieces sizes to move smallest one
-                            if (pp.pieces.length > moving.pp.pieces.length) {
-                                pp.merge(moving.pp);
-                                moving.pp = pp; // memorize piece to follow
-                            } else {
-                                moving.pp.merge(pp);
+                    // check if moved polypiece is close to a matching other polypiece
+                    // check repeatedly since polypieces moved by merging may come close to other polypieces
+                    let doneSomething;
+                    do {
+                        doneSomething = false;
+                        for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
+                            let pp = puzzle.polyPieces[k];
+                            if (pp == moving.pp) continue; // don't match with myself
+                            if (moving.pp.ifNear(pp)) { // a match !
+                                // compare polypieces sizes to move smallest one
+                                if (pp.pieces.length > moving.pp.pieces.length) {
+                                    pp.merge(moving.pp);
+                                    moving.pp = pp; // memorize piece to follow
+                                } else {
+                                    moving.pp.merge(pp);
+                                }
+                                doneSomething = true;
+                                break;
                             }
-                            doneSomething = true;
-                            break;
-                        }
-                    } // for k
+                        } // for k
 
-                } while (doneSomething);
-                // not at its right place
-                puzzle.evaluateZIndex();
-                state = 50;
-                // if (puzzle.polyPieces.length == 1) state = 60; // won!
-                return;
+                    } while (doneSomething);
+                    // not at its right place
+                    puzzle.evaluateZIndex();
+                    state = 50;
+                    // if (puzzle.polyPieces.length == 1) state = 60; // won!
+                    return;
             } // switch (event.event)
 
             break;
@@ -1454,7 +1477,7 @@ window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue
 } // scope for animate
 //-----------------------------------------------------------------------------
 
-function loadInSave(save){
+function loadProgress(save){
     let first_line = save.shift();
 
     const savedProgress = localStorage.getItem(`prog${window.apseed}_${window.slot}`);
@@ -1480,21 +1503,20 @@ function loadInSave(save){
 
         const pp1 = findPolyPieceUsingPuzzlePiece(pieceIndices[0]);
         if (pp1) {
-        for (let i = 1; i < pieceIndices.length; i++) {
-            const ppNext = findPolyPieceUsingPuzzlePiece(pieceIndices[i]);
-            if (ppNext) {
-                pp1.merge(ppNext);
+            for (let i = 1; i < pieceIndices.length; i++) {
+                const ppNext = findPolyPieceUsingPuzzlePiece(pieceIndices[i]);
+                if (ppNext) {
+                    pp1.merge(ppNext);
+                }
             }
-        }
-        
+            
 
-        if(x < -9999 && unlocked_pieces.includes(pieceIndices[0])){
-            x = alea(0, 0.05*puzzle.gameWidth);
-            y = alea(0, 0.05*puzzle.gameHeight);
-        }
-        if(x > -9999){
-            pp1.moveTo(x, y);
-        }
+            if(x < -10 * puzzle.contWidth && unlocked_pieces.includes(pieceIndices[0])){
+                x = alea(0, 0.05*puzzle.gameWidth);
+                y = alea(0, 0.05*puzzle.gameHeight);
+            }else{
+                pp1.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
+            }
         }
     
     });
@@ -1553,14 +1575,14 @@ let menu = (function () {
     window.currentColorIndex = localStorage.getItem("backgroundColorIndex") || 0;
 
     document.getElementById("m10b").addEventListener("click", () => {
-    const forPuzzleElement = document.getElementById("forPuzzle");
-    window.currentColorIndex = (window.currentColorIndex + 1) % colors.length;
-    console.log(window.currentColorIndex);
-    forPuzzleElement.style.backgroundColor = colors[window.currentColorIndex];
-    localStorage.setItem("backgroundColorIndex", window.currentColorIndex);
+        const forPuzzleElement = document.getElementById("forPuzzle");
+        window.currentColorIndex = (window.currentColorIndex + 1) % colors.length;
+        console.log(window.currentColorIndex);
+        forPuzzleElement.style.backgroundColor = colors[window.currentColorIndex];
+        localStorage.setItem("backgroundColorIndex", window.currentColorIndex);
 
-    const jsonList = [{ type: "text", text: "Example text with new background" }];
-    window.jsonListener("", jsonList);
+        const jsonList = [{ type: "text", text: "Example text with new background" }];
+        window.jsonListener("", jsonList);
     });
 
     // Set the initial background color from localStorage if available
@@ -1663,7 +1685,7 @@ function saveProgress(save_as_file){
     if(window.gameplayStarted){
         let text = `${numberOfMerges}\n`;
         for (let pp of puzzle.polyPieces) {
-            text += `${pp.x},${pp.y}|`;
+            text += `${pp.x / puzzle.contWidth},${pp.y / puzzle.contHeight}|`;
             for (let p of pp.pieces) {
                 text += `${p.index},`;
             }

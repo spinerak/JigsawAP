@@ -119,9 +119,9 @@ function connectToServer(firsttime = true) {
     client.items.on("itemsReceived", receiveditemsListener);
     client.socket.on("connected", connectedListener);
     client.socket.on("disconnected", disconnectedListener);
-    if(document.getElementById("showTextClient").checked){
-        client.messages.on("message", jsonListener);
-    }
+    
+    client.messages.on("message", jsonListener);
+    
     client
     .login(connectionInfo.hostport, connectionInfo.name, connectionInfo.game, {password: connectionInfo.password})
         .then(() => {
@@ -446,4 +446,4 @@ function jsonListener(text, nodes) {
 }
 window.jsonListener = jsonListener;
 
-console.log("0.1.1")
+console.log("0.2.0")
