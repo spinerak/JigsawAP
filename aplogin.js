@@ -80,6 +80,8 @@ function pressed_solo(){
 
     apstatus = "Playing solo";
     document.getElementById("m6").innerText = apstatus;
+
+    document.getElementById("n1").style.display = "none";
 }
 
 var connectionInfo = null;
@@ -108,6 +110,11 @@ var client = null;
 var apstatus = "?";
 var connected = false;
 
+function getAPClient(){
+    return client;
+}
+window.getAPClient = getAPClient;
+
 function closeMenus(){
     document.getElementById("login-container").style.display = "none";
     document.getElementById("puzzleDIV").style.display = "block";
@@ -135,11 +142,6 @@ function connectToServer(firsttime = true) {
             document.getElementById('loginbutton').value  = "Failed: "+error;
             document.getElementById('loginbutton').style.backgroundColor = "red";
         });
-    // Disconnect from the server when unloading window.
-    window.addEventListener("beforeunload", () => {
-        client.disconnect();
-    });
-
 }
 
 const receiveditemsListener = (items, index) => {
@@ -173,6 +175,11 @@ const connectedListener = (packet) => {
 
     console.log("Connected packet:",packet);
     window.set_puzzle_dim(packet.slot_data.nx, packet.slot_data.ny);
+    window.load_save_from_datastorage = packet.slot_data.use_data_storage_for_save === 1;
+    
+    if(window.load_save_from_datastorage){
+        document.getElementById("m8").style.display = "none";
+    }
 
     puzzlePieceOrder = packet.slot_data.piece_order;
 
@@ -280,14 +287,14 @@ function playNewMergeSound() {
 }
 window.playNewMergeSound = playNewMergeSound;
 function playNewGameSound() {
-    // const soundSources = ["Sounds/b1.mp3", "Sounds/b2.mp3"];
-    // const randomSound = soundSources[Math.floor(Math.random() * soundSources.length)];
-    // const newItemSound = new Audio(randomSound);
+    const soundSources = ["Sounds/b1.mp3", "Sounds/b2.mp3"];
+    const randomSound = soundSources[Math.floor(Math.random() * soundSources.length)];
+    const newItemSound = new Audio(randomSound);
 
-    // newItemSound.play().catch(function(error) {
-    //     // Handle the error here (e.g., log it or show a warning message)
-    //     console.log("Could not play sound because user hasn't interacted with the website yet");
-    // });
+    newItemSound.play().catch(function(error) {
+        // Handle the error here (e.g., log it or show a warning message)
+        console.log("Could not play sound because user hasn't interacted with the website yet");
+    });
 }
 window.playNewGameSound = playNewGameSound;
 
