@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Jigsaw puzzle</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./zstyle020.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 </head>
@@ -15,6 +15,7 @@
   <div class="login-form">
       <!-- Title with Yacht Dice - Login -->
       <h2 class="login-heading">Jigsaw - Login</h2>
+      <h3 class="login-heading" style="text-align: center; color: #5f5; font-size: 1.2em;">Older backup version (0.2.0)</h3>
 
       <br>
       <div>
@@ -26,7 +27,7 @@
           <label for="name" class="login-label">Password</label>
           <input type="password" id="password" name="password" class="login-input" value="" placeholder="Leave blank if no password">
           <input type="submit" value="Login" id="loginbutton" class="login-submit">
-          <input type="submit" value="Solo (same seed every time, no save)" id="solobutton" class="login-submit">
+          <input type="submit" value="Solo (same seed every time)" id="solobutton" class="login-submit">
       </div>
 
 
@@ -55,10 +56,10 @@
       </select></li>
       
     <li id="m4" style="background-color: green;">Start!</li>
-    
+    <li id="m8">Start & manual load</li>
     <li id="m5">Credits</li>
     <li id="m6" style="background-color: #555;">AP: not connected</li>
-    
+    <li id="m7">Manual save</li>
      
     <li id="m9a"></li> <!-- number of merges -->
     <li id="m9"></li> <!-- logic1 -->
@@ -79,8 +80,8 @@
 
 <!-- partial -->
 
-  <script type="module" src="./aplogin.js"></script>
-  <script  src="./script.js"></script>
+  <script type="module" src="./zaplogin020.js"></script>
+  <script  src="./zscript020.js"></script>
 
 </body>
 </html>

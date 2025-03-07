@@ -5,7 +5,9 @@ function getUrlParameter(name) {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 };
 
-document.getElementById('hostport').value = parseInt(getUrlParameter('hostport')) || localStorage.getItem("hostport") || "archipelago.gg:38281";
+
+document.getElementById('hostport').value = getUrlParameter('hostport') || localStorage.getItem("hostport") || "archipelago.gg:38281";
+
 document.getElementById('name').value = getUrlParameter('name') || localStorage.getItem("name") || 'Player1';
 
 document.getElementById("loginbutton").addEventListener("click", pressed_login);
@@ -19,9 +21,9 @@ function pressed_login(){
     login();
 }
 
-let play_solo = false;
+window.play_solo = false;
 function pressed_solo(){
-    play_solo = true;
+    window.play_solo = true;
     
     window.possible_merges = [0, 0, 0, 0, 0, 0, 1, 3, 5, 5, 5, 6, 8, 9, 11, 13, 15, 16, 16, 18, 19, 20, 21, 22, 23, 24]
 
@@ -108,7 +110,7 @@ import {
 } from "https://unpkg.com/archipelago.js/dist/index.js";
 var client = null;
 var apstatus = "?";
-var connected = false;
+window.is_connected = false;
 
 function getAPClient(){
     return client;
@@ -126,6 +128,7 @@ function connectToServer(firsttime = true) {
     client.items.on("itemsReceived", receiveditemsListener);
     client.socket.on("connected", connectedListener);
     client.socket.on("disconnected", disconnectedListener);
+    client.socket.on("bounced", bouncedListener);
     
     client.messages.on("message", jsonListener);
     
@@ -142,6 +145,8 @@ function connectToServer(firsttime = true) {
             document.getElementById('loginbutton').value  = "Failed: "+error;
             document.getElementById('loginbutton').style.backgroundColor = "red";
         });
+
+
 }
 
 const receiveditemsListener = (items, index) => {
@@ -165,42 +170,89 @@ const connectedListener = (packet) => {
         }
         window.location.href = "/index011.html";
         return;
-    }else{
+    }
+    if(["0.0.6", "0.2.0"].includes(apworld)){
+        if(!localStorage.getItem("referredTo020")){
+            alert("You are using an older apworld, you will be forwarded to the backup version. You will only see this message once.")
+            localStorage.setItem("referredTo020", true);
+        }
+        window.location.href = "/index020.html";
+        return;
+    }
+    else{
         console.log("This apworld version should work", packet.slot_data.ap_world_version)
     }
 
-    connected = true;
     document.getElementById("m6").innerText = apstatus;
     
 
     console.log("Connected packet:",packet);
     window.set_puzzle_dim(packet.slot_data.nx, packet.slot_data.ny);
-    window.load_save_from_datastorage = packet.slot_data.use_data_storage_for_save === 1;
     
-    if(window.load_save_from_datastorage){
-        document.getElementById("m8").style.display = "none";
-    }
-
     puzzlePieceOrder = packet.slot_data.piece_order;
 
     window.possible_merges = packet.slot_data.possible_merges;
     window.actual_possible_merges = packet.slot_data.actual_possible_merges;
     console.log("Set merges possibilities")
 
-    let imagePath = "color-icon2.png";
+    let imagePath = "landscape.jpeg";
     if(packet.slot_data.orientation < 1){
-        imagePath = "https://images.pexels.com/photos/1658967/pexels-photo-1658967.jpeg";
-    }
-    if(packet.slot_data.orientation > 1){
-        imagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
-    }
+        imagePath = "portrait.jpg";   
+    }else if (packet.slot_data.orientation == 1){
+        imagePath = "color-icon2.png"
+    }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
+        let ind = packet.slot_data.which_image;
+        let images = [
+            "https://images.squarespace-cdn.com/content/v1/606d159a953867291018f801/1619987265163-9XILMVT3TK4HZ5X6538M/VH_01_1080pjpg.jpg",
+            "https://w0.peakpx.com/wallpaper/130/204/HD-wallpaper-pokemon-emerald-starters-awesome-cool-fun-sweet.jpg",
+            "https://images2.alphacoders.com/519/thumb-1920-519206.jpg",
+            "https://images5.alphacoders.com/137/thumb-1920-1374411.jpg",
+            "https://www.psu.com/wp/wp-content/uploads/2020/09/Minecraft-PS4-Wallpapers-16.jpg",
+            "https://www.4p.de/wp-content/uploads/sites/13/2025/02/super-mario-64.jpg",
+            "https://images5.alphacoders.com/511/511693.jpg",
+            "https://www.gamewallpapers.com/wallpapers_slechte_compressie/wallpaper_kingdom_hearts_2_01_1680x1050.jpg",
+            "https://wallpapers.com/images/hd/sonic-2-hd-dpqf4ipxbokd3qn0.jpg",
+            "https://images7.alphacoders.com/987/987600.png",
+            "https://images6.alphacoders.com/121/1217724.jpg",
+            "https://steamuserimages-a.akamaihd.net/ugc/789735406717992934/98AFDA51F2AE8FE4CD992CC0D9DD97FDF8705BF0/",
+            "https://pbs.twimg.com/media/GIusyQTXsAAOxcp?format=jpg&name=4096x4096",
+            "https://images.alphacoders.com/662/thumb-1920-662393.jpg",
+            "https://i0.wp.com/www.the-pixels.com/wp-content/uploads/2019/11/The-Legend-of-Zelda-Links-Awakening.png?fit=1920,1080&ssl=1",
+            "https://i.imgur.com/bWkEzlW.png"
+        ]
 
-    window.setImagePath(imagePath);
+        function checkImage(url, callback) {
+            let img = new Image();
+            img.onload = () => callback(true);  // Image loaded successfully
+            img.onerror = () => callback(false); // Image failed to load
+            img.src = url;
+        }
+
+        console.log(packet.slot_data.which_image)
+                
+        checkImage(images[ind-1], (isValid) => {
+            if (isValid) {
+                imagePath = images[ind-1];
+                console.log("DONE!")
+            } else {
+                console.log("Image is a dead link.");
+            }
+            window.setImagePath(imagePath);
+        });
+    }
+    if(getUrlParameter("go") == "LS"){
+        window.LoginStart = true;
+    }
+    window.is_connected = true;
+
 };
 
+const bouncedListener = (packet) => {
+    window.move_piece_bounced(packet.data[0], packet.data[1], packet.data[2]);
+}
+
 const disconnectedListener = (packet) => {
-    connected = false;
-    window.saveProgress(false);
+    window.is_connected = false;
     apstatus = "AP: Disconnected. Progress saved, please refresh.";
     document.getElementById("m6").innerText = apstatus;
     menu.open();
@@ -248,7 +300,7 @@ function openItems(items){
                 let piece = puzzlePieceOrder.shift();
                 // console.log("Unlocking piece", piece);
                 if (piece !== undefined) {
-                    window.unlockPiece(piece);
+                    window.unlockPiece(piece, c == number_of_pieces - 1);
                     itemUnlocked = true;
                 }
             }
@@ -260,7 +312,7 @@ function openItems(items){
 }
 
 function playNewItemSound() {
-    if(!window.gameplayStarted && !play_solo){
+    if(!window.gameplayStarted && !window.play_solo){
         return;
     }
     const soundSources = ["Sounds/p1.mp3", "Sounds/p2.mp3", "Sounds/p3.mp3", "Sounds/p4.mp3"];
@@ -300,7 +352,7 @@ window.playNewGameSound = playNewGameSound;
 
 function sendCheck(numberOfMerges){
     console.log(numberOfMerges);
-    if(connected){
+    if(window.is_connected){
         client.check(234782000 + numberOfMerges);
     }
 }
@@ -453,4 +505,9 @@ function jsonListener(text, nodes) {
 }
 window.jsonListener = jsonListener;
 
-console.log("0.2.0")
+
+if(getUrlParameter("go") == "LS"){
+    pressed_login();
+}
+
+console.log("0.3.0")
