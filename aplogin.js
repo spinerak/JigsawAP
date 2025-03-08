@@ -1,3 +1,23 @@
+let images = [
+    "https://images.squarespace-cdn.com/content/v1/606d159a953867291018f801/1619987265163-9XILMVT3TK4HZ5X6538M/VH_01_1080pjpg.jpg",
+    "https://w0.peakpx.com/wallpaper/130/204/HD-wallpaper-pokemon-emerald-starters-awesome-cool-fun-sweet.jpg",
+    "https://images2.alphacoders.com/519/thumb-1920-519206.jpg",
+    "https://images5.alphacoders.com/137/thumb-1920-1374411.jpg",
+    "https://www.psu.com/wp/wp-content/uploads/2020/09/Minecraft-PS4-Wallpapers-16.jpg",
+    "https://www.4p.de/wp-content/uploads/sites/13/2025/02/super-mario-64.jpg",
+    "https://images5.alphacoders.com/511/511693.jpg",
+    "https://www.gamewallpapers.com/wallpapers_slechte_compressie/wallpaper_kingdom_hearts_2_01_1680x1050.jpg",
+    "https://wallpapers.com/images/hd/sonic-2-hd-dpqf4ipxbokd3qn0.jpg",
+    "https://images7.alphacoders.com/987/987600.png",
+    "https://images6.alphacoders.com/121/1217724.jpg",
+    "https://steamuserimages-a.akamaihd.net/ugc/789735406717992934/98AFDA51F2AE8FE4CD992CC0D9DD97FDF8705BF0/",
+    "https://pbs.twimg.com/media/GIusyQTXsAAOxcp?format=jpg&name=4096x4096",
+    "https://images.alphacoders.com/662/thumb-1920-662393.jpg",
+    "https://i0.wp.com/www.the-pixels.com/wp-content/uploads/2019/11/The-Legend-of-Zelda-Links-Awakening.png?fit=1920,1080&ssl=1",
+    "https://i.imgur.com/bWkEzlW.png"
+]
+window.set_ap_image = false;
+
 function getUrlParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
@@ -25,56 +45,58 @@ window.play_solo = false;
 function pressed_solo(){
     window.play_solo = true;
     
-    window.possible_merges = [0, 0, 0, 0, 0, 0, 1, 3, 5, 5, 5, 6, 8, 9, 11, 13, 15, 16, 16, 18, 19, 20, 21, 22, 23, 24]
+    window.possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 
-    window.actual_possible_merges = [0, 0, 0, 0, 0, 0, 1, 3, 5, 5, 5, 6, 8, 9, 11, 13, 15, 16, 16, 18, 19, 20, 21, 22, 23, 24]
+    window.actual_possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 
 
     closeMenus();
 
-    window.set_puzzle_dim(5, 5);
+    window.set_puzzle_dim(6, 4);
 
-
-    window.unlockPiece(13);
-    window.unlockPiece(1);
-    window.unlockPiece(17);
-    window.unlockPiece(25);
-    window.unlockPiece(15);
-    window.unlockPiece(8);
+    window.unlockPiece(23);
+    window.unlockPiece(2);
+    window.unlockPiece(12);
     window.unlockPiece(18);
+    window.unlockPiece(7);
+    window.unlockPiece(13);
+    window.unlockPiece(21);
+    window.updateMergesLabels();
 
     function sendCheck(numberOfMerges){
         let trans = {
-            1: 20,
-            2: 11,
-            3: 21,
-            4: 9,
-            5: 6,
-            6: 3,
-            7: 2,
-            8: 14,
-            9: 16,
-            10: 22,
-            11: 5,
-            12: 4,
-            13: 24,
-            14: 12,
-            15: 10,
-            16: 23,
-            17: 19,
-            18: 7
+            1: 3,
+            2: 20,
+            3: 5,
+            4: 4,
+            5: 22,
+            6: 14,
+            7: 11,
+            8: 10,
+            9: 8,
+            10: 15,
+            11: 9,
+            12: 16,
+            13: 17,
+            14: 24,
+            15: 19,
+            16: 1,
+            17: 6
         }
         let val = trans.hasOwnProperty(numberOfMerges) ? trans[numberOfMerges] : -1;
         if(val > 0){
             setTimeout(() => {
                 window.unlockPiece(val);
                 playNewItemSound();
+                window.updateMergesLabels();
             }, 300);
         }
     }
     function sendGoal(){
         console.log("You won!")
     }
+
+    setImage(images[Math.floor(Math.random()*images.length)]);
 
 
     window.sendCheck = sendCheck;
@@ -193,7 +215,6 @@ const connectedListener = (packet) => {
 
     window.possible_merges = packet.slot_data.possible_merges;
     window.actual_possible_merges = packet.slot_data.actual_possible_merges;
-    console.log("Set merges possibilities")
 
     let imagePath = "landscape.jpeg";
     if(packet.slot_data.orientation < 1){
@@ -202,43 +223,7 @@ const connectedListener = (packet) => {
         imagePath = "color-icon2.png"
     }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
         let ind = packet.slot_data.which_image;
-        let images = [
-            "https://images.squarespace-cdn.com/content/v1/606d159a953867291018f801/1619987265163-9XILMVT3TK4HZ5X6538M/VH_01_1080pjpg.jpg",
-            "https://w0.peakpx.com/wallpaper/130/204/HD-wallpaper-pokemon-emerald-starters-awesome-cool-fun-sweet.jpg",
-            "https://images2.alphacoders.com/519/thumb-1920-519206.jpg",
-            "https://images5.alphacoders.com/137/thumb-1920-1374411.jpg",
-            "https://www.psu.com/wp/wp-content/uploads/2020/09/Minecraft-PS4-Wallpapers-16.jpg",
-            "https://www.4p.de/wp-content/uploads/sites/13/2025/02/super-mario-64.jpg",
-            "https://images5.alphacoders.com/511/511693.jpg",
-            "https://www.gamewallpapers.com/wallpapers_slechte_compressie/wallpaper_kingdom_hearts_2_01_1680x1050.jpg",
-            "https://wallpapers.com/images/hd/sonic-2-hd-dpqf4ipxbokd3qn0.jpg",
-            "https://images7.alphacoders.com/987/987600.png",
-            "https://images6.alphacoders.com/121/1217724.jpg",
-            "https://steamuserimages-a.akamaihd.net/ugc/789735406717992934/98AFDA51F2AE8FE4CD992CC0D9DD97FDF8705BF0/",
-            "https://pbs.twimg.com/media/GIusyQTXsAAOxcp?format=jpg&name=4096x4096",
-            "https://images.alphacoders.com/662/thumb-1920-662393.jpg",
-            "https://i0.wp.com/www.the-pixels.com/wp-content/uploads/2019/11/The-Legend-of-Zelda-Links-Awakening.png?fit=1920,1080&ssl=1",
-            "https://i.imgur.com/bWkEzlW.png"
-        ]
-
-        function checkImage(url, callback) {
-            let img = new Image();
-            img.onload = () => callback(true);  // Image loaded successfully
-            img.onerror = () => callback(false); // Image failed to load
-            img.src = url;
-        }
-
-        console.log(packet.slot_data.which_image)
-                
-        checkImage(images[ind-1], (isValid) => {
-            if (isValid) {
-                imagePath = images[ind-1];
-                console.log("DONE!")
-            } else {
-                console.log("Image is a dead link.");
-            }
-            window.setImagePath(imagePath);
-        });
+        setImage(images[ind-1]);
     }
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
@@ -246,6 +231,25 @@ const connectedListener = (packet) => {
     window.is_connected = true;
 
 };
+
+function setImage(url){
+    function checkImage(url, callback) {
+        let img = new Image();
+        img.onload = () => callback(true);  // Image loaded successfully
+        img.onerror = () => callback(false); // Image failed to load
+        img.src = url;
+    }
+            
+    checkImage(url, (isValid) => {
+        if (isValid) {
+            imagePath = url;
+            console.log("Set image!")
+        } else {
+            console.log("Image is a dead link.");
+        }
+        window.setImagePath(imagePath);
+    });
+}
 
 const bouncedListener = (packet) => {
     window.move_piece_bounced(packet.data[0], packet.data[1], packet.data[2]);
@@ -285,15 +289,19 @@ function openItems(items){
         let number_of_pieces = 0;
         if(items[i] == "Puzzle Piece"){
             number_of_pieces = 1;
+            console.log("1", number_of_pieces)
         }
         if(items[i] == "2 Puzzle Pieces"){
             number_of_pieces = 2;
+            console.log("2", number_of_pieces)
         }
         if(items[i] == "5 Puzzle Pieces"){
             number_of_pieces = 5;
+            console.log("5", number_of_pieces)
         }
         if(items[i] == "10 Puzzle Pieces"){
             number_of_pieces = 10;
+            console.log("10", number_of_pieces)
         }
         for(let c = 0; c < number_of_pieces; c++){
             if(puzzlePieceOrder){
@@ -308,6 +316,7 @@ function openItems(items){
     }
     if(itemUnlocked){
         playNewItemSound();
+        window.updateMergesLabels();
     }
 }
 
@@ -351,7 +360,6 @@ function playNewGameSound() {
 window.playNewGameSound = playNewGameSound;
 
 function sendCheck(numberOfMerges){
-    console.log(numberOfMerges);
     if(window.is_connected){
         client.check(234782000 + numberOfMerges);
     }
