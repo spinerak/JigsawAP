@@ -1,7 +1,7 @@
 let images = [
     "https://images.squarespace-cdn.com/content/v1/606d159a953867291018f801/1619987265163-9XILMVT3TK4HZ5X6538M/VH_01_1080pjpg.jpg",
     "https://w0.peakpx.com/wallpaper/130/204/HD-wallpaper-pokemon-emerald-starters-awesome-cool-fun-sweet.jpg",
-    "https://images2.alphacoders.com/519/thumb-1920-519206.jpg",
+    "https://images5.alphacoders.com/333/thumb-1920-333152.jpg",
     "https://images5.alphacoders.com/137/thumb-1920-1374411.jpg",
     "https://www.psu.com/wp/wp-content/uploads/2020/09/Minecraft-PS4-Wallpapers-16.jpg",
     "https://www.4p.de/wp-content/uploads/sites/13/2025/02/super-mario-64.jpg",
@@ -216,15 +216,20 @@ const connectedListener = (packet) => {
     window.possible_merges = packet.slot_data.possible_merges;
     window.actual_possible_merges = packet.slot_data.actual_possible_merges;
 
+    console.log("here", packet.slot_data.orientation)
     let imagePath = "landscape.jpeg";
     if(packet.slot_data.orientation < 1){
-        imagePath = "portrait.jpg";   
+        imagePath = "portrait.jpg";
+        setImage(imagePath);  
     }else if (packet.slot_data.orientation == 1){
-        imagePath = "color-icon2.png"
+        imagePath = "square.jpg"
+        setImage(imagePath);
     }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
         let ind = packet.slot_data.which_image;
+        console.log("set iamge")
         setImage(images[ind-1]);
     }
+    window.loadInitialFile()
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
     }
@@ -248,6 +253,8 @@ function setImage(url){
             console.log("Image is a dead link.");
         }
         window.setImagePath(imagePath);
+        console.log("image path set")
+        window.choose_ap_image = true;
     });
 }
 
@@ -289,19 +296,21 @@ function openItems(items){
         let number_of_pieces = 0;
         if(items[i] == "Puzzle Piece"){
             number_of_pieces = 1;
-            console.log("1", number_of_pieces)
         }
         if(items[i] == "2 Puzzle Pieces"){
             number_of_pieces = 2;
-            console.log("2", number_of_pieces)
         }
         if(items[i] == "5 Puzzle Pieces"){
             number_of_pieces = 5;
-            console.log("5", number_of_pieces)
         }
         if(items[i] == "10 Puzzle Pieces"){
             number_of_pieces = 10;
-            console.log("10", number_of_pieces)
+        }
+        if(items[i] == "25 Puzzle Pieces"){
+            number_of_pieces = 25;
+        }
+        if(items[i] == "100 Puzzle Pieces"){
+            number_of_pieces = 100;
         }
         for(let c = 0; c < number_of_pieces; c++){
             if(puzzlePieceOrder){

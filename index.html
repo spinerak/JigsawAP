@@ -16,6 +16,24 @@
       <!-- Title with Yacht Dice - Login -->
       <h2 class="login-heading">Jigsaw - Login</h2>
 
+      <label id="rotate-device-label" class="login-label" style="display: none;text-align: center; color: rgb(255, 196, 0); font-size: 1.2em;"
+      >Consider rotating your device to landscape!</label>
+      
+      <script>
+        window.addEventListener('resize', function() {
+          var label = document.getElementById('rotate-device-label');
+          if (window.innerHeight > window.innerWidth) {
+        label.style.display = 'block';
+          } else {
+        label.style.display = 'none';
+          }
+        });
+        // Initial check
+        if (window.innerHeight > window.innerWidth) {
+          document.getElementById('rotate-device-label').style.display = 'block';
+        }
+      </script>
+
       <br>
       <div>
           <label for="hostport" class="login-label">Host and Port</label>
