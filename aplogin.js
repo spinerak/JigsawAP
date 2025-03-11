@@ -34,6 +34,43 @@ document.getElementById("loginbutton").addEventListener("click", pressed_login);
 
 document.getElementById("solobutton").addEventListener("click", pressed_solo);
 
+document.getElementById("optionsbutton").addEventListener("click", () => {
+    window.open('options.html', '_blank');
+});
+
+function isMobile() {
+    return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        } else if (document.documentElement.webkitRequestFullscreen) { 
+            document.documentElement.webkitRequestFullscreen(); // Safari
+        }
+        document.getElementById('m11').textContent = 'Exit full screen';
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) { 
+            document.webkitExitFullscreen(); // Safari
+        }
+        document.getElementById('m11').textContent = 'Go full screen';
+    }
+}
+
+// Show the fullscreen button only on mobile devices
+window.addEventListener('load', () => {
+    if (isMobile()) {
+        document.getElementById('m11').style.display = 'block';
+        setTimeout(() => window.scrollTo(0, 1), 100); // URL bar hiding trick
+    }
+});
+
+document.getElementById("m11").addEventListener("click", toggleFullscreen);
+
+
 function pressed_login(){
     localStorage.setItem("hostport", document.getElementById("hostport").value);
     localStorage.setItem("name", document.getElementById("name").value);
@@ -527,4 +564,4 @@ if(getUrlParameter("go") == "LS"){
     pressed_login();
 }
 
-console.log("0.3.0")
+console.log("0.3.0b")

@@ -1,6 +1,15 @@
 "use strict";
 
-var downsize_to_fit = 0.85;
+var downsize_to_fit = localStorage.getItem("option_downsize");
+if (downsize_to_fit === null) downsize_to_fit = 0.85;
+
+var bevel_size = localStorage.getItem("option_bevel");
+if (bevel_size === null) bevel_size = 0.2;
+
+var shadow_size = localStorage.getItem("option_shadow");
+if (shadow_size === null) shadow_size = 0.5;
+
+
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
 
@@ -645,10 +654,11 @@ class PolyPiece {
         // make shadow
         this.polypiece_ctx.fillStyle = 'none';
         this.polypiece_ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        this.polypiece_ctx.shadowBlur = 32 * window.scaleFactor * puzzle.scalex / 2700;
-        this.polypiece_ctx.shadowOffsetX = 32 * window.scaleFactor * puzzle.scalex / 2700;
-        this.polypiece_ctx.shadowOffsetY = 32 * window.scaleFactor * puzzle.scalex / 2700;
+        this.polypiece_ctx.shadowBlur = 32 * window.scaleFactor * puzzle.scalex / 2700 * shadow_size * 2;
+        this.polypiece_ctx.shadowOffsetX = 32 * window.scaleFactor * puzzle.scalex / 2700 * shadow_size * 2;
+        this.polypiece_ctx.shadowOffsetY = 32 * window.scaleFactor * puzzle.scalex / 2700 * shadow_size * 2;
         
+            
         this.polypiece_ctx.fill(this.path);
         this.polypiece_ctx.shadowColor = 'rgba(0, 0, 0, 0)'; // stop shadow effect
 
@@ -691,6 +701,7 @@ class PolyPiece {
             this.polypiece_ctx.translate(-puzzle.embossThickness, puzzle.embossThickness);
             this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
             this.polypiece_ctx.stroke(path);
+            
             this.polypiece_ctx.restore();
         });
 
@@ -702,8 +713,8 @@ class PolyPiece {
         // sets the left, top properties (relative to container) of this.canvas
         this.x = x;
         this.y = y;
-        this.polypiece_canvas.style.left = x + 'px';
-        this.polypiece_canvas.style.top = y + 'px';
+        this.polypiece_canvas.style.left = (this.x * puzzle.scale_zoom) + 'px';
+        this.polypiece_canvas.style.top = (this.y * puzzle.scale_zoom) + 'px';
     } //
 
 } // class PolyPiece
@@ -779,6 +790,8 @@ class Puzzle {
         function handleLeave() {
             events.push({ event: 'leave' }); //
         }
+
+        this.scale_zoom = 1;
 
     } // Puzzle
 
@@ -981,16 +994,15 @@ class Puzzle {
         this.gameCanvas.height = this.gameHeight;
         this.gameCtx = this.gameCanvas.getContext("2d");
 
-        // this.gameCtx.scale(3,3)
-        
         this.gameCtx.drawImage(this.srcImage, 0, 0, this.gameWidth * downsize_to_fit, this.gameHeight * downsize_to_fit); //safe
+        
 
         this.gameCanvas.classList.add("gameCanvas");
         this.gameCanvas.style.zIndex = 500;
 
         /* scale pieces */
-        this.scalex = downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces
-        this.scaley = downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
+        this.scalex = downsize_to_fit * this.gameWidth / this.nx * puzzle.scale_zoom;    // average width of pieces, add zoom here
+        this.scaley = downsize_to_fit * this.gameHeight / this.ny * puzzle.scale_zoom;   // average height of pieces
         
 
         this.pieces.forEach(row => {
@@ -1007,7 +1019,7 @@ class Puzzle {
 
         /* computes the thickness used for emboss effect */
         // from 2 (scalex = 0)  to 5 (scalex = 200), not more than 5
-        this.embossThickness = mmin(2 + this.scalex / 200 * (5 - 2), 5) * window.scaleFactor * 0.75;
+        this.embossThickness = mmin(2 + this.scalex / 200 * (5 - 2), 5) * window.scaleFactor * bevel_size;
 
 
 
@@ -1312,6 +1324,7 @@ let moving; // for information about moved piece
                 document.getElementById("m3").style.display = "none";
                 document.getElementById("m4").style.display = "none";
                 document.getElementById("m5").style.display = "none";
+                document.getElementById("m5a").style.display = "none";
                 document.getElementById("m10b").style.display = "none";
 
                 /* prepare puzzle */
@@ -1364,8 +1377,9 @@ let moving; // for information about moved piece
                 
                 if (event.event != "touch") return;
 
-                const event_x = event.position.x * window.scaleFactor;
-                const event_y = event.position.y * window.scaleFactor;
+                const event_x = event.position.x * window.scaleFactor / puzzle.scale_zoom;
+                const event_y = event.position.y * window.scaleFactor / puzzle.scale_zoom;
+                console.log(event_x, event_y)
 
                 moving = {
                     xMouseInit: event_x,
@@ -1400,8 +1414,8 @@ let moving; // for information about moved piece
                 
                 switch (event.event) {
                     case "move":
-                        const event2_x = event.position.x * window.scaleFactor;
-                        const event2_y = event.position.y * window.scaleFactor;
+                        const event2_x = event.position.x * window.scaleFactor / puzzle.scale_zoom;
+                        const event2_y = event.position.y * window.scaleFactor / puzzle.scale_zoom;
                         let to_x = event2_x - moving.xMouseInit + moving.ppXInit;
                         let to_y = event2_y - moving.yMouseInit + moving.ppYInit;
                         to_x = mmin(
@@ -1506,6 +1520,7 @@ let menu = (function () {
         document.getElementById("m3").style.display = "block"
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
+        document.getElementById("m5a").style.display = "block"
         
         document.getElementById("m10b").style.display = "block"
     }
@@ -1535,6 +1550,9 @@ let menu = (function () {
 
     document.getElementById("m5").addEventListener("click", () => {
     window.open('credits.html', '_blank');
+    });
+    document.getElementById("m5a").addEventListener("click", () => {
+    window.open('options.html', '_blank');
     });
 
     const colors = ["#ffd", "#aa9", "#886", "#553", "#220", "#725", "#990", "#a31", "#342"];
@@ -1617,9 +1635,27 @@ window.addEventListener("resize", event => {
     events.push({ event: "resize" });
 });
 
+
 // Add zoom functionality
-let scale = 1;
-const zoomSensitivity = 0.1;
+// window.addEventListener("wheel", event => {
+//     event.preventDefault();
+//     const zoomIn = event.deltaY < 0;
+//     const zoomOut = event.deltaY > 0;
+//     const mouseX = event.clientX;
+//     const mouseY = event.clientY;
+
+//     if (zoomIn) {
+//         console.log("Zooming in at", mouseX, mouseY);
+//         puzzle.scale_zoom *= 1.01;
+//     } else if (zoomOut) {
+//         console.log("Zooming out at", mouseX, mouseY);
+//         puzzle.scale_zoom *= 0.99;
+//     }
+//     events.push({ event: "resize" });
+// });
+
+
+
 
 
 
