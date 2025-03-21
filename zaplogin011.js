@@ -103,7 +103,8 @@ function login() {
 // server stuff:
 import {
     Client
-} from "https://unpkg.com/archipelago.js/dist/index.js";
+} from "./archipelago.js";
+
 var client = null;
 var apstatus = "?";
 var connected = false;

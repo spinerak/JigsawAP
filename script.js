@@ -1,7 +1,8 @@
 "use strict";
 
-var downsize_to_fit = localStorage.getItem("option_downsize");
-if (downsize_to_fit === null) downsize_to_fit = 0.85;
+// var downsize_to_fit = localStorage.getItem("option_downsize");
+// if (downsize_to_fit === null) downsize_to_fit = 0.85;
+var downsize_to_fit = 0.85;
 
 var bevel_size = localStorage.getItem("option_bevel");
 if (bevel_size === null) bevel_size = 0.2;
@@ -381,6 +382,7 @@ class PolyPiece {
     */
 
     merge(otherPoly, notifyMerge = true) {
+        console.log("Call merge", this.pieces[0].index, otherPoly.pieces[0].index);
         if(this == otherPoly){
             return;
         }
@@ -399,6 +401,7 @@ class PolyPiece {
             console.log("The canvas is not a child of the container??", this, otherPoly);
         }
 
+        console.log("start for", otherPoly.pieces.length)
         for (let k = 0; k < otherPoly.pieces.length; ++k) {
 
             if (window.gameplayStarted && notifyMerge) {
@@ -415,6 +418,7 @@ class PolyPiece {
                 }, 1000);
                 
                 change_savedata_datastorage(max, min, true);
+                console.log("done merge", max, "to", min);
             }
 
             this.pieces.push(otherPoly.pieces[k]);
@@ -424,6 +428,7 @@ class PolyPiece {
             if (otherPoly.pieces[k].ky < this.pckymin) this.pckymin = otherPoly.pieces[k].ky;
             if (otherPoly.pieces[k].ky + 1 > this.pckymax) this.pckymax = otherPoly.pieces[k].ky + 1;
         } // for k
+        console.log("end for")
 
         // sort the pieces by increasing kx, ky
 
@@ -452,9 +457,12 @@ class PolyPiece {
     } // merge
 
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
-    ifNear(otherPoly) {
+    ifNear(otherPoly, ignoreCloseness = false) {
 
-        let p1, p2;
+        if(this.pieces.length > otherPoly.pieces.length){
+            return otherPoly.ifNear(this, ignoreCloseness)
+        }
+
         let puzzle = this.puzzle;
 
         // coordinates of origin of full picture for this PolyPieces
@@ -463,21 +471,28 @@ class PolyPiece {
 
         let ppx = otherPoly.x - puzzle.scalex * otherPoly.pckxmin;
         let ppy = otherPoly.y - puzzle.scaley * otherPoly.pckymin;
-        if (mhypot(x - ppx, y - ppy) >= puzzle.dConnect) return false; // not close enough
 
-        // this and otherPoly are in good relative position, have they a common side ?
-        for (let k = this.pieces.length - 1; k >= 0; --k) {
-            p1 = this.pieces[k];
-            for (let ko = otherPoly.pieces.length - 1; ko >= 0; --ko) {
-            p2 = otherPoly.pieces[ko];
-            if (p1.kx == p2.kx && mabs(p1.ky - p2.ky) == 1) return true; // true neighbors found
-            if (p1.ky == p2.ky && mabs(p1.kx - p2.kx) == 1) return true; // true neighbors found
-            } // for k
-        } // for k
+        if(!ignoreCloseness){
+            if (mhypot(x - ppx, y - ppy) >= puzzle.dConnect) return false; // not close enough
+        }
+        return true;
 
-        // nothing matches
+        // // this and otherPoly are in good relative position, have they a common side ?
+        // let neighs = [];
+        // for (let k = this.pieces.length - 1; k >= 0; --k) {
+        //     let p1 = this.pieces[k].index;
+        //     if (p1 <= apnx * (apny - 1)) neighs.push(p1 + apnx)
+        //     if (p1 > apnx) neighs.push(p1 - apnx)
+        //     if (p1 % apnx != 1) neighs.push(p1 - 1)
+        //     if (p1 % apnx != 0) neighs.push(p1 + 1)
+        // }
+        // if (neighs.some(neigh => otherPoly.pieces.some(piece => piece.index === neigh))) {
+        //     return true;
+        // }
 
-        return false;
+        // // nothing matches
+
+        // return false;
 
     } // ifNear
 
@@ -654,9 +669,9 @@ class PolyPiece {
         // make shadow
         this.polypiece_ctx.fillStyle = 'none';
         this.polypiece_ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        this.polypiece_ctx.shadowBlur = 32 * window.scaleFactor * puzzle.scalex / 2700 * shadow_size * 2;
-        this.polypiece_ctx.shadowOffsetX = 32 * window.scaleFactor * puzzle.scalex / 2700 * shadow_size * 2;
-        this.polypiece_ctx.shadowOffsetY = 32 * window.scaleFactor * puzzle.scalex / 2700 * shadow_size * 2;
+        this.polypiece_ctx.shadowBlur = 32 * window.scaleFactor * window.additional_zoom * puzzle.scalex / 2700 * shadow_size * 2;
+        this.polypiece_ctx.shadowOffsetX = 32 * window.scaleFactor * window.additional_zoom * puzzle.scalex / 2700 * shadow_size * 2;
+        this.polypiece_ctx.shadowOffsetY = 32 * window.scaleFactor * window.additional_zoom * puzzle.scalex / 2700 * shadow_size * 2;
         
             
         this.polypiece_ctx.fill(this.path);
@@ -676,20 +691,20 @@ class PolyPiece {
             pp.bs.drawPath(path, shiftx, shifty, true);
             pp.ls.drawPath(path, shiftx, shifty, true);
             path.closePath();
+            
 
             this.polypiece_ctx.clip(path);
             // do not copy from negative coordinates, does not work for all browsers
             const srcx = pp.kx ? ((pp.kx - 0.5) * puzzle.scalex) : 0;
             const srcy = pp.ky ? ((pp.ky - 0.5) * puzzle.scaley) : 0;
 
-            const destx = (pp.kx ? 0 : puzzle.scalex / 2) + (pp.kx - this.pckxmin) * puzzle.scalex;
-            const desty = (pp.ky ? 0 : puzzle.scaley / 2) + (pp.ky - this.pckymin) * puzzle.scaley;
+            const destx = ( (pp.kx ? 0 : 1 / 2) + (pp.kx - this.pckxmin) ) * puzzle.scalex;
+            const desty = ( (pp.ky ? 0 : 1 / 2) + (pp.ky - this.pckymin) ) * puzzle.scaley;
 
             let w = 2 * puzzle.scalex;
             let h = 2 * puzzle.scaley;
-            if (srcx + w > puzzle.gameCanvas.width) w = puzzle.gameCanvas.width - srcx;
-            if (srcy + h > puzzle.gameCanvas.height) h = puzzle.gameCanvas.height - srcy;
-
+            // if (srcx + w > puzzle.gameCanvas.width) w = puzzle.gameCanvas.width - srcx;
+            // if (srcy + h > puzzle.gameCanvas.height) h = puzzle.gameCanvas.height - srcy;
 
             this.polypiece_ctx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, destx, desty, w, h);
 
@@ -713,8 +728,8 @@ class PolyPiece {
         // sets the left, top properties (relative to container) of this.canvas
         this.x = x;
         this.y = y;
-        this.polypiece_canvas.style.left = (this.x * puzzle.scale_zoom) + 'px';
-        this.polypiece_canvas.style.top = (this.y * puzzle.scale_zoom) + 'px';
+        this.polypiece_canvas.style.left = (this.x) + 'px';
+        this.polypiece_canvas.style.top = (this.y) + 'px';
     } //
 
 } // class PolyPiece
@@ -748,6 +763,7 @@ class Puzzle {
         this.container.addEventListener("mousedown", event => {
             event.preventDefault();
             events.push({ event: 'touch', position: this.relativeMouseCoordinates(event) });
+            // console.log(event);
         });
         this.container.addEventListener("touchstart", event => {
             event.preventDefault();
@@ -768,6 +784,7 @@ class Puzzle {
             event.preventDefault();
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
+            
             events.push({ event: 'move', position: this.relativeMouseCoordinates(event) })
         });
         this.container.addEventListener("touchmove", event => {
@@ -776,6 +793,7 @@ class Puzzle {
             let ev = event.touches[0];
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
+            // console.log("touch", event.offsetX, event.offsetY, event)
             events.push({ event: 'move', position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
@@ -833,6 +851,7 @@ class Puzzle {
             console.log("coordinates and groups do not have the same length?", coordinates, groups)
         }
 
+        console.log("started making pieces")
         for (let key in coordinates) {
             let pieces_in_group = [];
             for (let ind of groups[key]) {
@@ -845,9 +864,11 @@ class Puzzle {
             ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
             this.polyPieces.push(ppp);
         }
+        console.log("done making pieces")
 
         this.evaluateZIndex();
 
+        console.log("done evaluate z index")
     } // Puzzle.create
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -994,15 +1015,21 @@ class Puzzle {
         this.gameCanvas.height = this.gameHeight;
         this.gameCtx = this.gameCanvas.getContext("2d");
 
-        this.gameCtx.drawImage(this.srcImage, 0, 0, this.gameWidth * downsize_to_fit, this.gameHeight * downsize_to_fit); //safe
+        this.gameCtx.drawImage(
+            this.srcImage, 
+            0, 
+            0, 
+            this.gameWidth * downsize_to_fit, 
+            this.gameHeight * downsize_to_fit
+        ); //safe
         
 
         this.gameCanvas.classList.add("gameCanvas");
-        this.gameCanvas.style.zIndex = 500;
+        this.gameCanvas.style.zIndex = 100000002;
 
         /* scale pieces */
-        this.scalex = downsize_to_fit * this.gameWidth / this.nx * puzzle.scale_zoom;    // average width of pieces, add zoom here
-        this.scaley = downsize_to_fit * this.gameHeight / this.ny * puzzle.scale_zoom;   // average height of pieces
+        this.scalex = downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
+        this.scaley = downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
         
 
         this.pieces.forEach(row => {
@@ -1015,11 +1042,11 @@ class Puzzle {
 
         /* computes the distance below which two pieces connect
             depends on the actual size of pieces, with lower limit */
-        this.dConnect = mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor;
+        this.dConnect = mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
 
         /* computes the thickness used for emboss effect */
         // from 2 (scalex = 0)  to 5 (scalex = 200), not more than 5
-        this.embossThickness = mmin(2 + this.scalex / 200 * (5 - 2), 5) * window.scaleFactor * bevel_size;
+        this.embossThickness = mmin(2 + this.scalex / 200 * (5 - 2), 5) * window.scaleFactor * window.additional_zoom * bevel_size;
 
 
 
@@ -1033,31 +1060,22 @@ class Puzzle {
         returns coordinates relative to container, even if page is scrolled or zoommed */
 
     const br = this.container.getBoundingClientRect();
+    
     return {
-        x: event.clientX - br.x,
-        y: event.clientY - br.y
+        x: (event.clientX - br.x) * window.scaleFactor / window.additional_zoom,
+        y: (event.clientY - br.y) * window.scaleFactor / window.additional_zoom,
+        p_x: (event.clientX - br.x) / br.width,
+        p_y: (event.clientY - br.y) / br.height
     };
     } // Puzzle.relativeMouseCoordinates
 
     
 
     evaluateZIndex() {
-
-    /* re-evaluates order of polypieces in puzzle after a merge
-        the polypieces must be in decreasing order of size(number of pieces),
-        preserving the previous order as much as possible
-    */
-    for (let k = this.polyPieces.length - 1; k > 0; --k) {
-        if (this.polyPieces[k].pieces.length > this.polyPieces[k - 1].pieces.length) {
-        // swap pieces if not in right order
-        [this.polyPieces[k], this.polyPieces[k - 1]] = [this.polyPieces[k - 1], this.polyPieces[k]];
-        }
-    }
-    // re-assign zIndex
-    this.polyPieces.forEach((pp, k) => {
-        pp.polypiece_canvas.style.zIndex = k + 10;
-    });
-    this.zIndexSup = this.polyPieces.length + 10; // higher than 'normal' zIndices
+        // re-assign zIndex
+        this.polyPieces.forEach((pp, k) => {
+            pp.polypiece_canvas.style.zIndex = -pp.pieces.length * 10000 + k + 100000000;
+        });
     } // Puzzle.evaluateZIndex
 } // class Puzzle
 //-----------------------------------------------------------------------------
@@ -1083,6 +1101,7 @@ let loadFile;
         reader.addEventListener('load', () => {
             puzzle.srcImage.src = reader.result;
             document.getElementById("previm").src = puzzle.srcImage.src;
+            imagePath = puzzle.srcImage.src;
         });
         reader.readAsDataURL(this.files[0]);
     } // getFile
@@ -1094,11 +1113,10 @@ let loadFile;
     } // loadFile
 } //  // scope for loadFile
 
-var imagePath = "landscape.jpeg";
+var imagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
 function loadInitialFile() {
     puzzle.srcImage.src = imagePath;
     document.getElementById("previm").src = imagePath;
-    console.log("IMAGE LOADED", imagePath)
     window.set_ap_image = true;
 }
 
@@ -1147,7 +1165,7 @@ function loadImageFunction(){
     puzzle.container.innerHTML = ""; // forget contents
     tmpImage = document.createElement("img");
     tmpImage.src = puzzle.srcImage.src;
-    console.log(puzzle.srcImage.src)
+    // console.log(puzzle.srcImage.src)
     puzzle.getContainerSize();
     fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
     
@@ -1185,9 +1203,8 @@ let moving; // for information about moved piece
 
                 puzzle.puzzle_scale();
                 
-                puzzle.polyPieces.forEach(pp => {
-                    console.log("resize move")
-                    
+                console.log("start scaling pieces")
+                puzzle.polyPieces.forEach(pp => {                    
                     let nx = pp.x;
                     let ny = pp.y;
 
@@ -1198,6 +1215,7 @@ let moving; // for information about moved piece
                     pp.moveTo(pp.x * x_change, pp.y * y_change);
 
                 }); // puzzle.polypieces.forEach
+                console.log("end scaling pieces")
             }
             
             puzzle.prevWidth = puzzle.contWidth;
@@ -1232,6 +1250,9 @@ let moving; // for information about moved piece
                 
                 if ((event && event.event == "nbpieces") || (window.LoginStart && window.is_connected)) {
                     state = 17;
+                    if(window.is_connected){
+                        imagePath = localStorage.setItem(`image_${window.apseed}_${window.slot}`, imagePath);
+                    }
                 }
                 
                 return;
@@ -1261,20 +1282,38 @@ let moving; // for information about moved piece
                             do_action(key, value, false);
                         });
 
+                        keys.push(`JIG_PROG_${window.slot}_M`);
+                        keys.push(`JIG_PROG_${window.slot}_O`);
+
                         let results = (await client.storage.fetch(keys, true))
                         console.log("results", results)
                         
                         for (let [key, value] of Object.entries(results)) {
-                            if(value){
-                                let pp_index = parseInt(key.split("_")[3]);
-                                window.save_file[pp_index] = value
+                            let spl = key.split("_")[3];
+                            if (spl === "O"){
+                                if(value){
+                                    if(Math.abs(parseFloat(value) - puzzle.srcImage.width / puzzle.srcImage.height) > 0.05){
+                                        alert("Warning, you are not using the same aspect ratio as before. Pieces might not be in the correct relative position. You can refresh now to discard this login (if you do ignore this error next time).")
+                                    }
+                                }
+                                change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
+                            }else{
+                                if(value){
+                                    if (spl === "M") {
+                                        numberOfMergesAtStart = parseInt(value);
+                                    }else {
+                                        let pp_index = parseInt(spl);
+                                        window.save_file[pp_index] = value;
+                                    }
+                                }
                             }
+                            
                         }
                     }
 
-                    unlocked_pieces.forEach(index => {
+                    unlocked_pieces.sort(() => Math.random() - 0.5).forEach(index => {
                         if (window.save_file[index] === undefined) {
-                            window.save_file[index] = [(index * 4321.1234) % 0.05, (index * 1234,4321) % 0.05];
+                            window.save_file[index] = [(index * 4321.1234) % 0.10, (index * 1234.4321) % 0.5];
                         }
                     });
                     
@@ -1312,7 +1351,7 @@ let moving; // for information about moved piece
 
                 for(let key of all_indices){
                     groups[key] = [key];
-                    coordinates[key] = [2,2];
+                    coordinates[key] = [3,3];
                 }
 
                 console.log("STARTING GAME")
@@ -1337,11 +1376,15 @@ let moving; // for information about moved piece
                 }
 
                 puzzle_ini = true;
+
+                console.log("done getting backlog of actions")
                 
                 puzzle.puzzle_scale();
+                console.log("done scaling puzzle")
                 puzzle.polyPieces.forEach(pp => {
                     pp.polypiece_drawImage();
                 }); // puzzle.polypieces.forEach
+                console.log("drawn each piece")
                 puzzle.gameCanvas.style.top = puzzle.offsy + "px";
                 puzzle.gameCanvas.style.left = puzzle.offsx + "px";
                 puzzle.gameCanvas.style.display = "block";
@@ -1377,9 +1420,9 @@ let moving; // for information about moved piece
                 
                 if (event.event != "touch") return;
 
-                const event_x = event.position.x * window.scaleFactor / puzzle.scale_zoom;
-                const event_y = event.position.y * window.scaleFactor / puzzle.scale_zoom;
-                console.log(event_x, event_y)
+                const event_x = event.position.x;
+                const event_y = event.position.y;
+                // console.log(event_x, event_y)
 
                 moving = {
                     xMouseInit: event_x,
@@ -1387,7 +1430,8 @@ let moving; // for information about moved piece
                 }
 
                 /* evaluates if contact inside a PolyPiece, by decreasing z-index */
-                for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
+                puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+                for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
                     let pp = puzzle.polyPieces[k];
                     if (pp.polypiece_ctx.isPointInPath(pp.path, event_x - pp.x, event_y - pp.y)) {
                         moving.pp = pp;
@@ -1396,12 +1440,37 @@ let moving; // for information about moved piece
                         // move selected piece to top of polypieces stack
                         puzzle.polyPieces.splice(k, 1);
                         puzzle.polyPieces.push(pp);
-                        pp.polypiece_canvas.style.zIndex = puzzle.zIndexSup; // to foreground
+                        pp.polypiece_canvas.style.zIndex = 100000001; // to foreground
+                        
                         state = 55;
                         return;
                     }
-
                 } // for k
+
+                if(zoomP == 1) return;
+
+                startDragX = event.position.p_x;
+                startDragY = event.position.p_y;
+
+                state = 52;
+                break;
+
+            case 52:  //dragging screen
+                if (!event) return;
+                switch (event.event) {
+                    case "move":
+                        // console.log(event.position.p_x, startDragX, zoomX)
+                        zoomX += (event.position.p_x - startDragX) * zoomP;
+                        zoomY += (event.position.p_y - startDragY) * zoomP;
+                        startDragX = event.position.p_x - (event.position.p_x - startDragX);
+                        startDragY = event.position.p_y - (event.position.p_y - startDragY);
+                        updateZoomAndPosition();
+                        
+                        break;
+                    case "leave":
+                        state = 50;
+                        break;
+                }
                 break;
 
             case 55:  // moving piece
@@ -1414,8 +1483,9 @@ let moving; // for information about moved piece
                 
                 switch (event.event) {
                     case "move":
-                        const event2_x = event.position.x * window.scaleFactor / puzzle.scale_zoom;
-                        const event2_y = event.position.y * window.scaleFactor / puzzle.scale_zoom;
+                        const event2_x = event.position.x;
+                        const event2_y = event.position.y;
+                        // console.log(event2_x, event2_y)
                         let to_x = event2_x - moving.xMouseInit + moving.ppXInit;
                         let to_y = event2_y - moving.yMouseInit + moving.ppYInit;
                         to_x = mmin(
@@ -1444,31 +1514,26 @@ let moving; // for information about moved piece
                     case "leave":
                         // check if moved polypiece is close to a matching other polypiece
                         // check repeatedly since polypieces moved by merging may come close to other polypieces
-                        let doneSomething;
-                        let doneSomethingAtAll = false;
-                        do {
-                            doneSomething = false;
-                            for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
-                                let pp = puzzle.polyPieces[k];
-                                if (pp == moving.pp) continue; // don't match with myself
-                                if (moving.pp.ifNear(pp)) { // a match !
-                                    // compare polypieces sizes to move smallest one
-                                    if (pp.pieces.length > moving.pp.pieces.length) {
-                                        pp.merge(moving.pp);
-                                        moving.pp = pp; // memorize piece to follow
-                                    } else {
-                                        moving.pp.merge(pp);
-                                    }
-                                    doneSomething = true;
-                                    doneSomethingAtAll = true;
-                                    break;
-                                }
-                            } // for k
 
-                        } while (doneSomething);
+                        for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
+                            // console.log(k)
+                            let pp = puzzle.polyPieces[k];
+                            if (pp == moving.pp) continue; // don't match with myself
+                            if (moving.pp.ifNear(pp)) { // a match !
+                                // compare polypieces sizes to move smallest one
+                                console.log("found something!")
+                                if (pp.pieces.length > moving.pp.pieces.length || (pp.pieces.length == moving.pp.pieces.length && pp.pieces[0].index > moving.pp.pieces[0].index)) {
+                                    pp.merge(moving.pp);
+                                    moving.pp = pp; // memorize piece to follow
+                                } else {
+                                    moving.pp.merge(pp);
+                                }
+                                console.log("done merging")
+                            }
+                        } // for k
 
                         if (window.gameplayStarted && !window.play_solo) {
-                            console.log("move piece", moving.pp.pieces[0].index, moving.pp);                        
+                            // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                        
                             change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
                             
                             const currentPieceIndex = moving.pp.pieces[0].index;
@@ -1480,6 +1545,8 @@ let moving; // for information about moved piece
                                 }
                             }, 1000);
                         }
+
+                        
 
                         moving = null;
 
@@ -1629,30 +1696,85 @@ let menu = (function () {
 
 menu.open();
 
+let resizeTimeout = null
 window.addEventListener("resize", event => {
-    // do not accumulate resize events in events queue - keep only current one
-    if (events.length && events[events.length - 1].event == "resize") return;;
-    events.push({ event: "resize" });
+    if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+    }
+    resizeTimeout = setTimeout(() => {
+        events.push({ event: "resize" });
+        resizeTimeout = null;
+    }, 300);
+});
+
+const forPuzzle = document.getElementById('forPuzzle');
+window.additional_zoom = 1;
+
+function updateZoomAndPosition() {
+    const puzzle = document.getElementById('forPuzzle');
+
+    // Extract scale and translate values using regex
+    const scaleFactor = 1 / parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
+    
+    // Build the new transform string
+    const newTransform = `
+        translate(calc(-50% * (1 - ${scaleFactor})), -50%)
+        scale(${scaleFactor})
+
+        translate(${zoomX*100}%, ${zoomY*100}%)
+        scale(${zoomP})
+    `;
+
+    // Apply the new transform
+    puzzle.style.transform = newTransform;
+    window.additional_zoom = zoomP;
+}
+
+let startDragX = 0;
+let startDragY = 0;
+let zoomX = 0;
+let zoomY = 0;
+let zoomP = 1;
+forPuzzle.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    if (event.deltaY < 0) {
+        const co = puzzle.relativeMouseCoordinates(event);
+        zoomX = -co.p_x + 1/2;
+        zoomY = -co.p_y + 1/2;
+        zoomP = 2;
+        updateZoomAndPosition();
+    } else {
+        zoomX = 0;
+        zoomY = 0;
+        zoomP = 1;
+        updateZoomAndPosition();
+    }
+});
+
+let lastTap = 0;
+forPuzzle.addEventListener('touchend', (event) => {
+    console.log("HEYO")
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+    if (tapLength < 300 && tapLength > 0) {
+        event.preventDefault();
+        const co = puzzle.relativeMouseCoordinates(event.changedTouches[0]);
+        if (window.additional_zoom === 1) {
+            zoomX = -co.p_x + 1/2;
+            zoomY = -co.p_y + 1/2;
+            zoomP = 2;
+            updateZoomAndPosition();
+        } else {
+            zoomX = 0;
+            zoomY = 0;
+            zoomP = 1;
+            updateZoomAndPosition();
+        }
+    }
+    lastTap = currentTime;
 });
 
 
-// Add zoom functionality
-// window.addEventListener("wheel", event => {
-//     event.preventDefault();
-//     const zoomIn = event.deltaY < 0;
-//     const zoomOut = event.deltaY > 0;
-//     const mouseX = event.clientX;
-//     const mouseY = event.clientY;
-
-//     if (zoomIn) {
-//         console.log("Zooming in at", mouseX, mouseY);
-//         puzzle.scale_zoom *= 1.01;
-//     } else if (zoomOut) {
-//         console.log("Zooming out at", mouseX, mouseY);
-//         puzzle.scale_zoom *= 0.99;
-//     }
-//     events.push({ event: "resize" });
-// });
 
 
 
@@ -1719,19 +1841,28 @@ function newMerge(add = 1){
     if(add < 1){
         return;
     }
-    for(let i = 0; i<add; i++){
+    let newRecord = false;
+    for(let i = 0; i < add; i++){
         numberOfMerges += 1;
-        console.log("numberOfMerges:", numberOfMerges);
-        window.sendCheck(numberOfMerges);
-        if(numberOfMerges == apnx * apny - 1){
-            window.sendGoal();
+        
+        if(numberOfMerges > numberOfMergesAtStart){
+            window.sendCheck(numberOfMerges);
+            // console.log("Send check for", numberOfMerges)
+            if(numberOfMerges == apnx * apny - 1){
+                window.sendGoal();
+            }
+            newRecord = true;
         }
+    }
+    if(newRecord){
+        change_savedata_datastorage("M", numberOfMerges, true);
     }
     document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
     window.playNewMergeSound();
 }
 
 var numberOfMerges = 0;
+var numberOfMergesAtStart = 0;
 
 function setImagePath(l){
     imagePath = l;
@@ -1747,16 +1878,17 @@ function move_piece_bounced(pp_index, x, y){
 window.move_piece_bounced = move_piece_bounced;
 
 function change_savedata_datastorage(key, value, final) {
+    
     if(window.play_solo) return;
-
+    // console.log(key, value, final)
     if(final){
         const client = window.getAPClient();
-        console.log("setting", `JIG_PROG_${window.slot}_${key}`, "to", value)
+        // console.log("setting", `JIG_PROG_${window.slot}_${key}`, "to", value)
         client.storage.prepare(`JIG_PROG_${window.slot}_${key}`, 0).replace(value).commit();
     }else{
         const client = window.getAPClient();
         if (!window.bounceTimeout) {
-            console.log("sending bounce", [key, value[0], value[1]])
+            // console.log("sending bounce", [key, value[0], value[1]])
             client.bounce({"slots": [window.slot]}, [key, value[0], value[1]]);
             window.bounceTimeout = setTimeout(() => {
                 window.bounceTimeout = null;
@@ -1767,7 +1899,7 @@ function change_savedata_datastorage(key, value, final) {
 
 let pending_actions = []
 function do_action(key, value, bounce){
-    console.log("got response", key, value, bounce);
+    // console.log("got response", key, value, bounce);
     if(!window.save_loaded){
         if(!bounce){
             pending_actions.push([key, value]);
@@ -1787,7 +1919,7 @@ function do_action(key, value, bounce){
             const [x, y] = value;
             if (pp) {
                 if(!bounce || (bounce && !window.ignore_bounce_pieces.includes(pp_index))){
-                    console.log("moving because of action", key, value, bounce);
+                    // console.log("moving because of action", key, value, bounce);
                     pp.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
                 }
             }
@@ -1798,9 +1930,44 @@ function do_action(key, value, bounce){
             }
             const pp2 = findPolyPieceUsingPuzzlePiece(value);
             if(pp != pp2){
-                console.log("merging because of action", key, value, bounce)
-                pp.merge(pp2, false);
+                // console.log("merging because of action", key, value, bounce)
+                if (pp.pieces.length > pp2.pieces.length  || (pp.pieces.length == pp2.pieces.length && pp.pieces[0].index > pp2.pieces[0].index)) {
+                    pp.merge(pp2);
+                } else {
+                    pp2.merge(pp);
+                }
             }
         }
     }
 }
+
+
+window.debug = localStorage.getItem("debug") == "yes";
+
+document.addEventListener('keydown', function(event) {
+    if(!window.debug) return;
+    if (event.key === 'S' || event.key === 's') {
+        console.log("Let's go")
+        for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
+            for (let l = k - 1; l >= 0; --l) {
+                let pp1 = puzzle.polyPieces[k];
+                let pp2 = puzzle.polyPieces[l];
+                if (pp1 == pp2) continue; // don't match with myself
+                if (!unlocked_pieces.includes(pp1.pieces[0].index)) continue;
+                if (!unlocked_pieces.includes(pp2.pieces[0].index)) continue;
+                
+                if (pp1.ifNear(pp2, true)) { // a match !
+                    console.log("match found")
+                    // compare polypieces sizes to move smallest one
+                    if (pp1.pieces.length > pp2.pieces.length  || (pp1.pieces.length == pp2.pieces.length && pp1.pieces[0].index > pp2.pieces[0].index)) {
+                        pp1.merge(pp2);
+                    } else {
+                        pp2.merge(pp1);
+                    }
+                    console.log('merged')
+                    return;
+                }
+            }
+        } // for k
+    }
+});

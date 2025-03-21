@@ -79,11 +79,15 @@
     }
 
     #puzzleDIV {
+      width: 100vw;   /* 100% of the viewport width */
+      height: 100vh;  /* 100% of the viewport height */
       display: none;
+      overflow: hidden; /* Prevent scrolling or overflow */
+      position: relative; /* Ensures contained elements respect its boundaries */
     }
 
     :root {
-      --scale-factor: 2; /* Change this to 3, 4, etc., to adjust the size */
+      --scale-factor: 4; /* Change this to 3, 4, etc., to adjust the size */
     }
     
     #forPuzzle {
@@ -94,7 +98,11 @@
       max-width: calc(177.78vh * var(--scale-factor)); /* Maintain 16:9 aspect ratio */
       top: 50%;
       left: 0;
-      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%) scale(calc(1 / var(--scale-factor)));    
+      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%) 
+                  scale(calc(1 / var(--scale-factor)))
+
+                  translate(0%, 0%) /* for zoom */
+                  scale(1.0); /* for zoom */
       background-color: #ffffdd;
       overflow: hidden;
     }

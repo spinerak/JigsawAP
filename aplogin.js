@@ -14,7 +14,7 @@ let images = [
     "https://pbs.twimg.com/media/GIusyQTXsAAOxcp?format=jpg&name=4096x4096",
     "https://images.alphacoders.com/662/thumb-1920-662393.jpg",
     "https://i0.wp.com/www.the-pixels.com/wp-content/uploads/2019/11/The-Legend-of-Zelda-Links-Awakening.png?fit=1920,1080&ssl=1",
-    "https://i.imgur.com/bWkEzlW.png"
+    "https://i.postimg.cc/brpDKW61/bWkEzlW.png"
 ]
 window.set_ap_image = false;
 
@@ -166,7 +166,8 @@ function login() {
 // server stuff:
 import {
     Client
-} from "https://unpkg.com/archipelago.js/dist/index.js";
+} from "./archipelago.js";
+
 var client = null;
 var apstatus = "?";
 window.is_connected = false;
@@ -201,8 +202,16 @@ function connectToServer(firsttime = true) {
         })
         .catch((error) => {
             console.log("Failed to connect", error)
-            document.getElementById('loginbutton').value  = "Failed: "+error;
+            let errorMessage = "Failed: " + error;
+            
+            document.getElementById('loginbutton').value = errorMessage;
             document.getElementById('loginbutton').style.backgroundColor = "red";
+
+            document.getElementById('solobutton').value = "Common remedies: refresh room and check login info"
+            document.getElementById('solobutton').style.backgroundColor = "red";
+
+            document.getElementById('optionsbutton').value = "Please refresh this page to try again :)"
+            document.getElementById('optionsbutton').style.backgroundColor = "red";
         });
 
 
@@ -253,19 +262,29 @@ const connectedListener = (packet) => {
     window.possible_merges = packet.slot_data.possible_merges;
     window.actual_possible_merges = packet.slot_data.actual_possible_merges;
 
-    console.log("here", packet.slot_data.orientation)
-    let imagePath = "landscape.jpeg";
-    if(packet.slot_data.orientation < 1){
-        imagePath = "portrait.jpg";
-        setImage(imagePath);  
-    }else if (packet.slot_data.orientation == 1){
-        imagePath = "square.jpg"
+    let imagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
+
+    if(localStorage.getItem(`image_${window.apseed}_${window.slot}`)){
+        imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
         setImage(imagePath);
-    }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
-        let ind = packet.slot_data.which_image;
-        console.log("set iamge")
-        setImage(images[ind-1]);
+    } else {
+        if(packet.slot_data.orientation < 1){
+            imagePath = "https://images.pexels.com/photos/1658967/pexels-photo-1658967.jpeg";
+            setImage(imagePath);  
+        }else if (packet.slot_data.orientation == 1){
+            imagePath = "https://images.pexels.com/photos/3209471/pexels-photo-3209471.jpeg"
+            setImage(imagePath);
+        }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
+            let ind = packet.slot_data.which_image;
+            console.log("set iamge")
+            if(window.apseed == "58032389700599746566"){
+                setImage("https://i.postimg.cc/Jh97t1qt/upscalemedia-transformed.jpg")
+            }else{
+                setImage(images[ind-1]);
+            }
+        }
     }
+
     window.loadInitialFile()
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
@@ -564,4 +583,4 @@ if(getUrlParameter("go") == "LS"){
     pressed_login();
 }
 
-console.log("0.3.0b")
+console.log("0.3.0d")

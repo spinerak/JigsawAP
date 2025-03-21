@@ -61,11 +61,11 @@
         <span id="sliderValue2">0.5</span>
     </label>
 
-    <label>
+    <!-- <label>
         Fraction of screen filled with puzzle:
         <input type="range" id="sliderOption3" min="0.5" max="0.95" step="0.05">
         <span id="sliderValue3">0.85</span>
-    </label>
+    </label> -->
 
     <!-- <label>
         Free text:
@@ -80,7 +80,7 @@
         // const radioOptions = document.getElementsByName('radioOption');
         const sliderOption1 = document.getElementById('sliderOption1');
         const sliderOption2 = document.getElementById('sliderOption2');
-        const sliderOption3 = document.getElementById('sliderOption3');
+        // const sliderOption3 = document.getElementById('sliderOption3');
         const sliderValue1 = document.getElementById('sliderValue1');
         const sliderValue2 = document.getElementById('sliderValue2');
         const sliderValue3 = document.getElementById('sliderValue3');
@@ -94,10 +94,10 @@
             // radioOptions.forEach(radio => { radio.checked = radio.value === selectedRadio; });
             sliderOption1.value = localStorage.getItem('option_bevel') || 0.75;
             sliderOption2.value = localStorage.getItem('option_shadow') || 0.5;
-            sliderOption3.value = localStorage.getItem('option_downsize') || 0.85;
+            // sliderOption3.value = localStorage.getItem('option_downsize') || 0.85;
             sliderValue1.textContent = sliderOption1.value;
             sliderValue2.textContent = sliderOption2.value;
-            sliderValue3.textContent = sliderOption3.value;
+            // sliderValue3.textContent = sliderOption3.value;
             // textOption.value = localStorage.getItem('textOption') || '';
         }
 
@@ -107,7 +107,7 @@
             // localStorage.setItem('radioOption', selectedRadio);
             localStorage.setItem('option_bevel', sliderOption1.value);
             localStorage.setItem('option_shadow', sliderOption2.value);
-            localStorage.setItem('option_downsize', sliderOption3.value);
+            // localStorage.setItem('option_downsize', sliderOption3.value);
             // localStorage.setItem('textOption', textOption.value);
         }
 
@@ -129,10 +129,10 @@
             sliderValue2.textContent = sliderOption2.value;
             markUnsaved();
         });
-        sliderOption3.addEventListener('input', () => {
-            sliderValue3.textContent = sliderOption3.value;
-            markUnsaved();
-        });
+        // sliderOption3.addEventListener('input', () => {
+        //     sliderValue3.textContent = sliderOption3.value;
+        //     markUnsaved();
+        // });
         // textOption.addEventListener('input', markUnsaved);
         // saveButton.addEventListener('click', saveSettings);
 
@@ -143,10 +143,10 @@
             localStorage.setItem('options_to_default_1', 1);
             sliderOption1.value = 0.75;
             sliderOption2.value = 0.5;
-            sliderOption3.value = 0.85;
+            // sliderOption3.value = 0.85;
             sliderValue1.textContent = sliderOption1.value;
             sliderValue2.textContent = sliderOption2.value;
-            sliderValue3.textContent = sliderOption3.value;
+            // sliderValue3.textContent = sliderOption3.value;
             markUnsaved(false);
         }
     </script>
