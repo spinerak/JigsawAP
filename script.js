@@ -1121,6 +1121,7 @@ let loadFile;
 
     let elFile = document.createElement('input');
     elFile.setAttribute('type', 'file');
+    elFile.setAttribute('multiple', 'multiple');
     elFile.style.display = 'none';
     elFile.addEventListener("change", getFile);
 
@@ -1129,13 +1130,14 @@ let loadFile;
             //      returnLoadFile ({fail: 'no file'});
             return;
         }
-        let file = this.files[0];
+        
         let reader = new FileReader();
+        let randomIndex = Math.floor(Math.random() * this.files.length);
 
         reader.addEventListener('load', () => {
             setImagePath(reader.result);
         });
-        reader.readAsDataURL(this.files[0]);
+        reader.readAsDataURL(this.files[randomIndex]);
     } // getFile
 
     loadFile = function (ooptions) {
