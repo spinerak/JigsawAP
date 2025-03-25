@@ -1361,20 +1361,20 @@ let moving; // for information about moved piece
                         }
                     });
                     
-                    state = 18.5;
+                    state = 19;
                 }
             case 18: // wait for save file
                 return;
 
-            case 18.5:
-                console.log("waiting 10 seconds")
-                setTimeout(() => {
-                    state = 19;
-                }, 10000);
-                state = 18.7;
-                return;
-            case 18.7:
-                return;
+            // case 18.5:
+            //     console.log("waiting 10 seconds")
+            //     setTimeout(() => {
+            //         state = 19;
+            //     }, 10000);
+            //     state = 18.7;
+            //     return;
+            // case 18.7:
+            //     return;
 
 
 
