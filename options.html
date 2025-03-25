@@ -52,13 +52,13 @@
     <label>
         Border thickness of pieces:
         <input type="range" id="sliderOption1" min="0" max="2" step="0.05">
-        <span id="sliderValue1">0.2</span>
+        <span id="sliderValue1">0.1</span>
     </label>
 
     <label>
         Shadow thickness of pieces:
         <input type="range" id="sliderOption2" min="0" max="2" step="0.05">
-        <span id="sliderValue2">0.5</span>
+        <span id="sliderValue2">0</span>
     </label>
 
     <!-- <label>
@@ -83,17 +83,17 @@
         // const sliderOption3 = document.getElementById('sliderOption3');
         const sliderValue1 = document.getElementById('sliderValue1');
         const sliderValue2 = document.getElementById('sliderValue2');
-        const sliderValue3 = document.getElementById('sliderValue3');
+        // const sliderValue3 = document.getElementById('sliderValue3');
         // const textOption = document.getElementById('textOption');
         // const saveButton = document.getElementById('saveButton');
 
         function loadSettings() {
-            // checkboxOption1.checked = JSON.parse(localStorage.getItem('option_bevel')) ?? true;
-            // checkboxOption2.checked = JSON.parse(localStorage.getItem('option_shadow')) ?? true;
+            // checkboxOption1.checked = JSON.parse(localStorage.getItem('option_bevel_2')) ?? true;
+            // checkboxOption2.checked = JSON.parse(localStorage.getItem('option_shadow_2')) ?? true;
             // const selectedRadio = localStorage.getItem('radioOption') || 'option1';
             // radioOptions.forEach(radio => { radio.checked = radio.value === selectedRadio; });
-            sliderOption1.value = localStorage.getItem('option_bevel') || 0.75;
-            sliderOption2.value = localStorage.getItem('option_shadow') || 0.5;
+            sliderOption1.value = localStorage.getItem('option_bevel_2') || 0.1;
+            sliderOption2.value = localStorage.getItem('option_shadow_2') || 0;
             // sliderOption3.value = localStorage.getItem('option_downsize') || 0.85;
             sliderValue1.textContent = sliderOption1.value;
             sliderValue2.textContent = sliderOption2.value;
@@ -102,11 +102,11 @@
         }
 
         function saveSettings() {
-            // localStorage.setItem('option_shadow', checkboxOption2.checked);
+            // localStorage.setItem('option_shadow_2', checkboxOption2.checked);
             // const selectedRadio = [...radioOptions].find(radio => radio.checked)?.value;
             // localStorage.setItem('radioOption', selectedRadio);
-            localStorage.setItem('option_bevel', sliderOption1.value);
-            localStorage.setItem('option_shadow', sliderOption2.value);
+            localStorage.setItem('option_bevel_2', sliderOption1.value);
+            localStorage.setItem('option_shadow_2', sliderOption2.value);
             // localStorage.setItem('option_downsize', sliderOption3.value);
             // localStorage.setItem('textOption', textOption.value);
         }
@@ -137,18 +137,6 @@
         // saveButton.addEventListener('click', saveSettings);
 
         loadSettings();
-        
-
-        if(!localStorage.getItem('options_to_default_1')){
-            localStorage.setItem('options_to_default_1', 1);
-            sliderOption1.value = 0.75;
-            sliderOption2.value = 0.5;
-            // sliderOption3.value = 0.85;
-            sliderValue1.textContent = sliderOption1.value;
-            sliderValue2.textContent = sliderOption2.value;
-            // sliderValue3.textContent = sliderOption3.value;
-            markUnsaved(false);
-        }
     </script>
 </body>
 </html>

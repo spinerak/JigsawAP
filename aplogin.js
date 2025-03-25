@@ -1,21 +1,3 @@
-let images = [
-    "https://images.squarespace-cdn.com/content/v1/606d159a953867291018f801/1619987265163-9XILMVT3TK4HZ5X6538M/VH_01_1080pjpg.jpg",
-    "https://w0.peakpx.com/wallpaper/130/204/HD-wallpaper-pokemon-emerald-starters-awesome-cool-fun-sweet.jpg",
-    "https://images5.alphacoders.com/333/thumb-1920-333152.jpg",
-    "https://images5.alphacoders.com/137/thumb-1920-1374411.jpg",
-    "https://www.psu.com/wp/wp-content/uploads/2020/09/Minecraft-PS4-Wallpapers-16.jpg",
-    "https://www.4p.de/wp-content/uploads/sites/13/2025/02/super-mario-64.jpg",
-    "https://images5.alphacoders.com/511/511693.jpg",
-    "https://www.gamewallpapers.com/wallpapers_slechte_compressie/wallpaper_kingdom_hearts_2_01_1680x1050.jpg",
-    "https://wallpapers.com/images/hd/sonic-2-hd-dpqf4ipxbokd3qn0.jpg",
-    "https://images7.alphacoders.com/987/987600.png",
-    "https://images6.alphacoders.com/121/1217724.jpg",
-    "https://steamuserimages-a.akamaihd.net/ugc/789735406717992934/98AFDA51F2AE8FE4CD992CC0D9DD97FDF8705BF0/",
-    "https://pbs.twimg.com/media/GIusyQTXsAAOxcp?format=jpg&name=4096x4096",
-    "https://images.alphacoders.com/662/thumb-1920-662393.jpg",
-    "https://i0.wp.com/www.the-pixels.com/wp-content/uploads/2019/11/The-Legend-of-Zelda-Links-Awakening.png?fit=1920,1080&ssl=1",
-    "https://i.postimg.cc/brpDKW61/bWkEzlW.png"
-]
 window.set_ap_image = false;
 
 function getUrlParameter(name) {
@@ -132,8 +114,12 @@ function pressed_solo(){
     function sendGoal(){
         console.log("You won!")
     }
+    let ind = Math.floor(Math.random() * window.possibleImages.length);
+    let imagePath = window.possibleImages[ind]
+    document.getElementById("defaultImageIndex").selectedIndex = ind;
+    window.defaultImagePath = imagePath;
 
-    setImage(images[Math.floor(Math.random()*images.length)]);
+    setImage(imagePath);
 
 
     window.sendCheck = sendCheck;
@@ -264,34 +250,41 @@ const connectedListener = (packet) => {
 
     let imagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
 
+    if(packet.slot_data.orientation < 1){
+        imagePath = "https://images.pexels.com/photos/1658967/pexels-photo-1658967.jpeg";
+    }else if (packet.slot_data.orientation == 1){
+        imagePath = "https://images.pexels.com/photos/3209471/pexels-photo-3209471.jpeg"
+    }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
+        let ind = packet.slot_data.which_image;
+        imagePath = window.possibleImages[ind-1]
+        document.getElementById("defaultImageIndex").selectedIndex = ind - 1;
+    }
+    window.defaultImagePath = imagePath;
+
     if(localStorage.getItem(`image_${window.apseed}_${window.slot}`)){
         imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
-        setImage(imagePath);
-    } else {
-        if(packet.slot_data.orientation < 1){
-            imagePath = "https://images.pexels.com/photos/1658967/pexels-photo-1658967.jpeg";
-            setImage(imagePath);  
-        }else if (packet.slot_data.orientation == 1){
-            imagePath = "https://images.pexels.com/photos/3209471/pexels-photo-3209471.jpeg"
-            setImage(imagePath);
-        }else if(packet.slot_data.orientation > 1){  // landscape, choose a random one
-            let ind = packet.slot_data.which_image;
-            console.log("set iamge")
-            if(window.apseed == "58032389700599746566"){
-                setImage("https://i.postimg.cc/Jh97t1qt/upscalemedia-transformed.jpg")
-            }else{
-                setImage(images[ind-1]);
-            }
-        }
     }
 
-    window.loadInitialFile()
+    window.imagePath = imagePath;
+    setImage(imagePath);
+    
+    
+    
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
     }
     window.is_connected = true;
 
 };
+
+document.getElementById("defaultImageIndex").addEventListener("click", (event) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to parent elements
+});
+document.getElementById("defaultImageIndex").addEventListener("change", (event) => {
+    const selectedIndex = event.target.selectedIndex;
+    let imagePath = window.possibleImages[selectedIndex];
+    setImage(imagePath);
+});
 
 function setImage(url){
     function checkImage(url, callback) {
@@ -309,8 +302,9 @@ function setImage(url){
             console.log("Image is a dead link.");
         }
         window.setImagePath(imagePath);
-        console.log("image path set")
+        
         window.choose_ap_image = true;
+        window.set_ap_image = true;
     });
 }
 
@@ -583,4 +577,4 @@ if(getUrlParameter("go") == "LS"){
     pressed_login();
 }
 
-console.log("0.3.0d")
+console.log("0.3.0h")
