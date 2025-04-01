@@ -58,21 +58,6 @@
       height: auto;
     }
 
-    #log {
-      /* background-color: rgba(32, 32, 0, 0.5); */
-      bottom: 3vh;
-      left: 3vw;
-      width: 30vw;
-      height: 16vh;
-      font-size: max(1vw, 2vh);
-      color: rgba(0, 0, 0, 0.1);
-      /* pointer-events: none; */
-      overflow-x: hidden; /* Disable hor scrolling */
-      display: flex;
-      flex-direction: column; /* Display new messages at the bottom */
-      text-align: left;
-    }
-
 
 
     #m7, #m8, #m9, #m9a, #m10, #m11, #m13 {
@@ -104,7 +89,7 @@
 
                   translate(0%, 0%) /* for zoom */
                   scale(1.0); /* for zoom */
-      background-color: #ffffdd;
+      background-color: transparent;
       overflow: hidden;
     }
     
@@ -189,3 +174,114 @@
         color: #ffffff;
     }
 
+
+    #previm {
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain; /* Maintain natural aspect ratio */
+      user-select: none; /* Make it unselectable */
+      pointer-events: none; /* Ignore mouse events */
+    }
+
+    #draggable1 { 
+      display: inline-block; /* Ensure the element wraps around its content */
+      width: 300px; /* Adjust width to fit the image */
+      height: 200px; /* Adjust height to fit the image */
+      background: #444; 
+      position: absolute; 
+      top: 50px; 
+      left: 50px; 
+      border-radius: 8px; 
+      padding: 0; /* Remove extra padding */
+      cursor: grab; 
+      user-select: none; /* Prevent text selection */
+    }
+
+    #draggable2 { 
+      display: inline-block; /* Ensure the element wraps around its content */
+      width: 300px; /* Adjust width to fit the image */
+      height: 200px; /* Adjust height to fit the image */
+      background: #444; 
+      position: absolute; 
+      top: 50px; 
+      left: 50px; 
+      border-radius: 8px; 
+      padding: 0; /* Remove extra padding */
+      cursor: grab; 
+      user-select: none; /* Prevent text selection */
+    }
+
+    #taskbar1 { 
+        width: 50px; height: 30px; background: #444; color: #fff;
+        position: absolute; bottom: 50px; right: 10px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        z-index: 99999999;
+    }
+    #taskbar2 { 
+        width: 50px; height: 30px; background: #444; color: #fff;
+        position: absolute; bottom: 10px; right: 10px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        z-index: 99999999;
+    }
+    .controls { 
+        position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; 
+        align-items: center; /* Vertically center buttons */
+    }
+    .control-btn { 
+        width: 24px; height: 24px; border-radius: 50%; border: none; 
+        background: #1e1e1e; color: #fff; display: flex; 
+        align-items: center; justify-content: center; cursor: pointer;
+        font-weight: bold; font-size: 16px; line-height: 0; /* Center text better */
+    }
+    
+    .resizer {
+      position: absolute;
+      width: 10px; height: 10px;
+      background: transparent;
+    }
+    /* .resizer.right { right: 0; top: 0; height: 100%; cursor: ew-resize; }
+    .resizer.bottom { bottom: 0; left: 0; width: 100%; cursor: ns-resize; } */
+    .resizer.corner { 
+        right: 0; bottom: 0; width: 15px; height: 15px; 
+        cursor: nwse-resize; background: #888; border-radius: 3px;
+    }
+
+    #log {
+      /* background-color: rgba(32, 32, 0, 0.5); */
+      bottom: 3vh;
+      left: 3vw;
+      width: 100%;
+      height: calc(100% - 27px);    
+      font-size: max(1vw, 2vh);
+      color: rgba(255, 255, 255, 0.9);
+      /* pointer-events: none; */
+      overflow-x: hidden; /* Disable hor scrolling */
+      display: flex;
+      flex-direction: column; /* Display new messages at the bottom */
+      text-align: left;
+      /* margin: 10px; */
+    }
+
+    #sendButton {
+      height: 26px;
+      width: 35px;
+      background-color: #777;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      align-items: center; /* Vertically center text */
+      justify-content: center; /* Horizontally center text */
+      font-size: 14px;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+
+    #messageInput {
+      height: 18px;
+      width: calc(90% - 50px);
+    }

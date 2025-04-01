@@ -128,7 +128,29 @@ function pressed_solo(){
     apstatus = "Playing solo";
     document.getElementById("m6").innerText = apstatus;
 
-    document.getElementById("n1").style.display = "none";
+    // document.getElementById('taskbar1').style.display = "flex";
+    document.getElementById('taskbar2').style.display = "flex";
+
+    
+    const messages = [
+        "When will you add deathlink?",
+        "When will you add trap items?",
+        "How do I unlock more pieces?",
+        "Can I change the puzzle image?",
+        "What is the next feature update?",
+        "Why is the sky blue?",
+        "Can I play this on my phone?",
+        "How do I connect to the server?",
+        "What does AP stand for?",
+        "Is there a way to reset progress?"
+    ];
+
+    setInterval(() => {
+        const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+        const jsonList = [{ type: "text", text: randomMessage }];
+        window.jsonListener("", jsonList);
+    }, 1500);
+
 }
 
 var connectionInfo = null;
@@ -268,7 +290,10 @@ const connectedListener = (packet) => {
     window.imagePath = imagePath;
     setImage(imagePath);
     
-    
+    document.getElementById('taskbar1').style.display = "flex";
+    document.getElementById('taskbar2').style.display = "flex";
+
+
     
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
@@ -287,29 +312,50 @@ document.getElementById("defaultImageIndex").addEventListener("change", (event) 
 });
 
 function setImage(url){
+    console.log(":)")
     function checkImage(url, callback) {
+        console.log(":)")
         let img = new Image();
+        console.log(":)")
         img.onload = () => callback(true);  // Image loaded successfully
+        console.log(":)")
         img.onerror = () => callback(false); // Image failed to load
+        console.log(":)")
         img.src = url;
+        console.log(":)")
     }
             
+    console.log(":)")
     checkImage(url, (isValid) => {
+        console.log(":)")
         if (isValid) {
+            console.log(":)")
             imagePath = url;
+            console.log(":)")
             console.log("Set image!")
+            console.log(":)")
         } else {
+            console.log(":)")
             console.log("Image is a dead link.");
+            console.log(":)")
         }
+        console.log(":)")
         window.setImagePath(imagePath);
+        console.log(":)")
         
         window.choose_ap_image = true;
+        console.log(":)")
         window.set_ap_image = true;
+        console.log(":)")
     });
 }
 
 const bouncedListener = (packet) => {
-    window.move_piece_bounced(packet.data[0], packet.data[1], packet.data[2]);
+    if(packet){
+        if(packet.data){
+            window.move_piece_bounced(packet.data[0], packet.data[1], packet.data[2]);
+        }
+    }
 }
 
 const disconnectedListener = (packet) => {
@@ -576,5 +622,12 @@ window.jsonListener = jsonListener;
 if(getUrlParameter("go") == "LS"){
     pressed_login();
 }
+
+function sendText(message){
+    if(window.is_connected){
+        client.messages.say(message);
+    }
+}
+window.sendText = sendText;
 
 console.log("0.3.0h")

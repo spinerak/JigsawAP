@@ -95,6 +95,15 @@
         <option value="22">22</option>
         <option value="23">23</option>
         <option value="24">24</option>
+        <option value="25">25</option>
+        <option value="26">26</option>
+        <option value="27">27</option>
+        <option value="28">28</option>
+        <option value="29">29</option>
+        <option value="30">30</option>
+        <option value="31">31</option>
+        <option value="32">32</option>
+        <option value="33">33</option>
       </select>
     </li>
     <li id="m2">load custom image</li>
@@ -178,19 +187,43 @@
     
     <li id="m6" style="background-color: #555;">AP: not connected</li>
   </ul>
-
-  <ul id="nenu">
-    <li id="n0"><img id="previm" src="portrait2.png" alt="Image"></li>
-    <li id="n1"><div id="log"></div></li>
-  </ul>
-
-  <!-- <div id="log"></div> -->
-
   
 </div>
 
+<div class="draggable" id="draggable1" style="display: none;">
+  <div class="controls">
+      <button class="control-btn" id="control-btn1">-</button>
+  </div>
+
+  <div id="log"></div>
+  <input type="text" id="messageInput" placeholder="Type your message here">
+  <button id="sendButton">➜</button>
+  
+  <!-- <div class="resizer right" id="resizerRight1"></div>
+  <div class="resizer bottom" id="resizerBottom1"></div> -->
+  <div class="resizer corner" id="resizerCorner1"></div>
+</div>
+<div class="taskbar" id="taskbar1" style="display: none;">📝</div>
+
+
+<div class="draggable" id="draggable2" style="display: none;">
+  <div class="controls">
+      <button class="control-btn" id="control-btn2a">-</button>
+  </div>
+  <img id="previm" src="portrait2.png" alt="Image">
+  <!-- <div class="resizer right" id="resizerRight2"></div>
+  <div class="resizer bottom" id="resizerBottom2"></div> -->
+  <div class="resizer corner" id="resizerCorner2"></div>
+</div>
+<div class="taskbar" id="taskbar2" style="display: none;">🔍</div>
+
+
+
+
+
 <!-- partial -->
 
+  <script type="module" src="./clientandpreview.js"></script>
   <script type="module" src="./loadimages.js"></script>
   <script type="module" src="./aplogin.js"></script>
   <script  src="./script.js"></script>

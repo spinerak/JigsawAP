@@ -651,8 +651,8 @@ class PolyPiece {
         this.tbLoops.forEach(loop => {
             let without = false;
             loop.forEach(side => {
-                side.drawPath(ctx, shiftx, shifty, without);
-                without = true;
+            side.drawPath(ctx, shiftx, shifty, without);
+            without = true;
             });
             ctx.closePath();
         });
@@ -662,7 +662,6 @@ class PolyPiece {
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
 
     polypiece_drawImage(ignoreRedraw) {
-        // ignoreRedraw = false;
 
         /* resizes canvas to be bigger than if pieces were perfect rectangles
         so that their shapes actually fit in the canvas
@@ -688,94 +687,76 @@ class PolyPiece {
         this.path = new Path2D();
         this.drawPath(this.path, -this.offsx, -this.offsy);
 
-        const srcx = this.pckxmin ? ((this.pckxmin - 0.5) * puzzle.scalex) : 0;
-        const srcy = this.pckymin ? ((this.pckymin - 0.5) * puzzle.scaley) : 0;
 
-        const destx = ( (this.pckxmin ? 0 : 1 / 2) ) * puzzle.scalex;
-        const desty = ( (this.pckymin ? 0 : 1 / 2) ) * puzzle.scaley;
-
-        let w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
-        let h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
-
-        this.polypiece_ctx.save();
-        this.polypiece_ctx.clip(this.path);
-
-        this.polypiece_ctx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, destx, desty, w, h);
-
+        // // make shadow
+        // this.polypiece_ctx.fillStyle = 'none';
+        // this.polypiece_ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        // this.polypiece_ctx.shadowBlur = 32 * window.scaleFactor * window.additional_zoom * puzzle.scalex / 2700 * shadow_size * 2;
+        // this.polypiece_ctx.shadowOffsetX = 32 * window.scaleFactor * window.additional_zoom * puzzle.scalex / 2700 * shadow_size * 2;
+        // this.polypiece_ctx.shadowOffsetY = 32 * window.scaleFactor * window.additional_zoom * puzzle.scalex / 2700 * shadow_size * 2;
         
+            
+        // this.polypiece_ctx.fill(this.path);
+        // this.polypiece_ctx.shadowColor = 'rgba(0, 0, 0, 0)'; // stop shadow effect
 
 
-        this.polypiece_ctx.restore();    
+        this.pieces.forEach((pp, kk) => {
 
-        
-        // Draw a red outline
-        if(this.hinted){
-            this.polypiece_ctx.strokeStyle = "red";
-            this.polypiece_ctx.lineWidth = Math.max(.02 * puzzle.scalex, 5);
-            this.polypiece_ctx.stroke(this.path);
-        }
+            if(!pp.drawn || !ignoreRedraw) {
+                this.polypiece_ctx.save();
 
-        let borders = false;
+                const path = new Path2D();
+                const shiftx = -this.offsx;
+                const shifty = -this.offsy;
+                pp.ts.drawPath(path, shiftx, shifty, false);
+                pp.rs.drawPath(path, shiftx, shifty, true);
+                pp.bs.drawPath(path, shiftx, shifty, true);
+                pp.ls.drawPath(path, shiftx, shifty, true);
+                path.closePath();
+                
 
-        if(borders){
-        
-            this.pieces.forEach((pp, kk) => {
+                this.polypiece_ctx.clip(path);
+                // do not copy from negative coordinates, does not work for all browsers
+                const srcx = pp.kx ? ((pp.kx - 0.5) * puzzle.scalex) : 0;
+                const srcy = pp.ky ? ((pp.ky - 0.5) * puzzle.scaley) : 0;
 
-                if(!pp.drawn || !ignoreRedraw) {
-                    this.polypiece_ctx.save();
+                const destx = ( (pp.kx ? 0 : 1 / 2) + (pp.kx - this.pckxmin) ) * puzzle.scalex;
+                const desty = ( (pp.ky ? 0 : 1 / 2) + (pp.ky - this.pckymin) ) * puzzle.scaley;
 
-                    const path = new Path2D();
-                    const shiftx = -this.offsx;
-                    const shifty = -this.offsy;
-                    pp.ts.drawPath(path, shiftx, shifty, false);
-                    pp.rs.drawPath(path, shiftx, shifty, true);
-                    pp.bs.drawPath(path, shiftx, shifty, true);
-                    pp.ls.drawPath(path, shiftx, shifty, true);
-                    path.closePath();
+                let w = 2 * puzzle.scalex;
+                let h = 2 * puzzle.scaley;
+                // if (srcx + w > puzzle.gameCanvas.width) w = puzzle.gameCanvas.width - srcx;
+                // if (srcy + h > puzzle.gameCanvas.height) h = puzzle.gameCanvas.height - srcy;
 
-                    this.polypiece_ctx.clip(path);
-                    // do not copy from negative coordinates, does not work for all browsers
-                    const srcx = pp.kx ? ((pp.kx - 0.5) * puzzle.scalex) : 0;
-                    const srcy = pp.ky ? ((pp.ky - 0.5) * puzzle.scaley) : 0;
-
-                    const destx = ( (pp.kx ? 0 : 1 / 2) + (pp.kx - this.pckxmin) ) * puzzle.scalex;
-                    const desty = ( (pp.ky ? 0 : 1 / 2) + (pp.ky - this.pckymin) ) * puzzle.scaley;
-
-                    let w = 2 * puzzle.scalex;
-                    let h = 2 * puzzle.scaley;
-                    // if (srcx + w > puzzle.gameCanvas.width) w = puzzle.gameCanvas.width - srcx;
-                    // if (srcy + h > puzzle.gameCanvas.height) h = puzzle.gameCanvas.height - srcy;
-
-                    let embth = puzzle.scalex * 0.01 * bevel_size * window.scaleFactor * window.additional_zoom;
-                    if(this.hinted){
-                        embth = puzzle.scalex * 0.01 * window.scaleFactor * window.additional_zoom;
-                    }
-                    // console.log(embth)
-
-                    // this.polypiece_ctx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, destx, desty, w, h);
-
-                    this.polypiece_ctx.translate(embth / 2, -embth / 2);
-                    this.polypiece_ctx.lineWidth = embth;
-                    this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-                    if(this.hinted){
-                        this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
-                    }
-                    this.polypiece_ctx.stroke(path);
-
-                    this.polypiece_ctx.translate(-embth, embth);
-                    this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-                    
-                    if(this.hinted){
-                        this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
-                    }
-                    this.polypiece_ctx.stroke(path);
-                    
-                    this.polypiece_ctx.restore();
-
-                    pp.drawn = true;
+                let embth = puzzle.scalex * 0.01 * bevel_size * window.scaleFactor * window.additional_zoom;
+                if(this.hinted){
+                    embth = puzzle.scalex * 0.01 * window.scaleFactor * window.additional_zoom;
                 }
-            });
-        }
+                // console.log(embth)
+
+                this.polypiece_ctx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, destx, desty, w, h);
+
+                this.polypiece_ctx.translate(embth / 2, -embth / 2);
+                this.polypiece_ctx.lineWidth = embth;
+                this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+                if(this.hinted){
+                    this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
+                }
+                this.polypiece_ctx.stroke(path);
+
+                this.polypiece_ctx.translate(-embth, embth);
+                this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+                
+                if(this.hinted){
+                    this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
+                }
+                this.polypiece_ctx.stroke(path);
+                
+                this.polypiece_ctx.restore();
+
+                pp.drawn = true;
+            }
+        });
 
 
     } // PolyPiece.polypiece_drawImage
@@ -1293,7 +1274,6 @@ let moving; // for information about moved piece
             break;
 
             case 10: // load image
-                document.getElementById("m4").textContent = "Loading image...";
                 loadImageFunction();
                 state = 15;
                 return;
@@ -1308,7 +1288,7 @@ let moving; // for information about moved piece
                 } 
                 
                 if ((event && event.event == "nbpieces") || (window.LoginStart && window.is_connected)) {
-                    document.getElementById("m4").textContent = "Loading pieces...";
+                    document.getElementById("m4").textContent = "Loading...";
 
                     state = 17;
                     if(window.is_connected){
@@ -1977,7 +1957,7 @@ function change_savedata_datastorage(key, value, final) {
 
 let pending_actions = []
 function do_action(key, value, bounce){
-    // console.log("got response", key, value, bounce);
+    console.log("got response", key, value, bounce);
     if(accept_pending_actions){
         if(!bounce){
             pending_actions.push([key, value]);
@@ -2008,7 +1988,7 @@ function do_action(key, value, bounce){
             }
             if (pp) {
                 if(!bounce || (bounce && !window.ignore_bounce_pieces.includes(pp_index))){
-                    // console.log("moving because of action", key, value, bounce);
+                    console.log("moving because of action", key, value, bounce);
                     pp.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
                 }
             }
