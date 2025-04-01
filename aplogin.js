@@ -312,41 +312,24 @@ document.getElementById("defaultImageIndex").addEventListener("change", (event) 
 });
 
 function setImage(url){
-    console.log(":)")
     function checkImage(url, callback) {
-        console.log(":)")
         let img = new Image();
-        console.log(":)")
         img.onload = () => callback(true);  // Image loaded successfully
-        console.log(":)")
         img.onerror = () => callback(false); // Image failed to load
-        console.log(":)")
         img.src = url;
-        console.log(":)")
     }
             
-    console.log(":)")
     checkImage(url, (isValid) => {
-        console.log(":)")
         if (isValid) {
-            console.log(":)")
             imagePath = url;
-            console.log(":)")
             console.log("Set image!")
-            console.log(":)")
         } else {
-            console.log(":)")
             console.log("Image is a dead link.");
-            console.log(":)")
         }
-        console.log(":)")
         window.setImagePath(imagePath);
-        console.log(":)")
         
         window.choose_ap_image = true;
-        console.log(":)")
         window.set_ap_image = true;
-        console.log(":)")
     });
 }
 
