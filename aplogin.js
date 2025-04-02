@@ -287,6 +287,11 @@ const connectedListener = (packet) => {
         imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
     }
 
+    const overrideImage = getUrlParameter('image');
+    if (overrideImage !== '') {
+        imagePath = overrideImage;
+    }
+
     window.imagePath = imagePath;
     setImage(imagePath);
     
