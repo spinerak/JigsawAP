@@ -391,6 +391,8 @@ class PolyPiece {
             return;
         }
 
+        const changingIndex = Math.max(this.pieces[0].index, otherPoly.pieces[0].index);
+
         const orgpckxmin = this.pckxmin;
         const orgpckymin = this.pckymin;
 
@@ -471,7 +473,7 @@ class PolyPiece {
 
         this.puzzle.evaluateZIndex();
 
-        newMerge();
+        newMerge(changingIndex);
 
 
     } // merge
@@ -915,8 +917,11 @@ class Puzzle {
                 let w = (ind-1) % window.apnx;
                 let h = Math.floor((ind-1) / window.apnx);
                 pieces_in_group.push(this.pieces[h][w]);
+                if(ind != key){
+                    newMerge(ind, false);
+                }
             }
-            newMerge(pieces_in_group.length - 1);
+
             let ppp = new PolyPiece(pieces_in_group, this);
             ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
             this.polyPieces.push(ppp);
@@ -1295,6 +1300,7 @@ let moving; // for information about moved piece
             case 10: // load image
                 document.getElementById("m4").textContent = "Loading image...";
                 loadImageFunction();
+                document.getElementById("m4").textContent = "Start";
                 state = 15;
                 return;
 
@@ -1342,7 +1348,8 @@ let moving; // for information about moved piece
                         let client = window.getAPClient();                  
 
                         await client.storage.notify(keys, (key, value, oldValue) => {
-                            do_action(key, value, false);
+                            console.log("notify", key, value, oldValue);
+                            do_action(key, value, oldValue, false);
                         });
 
                         keys.push(`JIG_PROG_${window.slot}_M`);
@@ -1429,7 +1436,7 @@ let moving; // for information about moved piece
 
                 for(let key of all_indices){
                     groups[key] = [key];
-                    coordinates[key] = [3,3];
+                    coordinates[key] = [30,30];
                 }
 
                 console.log("STARTING GAME")
@@ -1473,7 +1480,7 @@ let moving; // for information about moved piece
                 try {
                     for(let data of pending_actions){
                         console.log("Pending action", data, pending_actions)
-                        do_action(data[0], data[1], false);
+                        do_action(data[0], data[1], data[2], false);
                     }
                 } catch (error) {
                     console.error("Error processing pending actions:", error);
@@ -1899,7 +1906,7 @@ function unlockPiece(index) {
         );
     }else if (accept_pending_actions){
         console.log("Adding to pending actions", index)
-        pending_actions.push([`x_x_x_${index}`, "unlock"]);
+        pending_actions.push([`x_x_x_${index}`, "unlock", "x"]);
     }
 }
 
@@ -1911,28 +1918,32 @@ function updateMergesLabels(){
 window.unlockPiece = unlockPiece;
 window.updateMergesLabels = updateMergesLabels
 
-function newMerge(add = 1){
-    if(add < 1){
-        return;
-    }
+var mergedKeys = [];
+
+function newMerge(key, playSound = true){
+    if (mergedKeys.includes(key)) return;
+    mergedKeys.push(key);
+    
     let newRecord = false;
-    for(let i = 0; i < add; i++){
-        numberOfMerges += 1;
-        
-        if(numberOfMerges > numberOfMergesAtStart){
-            window.sendCheck(numberOfMerges);
-            // console.log("Send check for", numberOfMerges)
-            if(numberOfMerges == apnx * apny - 1){
-                window.sendGoal();
-            }
-            newRecord = true;
+    
+    numberOfMerges += 1;
+    
+    if(numberOfMerges > numberOfMergesAtStart){
+        window.sendCheck(numberOfMerges);
+        // console.log("Send check for", numberOfMerges)
+        if(numberOfMerges == apnx * apny - 1){
+            window.sendGoal();
         }
+        newRecord = true;
     }
+        
     if(newRecord){
         change_savedata_datastorage("M", numberOfMerges, true);
     }
     document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
-    window.playNewMergeSound();
+    if(playSound){
+        window.playNewMergeSound();
+    }
 }
 
 var numberOfMerges = 0;
@@ -1950,19 +1961,38 @@ function setImagePath(l){
 window.setImagePath = setImagePath;
 
 function move_piece_bounced(pp_index, x, y){
-    do_action(`x_x_x_${pp_index}`, [x,y], true);
+    do_action(`x_x_x_${pp_index}`, [x,y], [0,0], true);
 }
 
 window.move_piece_bounced = move_piece_bounced;
 
-function change_savedata_datastorage(key, value, final) {
+async function change_savedata_datastorage(key, value, final) {
+    console.log("change_savedata_datastorage", key, value, final)
     
     if(window.play_solo) return;
-    // console.log(key, value, final)
-    if(final){
+
+    //client.storage.prepare(`JIG_PROG_${window.slot}_${key}`, 0).replace(value).commit();
+    const key_name = `JIG_PROG_${window.slot}_${key}`;
+    
+    if(final){ //make sure you only replace it to lower values.
         const client = window.getAPClient();
-        // console.log("setting", `JIG_PROG_${window.slot}_${key}`, "to", value)
-        client.storage.prepare(`JIG_PROG_${window.slot}_${key}`, 0).replace(value).commit();
+        let currentValue = 0;
+        currentValue = await client.storage.fetch([key_name], true);
+        currentValue = currentValue[key_name];
+        console.log("currentValue", currentValue, key_name)
+        if (currentValue === null) {
+            client.storage.prepare(key_name, [0,0]).replace(value).commit();
+        } else if (Array.isArray(currentValue) && Array.isArray(value)) {
+            // Only replace if both are lists
+            client.storage.prepare(key_name, [0,0]).replace(value).commit();
+        } else if (typeof currentValue === "number" && typeof value === "number") {
+            // Replace only if value < currentValue
+            client.storage.prepare(key_name, [0,0]).min(value).commit();
+        } else if (!Array.isArray(value)) {
+            // If X is not a list, replace the current value
+            client.storage.prepare(key_name, [0,0]).replace(value).commit();
+        }
+
     }else{
         const client = window.getAPClient();
         if (!window.bounceTimeout) {
@@ -1976,11 +2006,11 @@ function change_savedata_datastorage(key, value, final) {
 }
 
 let pending_actions = []
-function do_action(key, value, bounce){
-    // console.log("got response", key, value, bounce);
+function do_action(key, value, oldValue, bounce){
+    console.log("got response", key, value, oldValue, bounce);
     if(accept_pending_actions){
         if(!bounce){
-            pending_actions.push([key, value]);
+            pending_actions.push([key, value, oldValue]);
             console.log("Add pending action", key, value, pending_actions)
         }
     } else if(process_pending_actions) {
@@ -2012,8 +2042,10 @@ function do_action(key, value, bounce){
                     pp.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
                 }
             }
-        } else {
+        } else { // value is an int
             value = parseInt(value);
+            if (typeof oldValue === "number") return; //already merged!
+
             if(moving_that_piece || (moving && moving.pp && moving.pp.pieces && moving.pp.pieces[0].index == value)){
                 moving = null; // let go of piece if someone else merges it...
             }

@@ -24,9 +24,11 @@ function handleDrag(draggable, isDragging, offsetX, offsetY, e) {
 
     const newLeft = Math.max(0, Math.min(window.innerWidth - draggable.offsetWidth - 5, clientX - offsetX));
     const newTop = Math.max(0, Math.min(window.innerHeight - draggable.offsetHeight - 5, clientY - offsetY));
+    
+    draggable.style.left = (newLeft / window.innerWidth) * 100 + 'vw';
+    draggable.style.top = (newTop / window.innerHeight) * 100 + 'vh';
 
-    draggable.style.left = newLeft + 'px';
-    draggable.style.top = newTop + 'px';
+    adjustedPosition(draggable);
 }
 
 document.addEventListener('mousemove', (e) => handleDrag(draggable1, isDragging1, offsetX1, offsetY1, e));
@@ -128,12 +130,14 @@ function enableResizing1(resizer, horizontal, vertical) {
         if (horizontal) {
             const newWidth = startWidth + (e.clientX - startX);
             const maxWidth = window.innerWidth - draggable1.offsetLeft - 5;
-            draggable1.style.width = Math.min(newWidth, maxWidth) + 'px';
+            draggable1.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+            adjustedSize(draggable1);
         }
         if (vertical) {
             const newHeight = startHeight + (e.clientY - startY);
             const maxHeight = window.innerHeight - draggable1.offsetTop - 5;
-            draggable1.style.height = Math.min(newHeight, maxHeight) + 'px';
+            draggable1.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+            adjustedSize(draggable1);
         }
     });
 
@@ -143,12 +147,14 @@ function enableResizing1(resizer, horizontal, vertical) {
         if (horizontal) {
             const newWidth = startWidth + (touch.clientX - startX);
             const maxWidth = window.innerWidth - draggable1.offsetLeft - 5;
-            draggable1.style.width = Math.min(newWidth, maxWidth) + 'px';
+            draggable1.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+            adjustedSize(draggable1);
         }
         if (vertical) {
             const newHeight = startHeight + (touch.clientY - startY);
             const maxHeight = window.innerHeight - draggable1.offsetTop - 5;
-            draggable1.style.height = Math.min(newHeight, maxHeight) + 'px';
+            draggable1.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+            adjustedSize(draggable1);
         }
     });
 
@@ -184,12 +190,14 @@ function enableResizing2(resizer, horizontal, vertical) {
         if (horizontal) {
             const newWidth = startWidth + (e.clientX - startX);
             const maxWidth = window.innerWidth - draggable2.offsetLeft - 5;
-            draggable2.style.width = Math.min(newWidth, maxWidth) + 'px';
+            draggable2.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+            adjustedSize(draggable2);
         }
         if (vertical) {
             const newHeight = startHeight + (e.clientY - startY);
             const maxHeight = window.innerHeight - draggable2.offsetTop - 5;
-            draggable2.style.height = Math.min(newHeight, maxHeight) + 'px';
+            draggable2.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+            adjustedSize(draggable2);
         }
     });
 
@@ -199,20 +207,71 @@ function enableResizing2(resizer, horizontal, vertical) {
         if (horizontal) {
             const newWidth = startWidth + (touch.clientX - startX);
             const maxWidth = window.innerWidth - draggable2.offsetLeft - 5;
-            draggable2.style.width = Math.min(newWidth, maxWidth) + 'px';
+            draggable2.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+            adjustedSize(draggable2);
         }
         if (vertical) {
             const newHeight = startHeight + (touch.clientY - startY);
             const maxHeight = window.innerHeight - draggable2.offsetTop - 5;
-            draggable2.style.height = Math.min(newHeight, maxHeight) + 'px';
+            draggable2.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+            adjustedSize(draggable2);
         }
     });
 
     document.addEventListener('mouseup', () => { resizing = false; });
     document.addEventListener('touchend', () => { resizing = false; });
 }
+function adjustedSize(draggable) {
+    if (draggable === draggable1) {
+        const widthVW = parseFloat(draggable.style.width);
+        const heightVH = parseFloat(draggable.style.height);
+        console.log(`Draggable1 Size: ${widthVW}vw, ${heightVH}vh`);
+        localStorage.setItem('draggable1Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+    }
+    if (draggable === draggable2) {
+        const widthVW = parseFloat(draggable.style.width);
+        const heightVH = parseFloat(draggable.style.height);
+        console.log(`Draggable2 Size: ${widthVW}vw, ${heightVH}vh`);
+        localStorage.setItem('draggable2Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+    }
+}
 
+function adjustedPosition(draggable) {
+    if (draggable === draggable1) {
+        const leftVW = parseFloat(draggable.style.left);
+        const topVH = parseFloat(draggable.style.top);
+        console.log(`Draggable1 Position: ${leftVW}vw, ${topVH}vh`);
+        localStorage.setItem('draggable1Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+    }
+    if (draggable === draggable2) {
+        const leftVW = parseFloat(draggable.style.left);
+        const topVH = parseFloat(draggable.style.top);
+        console.log(`Draggable2 Position: ${leftVW}vw, ${topVH}vh`);
+        localStorage.setItem('draggable2Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+    }
+}
 
+// Load saved positions and sizes from localStorage
+if (localStorage.getItem('draggable1Position')) {
+    const draggable1Position = JSON.parse(localStorage.getItem('draggable1Position'));
+    draggable1.style.left = `${draggable1Position.width}`;
+    draggable1.style.top = `${draggable1Position.height}`;
+}
+if (localStorage.getItem('draggable1Size')) {
+    const draggable1Size = JSON.parse(localStorage.getItem('draggable1Size'));
+    draggable1.style.width = `${draggable1Size.width}`;
+    draggable1.style.height = `${draggable1Size.height}`;
+}
+if (localStorage.getItem('draggable2Position')) {
+    const draggable2Position = JSON.parse(localStorage.getItem('draggable2Position'));
+    draggable2.style.left = `${draggable2Position.width}`;
+    draggable2.style.top = `${draggable2Position.height}`;
+}
+if (localStorage.getItem('draggable2Size')) {
+    const draggable2Size = JSON.parse(localStorage.getItem('draggable2Size'));
+    draggable2.style.width = `${draggable2Size.width}`;
+    draggable2.style.height = `${draggable2Size.height}`;
+}
 
 function sendMessage() {
     const messageInput = document.getElementById('messageInput');

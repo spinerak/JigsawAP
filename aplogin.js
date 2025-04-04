@@ -119,6 +119,11 @@ function pressed_solo(){
     document.getElementById("defaultImageIndex").selectedIndex = ind;
     window.defaultImagePath = imagePath;
 
+    const overrideImage = getUrlParameter('image');
+    if (overrideImage !== '') {
+        imagePath = overrideImage;
+    }
+
     setImage(imagePath);
 
 
@@ -618,4 +623,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.3.0h")
+console.log("0.3.0i")

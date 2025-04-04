@@ -31,7 +31,10 @@ window.possibleImages = [
     "https://images6.alphacoders.com/683/thumb-1920-683884.jpg",
     "https://rubygator.nl/cdn/shop/files/Prismatic-Evolutions-Super-Premium-Collection-Playmat.webp?v=1740558485&width=2713",
     "https://static1.thegamerimages.com/wordpress/wp-content/uploads/2021/01/10-Great-Mods-For-Slay-The-Spire-featured-image.jpg",
-    "https://nintendoeverything.com/wp-content/uploads/Tevi-physical.jpg"
+    "https://nintendoeverything.com/wp-content/uploads/Tevi-physical.jpg",
+    "https://ilovepuzzles.com.au/cdn/shop/products/81cQCIGBnkL._AC_SL1500.jpg",
+    "https://digitalfantasydiary.com/wp-content/uploads/2020/09/a-short-hike.jpg",
+    "https://d17c72h1ypygg7.cloudfront.net/subnautica/files/2014/03/CoralReefZone_9_TwistyBridges_HighRes.jpg/Coral_Reef_Zone_9_Twisty_Bridges_High_Res_133b5cefec.jpg"
 ]
 console.log("Loaded images!");
 

@@ -197,6 +197,7 @@
       padding: 0; /* Remove extra padding */
       cursor: grab; 
       user-select: none; /* Prevent text selection */
+      z-index: 99;
     }
 
     #draggable2 { 
@@ -211,22 +212,31 @@
       padding: 0; /* Remove extra padding */
       cursor: grab; 
       user-select: none; /* Prevent text selection */
+      z-index: 99;
     }
+
+
 
     #taskbar1 { 
         width: 50px; height: 30px; background: #444; color: #fff;
         position: absolute; bottom: 50px; right: 10px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer;
-        z-index: 99999999;
+        z-index: 1;
     }
+
+
+
     #taskbar2 { 
         width: 50px; height: 30px; background: #444; color: #fff;
         position: absolute; bottom: 10px; right: 10px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer;
-        z-index: 99999999;
+        z-index: 1;
     }
+
+
+
     .controls { 
         position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; 
         align-items: center; /* Vertically center buttons */
