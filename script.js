@@ -664,7 +664,6 @@ class PolyPiece {
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
 
     polypiece_drawImage(ignoreRedraw) {
-        // ignoreRedraw = false;
 
         /* resizes canvas to be bigger than if pieces were perfect rectangles
         so that their shapes actually fit in the canvas
@@ -690,6 +689,8 @@ class PolyPiece {
         this.path = new Path2D();
         this.drawPath(this.path, -this.offsx, -this.offsy);
 
+        console.log("tbLoops", this.pieces.length, this.tbLoops);
+
         const srcx = this.pckxmin ? ((this.pckxmin - 0.5) * puzzle.scalex) : 0;
         const srcy = this.pckymin ? ((this.pckymin - 0.5) * puzzle.scaley) : 0;
 
@@ -699,31 +700,37 @@ class PolyPiece {
         let w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
         let h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
 
-        this.polypiece_ctx.save();
-        this.polypiece_ctx.clip(this.path);
-
-        this.polypiece_ctx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, destx, desty, w, h);
-
-        
-
-
-        this.polypiece_ctx.restore();    
-
-        
-        // Draw a red outline
-        if(this.hinted){
-            this.polypiece_ctx.strokeStyle = "red";
-            this.polypiece_ctx.lineWidth = Math.max(.02 * puzzle.scalex, 5);
-            this.polypiece_ctx.stroke(this.path);
+        // Create an offscreen canvas the size of your destination draw area
+        if(!this.maskCanvas){
+            this.maskCanvas = document.createElement("canvas");
         }
+        this.maskCanvas.width = w;
+        this.maskCanvas.height = h;
+        const maskCtx = this.maskCanvas.getContext("2d");
 
-        let borders = false;
+        // 1. Draw your puzzle piece shape onto the mask canvas
+        maskCtx.save();
+        maskCtx.translate(-destx, -desty); // Align the path correctly relative to mask
+        maskCtx.fill(this.path);
+        maskCtx.restore();
+
+        // 2. Set composite mode to keep only pixels inside the shape
+        maskCtx.globalCompositeOperation = "source-in";
+
+        // 3. Draw the source image (only visible inside the shape now)
+        maskCtx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, 0, 0, w, h);
+
+        // 4. Draw the final result onto your main canvas
+        this.polypiece_ctx.drawImage(this.maskCanvas, destx, desty);
+
+
+        let borders = apnx * apny < 150 && (bevel_size > 0 || shadow_size > 0);
 
         if(borders){
         
             this.pieces.forEach((pp, kk) => {
 
-                if(!pp.drawn || !ignoreRedraw) {
+                if(true) { //!pp.drawn || !ignoreRedraw
                     this.polypiece_ctx.save();
 
                     const path = new Path2D();
@@ -759,17 +766,17 @@ class PolyPiece {
                     this.polypiece_ctx.translate(embth / 2, -embth / 2);
                     this.polypiece_ctx.lineWidth = embth;
                     this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-                    if(this.hinted){
-                        this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
-                    }
+                    // if(this.hinted){
+                    //     this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
+                    // }
                     this.polypiece_ctx.stroke(path);
 
                     this.polypiece_ctx.translate(-embth, embth);
                     this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
                     
-                    if(this.hinted){
-                        this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
-                    }
+                    // if(this.hinted){
+                    //     this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
+                    // }
                     this.polypiece_ctx.stroke(path);
                     
                     this.polypiece_ctx.restore();
@@ -777,6 +784,15 @@ class PolyPiece {
                     pp.drawn = true;
                 }
             });
+        }
+
+        
+        
+        // Draw a red outline
+        if(this.hinted){
+            this.polypiece_ctx.strokeStyle = "red";
+            this.polypiece_ctx.lineWidth = Math.max(.02 * puzzle.scalex, 5);
+            this.polypiece_ctx.stroke(this.path);
         }
 
 
@@ -1104,7 +1120,7 @@ class Puzzle {
 
         /* computes the distance below which two pieces connect
             depends on the actual size of pieces, with lower limit */
-        this.dConnect = mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
+        this.dConnect = 0.9 * mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
 
 
 
@@ -1967,7 +1983,7 @@ function move_piece_bounced(pp_index, x, y){
 window.move_piece_bounced = move_piece_bounced;
 
 async function change_savedata_datastorage(key, value, final) {
-    console.log("change_savedata_datastorage", key, value, final)
+    // console.log("change_savedata_datastorage", key, value, final)
     
     if(window.play_solo) return;
 
@@ -1987,7 +2003,7 @@ async function change_savedata_datastorage(key, value, final) {
             client.storage.prepare(key_name, [0,0]).replace(value).commit();
         } else if (typeof currentValue === "number" && typeof value === "number") {
             // Replace only if value < currentValue
-            client.storage.prepare(key_name, [0,0]).min(value).commit();
+            client.storage.prepare(key_name, 999999).replace(Math.min(currentValue, value)).commit();
         } else if (!Array.isArray(value)) {
             // If X is not a list, replace the current value
             client.storage.prepare(key_name, [0,0]).replace(value).commit();
@@ -2007,7 +2023,7 @@ async function change_savedata_datastorage(key, value, final) {
 
 let pending_actions = []
 function do_action(key, value, oldValue, bounce){
-    console.log("got response", key, value, oldValue, bounce);
+    // console.log("got response", key, value, oldValue, bounce);
     if(accept_pending_actions){
         if(!bounce){
             pending_actions.push([key, value, oldValue]);
@@ -2063,7 +2079,7 @@ function do_action(key, value, oldValue, bounce){
 }
 
 function askForHint(alsoConnect = false){
-    console.log("Let's go", alsoConnect)
+    // console.log("Let's go", alsoConnect)
     const shuffledIndices = [...Array(puzzle.polyPieces.length).keys()].sort(() => Math.random() - 0.5);
     for (let i = 0; i < shuffledIndices.length; i++) {
         for (let j = i + 1; j < shuffledIndices.length; j++) {
@@ -2117,5 +2133,14 @@ document.addEventListener('keydown', function(event) {
     }
     if(event.key === 'Q' || event.key === 'q'){
         window.goTo8888State = true;
+    }
+    if (event.key === 'A' || event.key === 'a') {
+        const interval = () => {
+            setTimeout(() => {
+            askForHint(true);
+            interval();
+            }, 100);
+        };
+        interval();
     }
 });

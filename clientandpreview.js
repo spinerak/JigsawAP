@@ -225,13 +225,13 @@ function adjustedSize(draggable) {
     if (draggable === draggable1) {
         const widthVW = parseFloat(draggable.style.width);
         const heightVH = parseFloat(draggable.style.height);
-        console.log(`Draggable1 Size: ${widthVW}vw, ${heightVH}vh`);
+        // console.log(`Draggable1 Size: ${widthVW}vw, ${heightVH}vh`);
         localStorage.setItem('draggable1Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
     }
     if (draggable === draggable2) {
         const widthVW = parseFloat(draggable.style.width);
         const heightVH = parseFloat(draggable.style.height);
-        console.log(`Draggable2 Size: ${widthVW}vw, ${heightVH}vh`);
+        // console.log(`Draggable2 Size: ${widthVW}vw, ${heightVH}vh`);
         localStorage.setItem('draggable2Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
     }
 }
@@ -240,13 +240,13 @@ function adjustedPosition(draggable) {
     if (draggable === draggable1) {
         const leftVW = parseFloat(draggable.style.left);
         const topVH = parseFloat(draggable.style.top);
-        console.log(`Draggable1 Position: ${leftVW}vw, ${topVH}vh`);
+        // console.log(`Draggable1 Position: ${leftVW}vw, ${topVH}vh`);
         localStorage.setItem('draggable1Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
     }
     if (draggable === draggable2) {
         const leftVW = parseFloat(draggable.style.left);
         const topVH = parseFloat(draggable.style.top);
-        console.log(`Draggable2 Position: ${leftVW}vw, ${topVH}vh`);
+        // console.log(`Draggable2 Position: ${leftVW}vw, ${topVH}vh`);
         localStorage.setItem('draggable2Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
     }
 }

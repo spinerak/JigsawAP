@@ -623,4 +623,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.3.0i")
+console.log("0.3.0k")
