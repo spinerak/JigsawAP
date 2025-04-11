@@ -1696,6 +1696,7 @@ let menu = (function () {
         document.getElementById("m10b").style.display = "block"
     }
     document.getElementById("m6").style.display = "block"
+    document.getElementById("m11").style.display = "block"
     if(gameStarted){
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
