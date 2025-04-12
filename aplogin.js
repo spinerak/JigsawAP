@@ -12,6 +12,8 @@ document.getElementById('hostport').value = getUrlParameter('hostport') || local
 
 document.getElementById('name').value = getUrlParameter('name') || localStorage.getItem("name") || 'Player1';
 
+document.getElementById('password').value = getUrlParameter('password') || '';
+
 document.getElementById("loginbutton").addEventListener("click", pressed_login);
 
 document.getElementById("solobutton").addEventListener("click", pressed_solo);
@@ -244,6 +246,7 @@ const connectedListener = (packet) => {
     window.slot = packet.slot;
 
     let apworld = packet.slot_data.ap_world_version
+    window.apworld = apworld;
     if(!apworld || ["0.0.0", "0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.1.0", "0.1.1"].includes(apworld)){
         if(!localStorage.getItem("referredTo011")){
             alert("You are using an older apworld, you will be forwarded to the backup version. You will only see this message once.")
@@ -259,8 +262,7 @@ const connectedListener = (packet) => {
         }
         window.location.href = "/index020.html";
         return;
-    }
-    else{
+    }else{
         console.log("This apworld version should work", packet.slot_data.ap_world_version)
     }
 
@@ -288,8 +290,48 @@ const connectedListener = (packet) => {
     }
     window.defaultImagePath = imagePath;
 
-    if(localStorage.getItem(`image_${window.apseed}_${window.slot}`)){
-        imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
+    if(apworld == "0.2.0" || apworld == "0.3.0"){
+        if(localStorage.getItem(`image_${window.apseed}_${window.slot}`)){
+            imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
+        }
+    }else{
+        const dbRequest = indexedDB.open("ImageDatabase", 1);
+
+        dbRequest.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains("images")) {
+                db.createObjectStore("images", { keyPath: "id" });
+            }
+        };
+
+        dbRequest.onsuccess = (event) => {
+            const db = event.target.result;
+            const transaction = db.transaction(["images"], "readonly");
+            const store = transaction.objectStore("images");
+            const getRequest = store.get(`${window.apseed}_${window.slot}`);
+
+            getRequest.onsuccess = () => {
+                if (getRequest.result) {
+                    imagePath = getRequest.result.imagePath;
+                } else {
+                    console.log("Image not found in IndexedDB, using default image.");
+                }
+                window.imagePath = imagePath;
+                setImage(imagePath);
+            };
+
+            getRequest.onerror = () => {
+                console.log("Error retrieving image from IndexedDB.");
+                window.imagePath = imagePath;
+                setImage(imagePath);
+            };
+        };
+
+        dbRequest.onerror = () => {
+            console.log("Error opening IndexedDB.");
+            window.imagePath = imagePath;
+            setImage(imagePath);
+        };
     }
 
     const overrideImage = getUrlParameter('image');
@@ -383,24 +425,16 @@ function openItems(items){
     for (let i = 0; i < items.length; i++) {
         // console.log(items[i], puzzlePieceOrder)
         let number_of_pieces = 0;
-        if(items[i] == "Puzzle Piece"){
+
+        if(items[i] == "Puzzle Piece" || items[i] == "1 Puzzle Piece"){
             number_of_pieces = 1;
         }
-        if(items[i] == "2 Puzzle Pieces"){
-            number_of_pieces = 2;
+        const match = items[i].match(/^(\d+)\s+Puzzle Pieces?$/);
+        if (match) {
+            number_of_pieces = parseInt(match[1], 10);
         }
-        if(items[i] == "5 Puzzle Pieces"){
-            number_of_pieces = 5;
-        }
-        if(items[i] == "10 Puzzle Pieces"){
-            number_of_pieces = 10;
-        }
-        if(items[i] == "25 Puzzle Pieces"){
-            number_of_pieces = 25;
-        }
-        if(items[i] == "100 Puzzle Pieces"){
-            number_of_pieces = 100;
-        }
+
+
         for(let c = 0; c < number_of_pieces; c++){
             if(puzzlePieceOrder){
                 let piece = puzzlePieceOrder.shift();
@@ -543,7 +577,7 @@ function adjustColorBrightness(color, amount) {
 }
 
 function jsonListener(text, nodes) {
-    const adjustColor = 0.5;
+    const adjustColor = 1;
 
     // Plaintext to console, because why not?
     const messageElement = document.createElement("div");
@@ -585,16 +619,18 @@ function jsonListener(text, nodes) {
                 nodeElement.title = "Game: " + node.player.game;
                 break;
 
-            case "item": {
+            case "item": 
                 nodeElement.style.fontWeight = "bold";
                 let typenumber = node.item.progression + 2 * node.item.useful + 4 * node.item.trap
+                console.log(node.item.progression, node.item.useful, node.item.trap, typenumber)
                 nodeElement.style.color = adjustColorBrightness(classaddcolor[typenumber], adjustColor);
                 nodeElement.title = classadddesc[typenumber];
-            }
+                break;
+            
 
             // no special coloring needed
             case "text":
-                nodeElement.style.color = adjustColorBrightness("rgba(126,126,126,1)", adjustColor);
+                nodeElement.style.color = adjustColorBrightness("rgba(200,200,200,1)", adjustColor);
             default:
                 break;
         }

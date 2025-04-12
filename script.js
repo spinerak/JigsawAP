@@ -689,7 +689,7 @@ class PolyPiece {
         this.path = new Path2D();
         this.drawPath(this.path, -this.offsx, -this.offsy);
 
-        console.log("tbLoops", this.pieces.length, this.tbLoops);
+        // console.log("tbLoops", this.pieces.length, this.tbLoops);
 
         const srcx = this.pckxmin ? ((this.pckxmin - 0.5) * puzzle.scalex) : 0;
         const srcy = this.pckymin ? ((this.pckymin - 0.5) * puzzle.scaley) : 0;
@@ -1334,7 +1334,37 @@ let moving; // for information about moved piece
 
                     state = 17;
                     if(window.is_connected){
-                        imagePath = localStorage.setItem(`image_${window.apseed}_${window.slot}`, imagePath);
+                        if(window.apworld == "0.2.0" || window.apworld == "0.3.0"){
+                            localStorage.setItem(`image_${window.apseed}_${window.slot}`, imagePath);
+                        }else{
+                            const dbRequest = indexedDB.open("ImageDatabase", 1);
+
+                            dbRequest.onupgradeneeded = (event) => {
+                                const db = event.target.result;
+                                if (!db.objectStoreNames.contains("images")) {
+                                    db.createObjectStore("images", { keyPath: "id" });
+                                }
+                            };
+
+                            dbRequest.onsuccess = (event) => {
+                                const db = event.target.result;
+                                const transaction = db.transaction(["images"], "readwrite");
+                                const store = transaction.objectStore("images");
+                                const putRequest = store.put({ id: `${window.apseed}_${window.slot}`, imagePath });
+
+                                putRequest.onsuccess = () => {
+                                    console.log("Image successfully saved to IndexedDB.");
+                                };
+
+                                putRequest.onerror = () => {
+                                    console.log("Error saving image to IndexedDB.");
+                                };
+                            };
+
+                            dbRequest.onerror = () => {
+                                console.log("Error opening IndexedDB.");
+                            };
+                        }
                     }
                 }
                 
@@ -1344,6 +1374,7 @@ let moving; // for information about moved piece
             case 17: // load save!
 
                 if(unlocked_pieces.length == 0){
+                    console.log("No unlocked pieces!")
                     return;
                 }
                 
@@ -1708,10 +1739,10 @@ let menu = (function () {
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
         document.getElementById("m5a").style.display = "block"
-        
         document.getElementById("m10b").style.display = "block"
     }
     document.getElementById("m6").style.display = "block"
+    document.getElementById("m11").style.display = "block"
     if(gameStarted){
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
@@ -1812,6 +1843,8 @@ function updateZoomAndPosition() {
     // Extract scale and translate values using regex
     const scaleFactor = 1 / parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
     
+    console.log(zoomX, zoomY)
+
     // Build the new transform string
     const newTransform = `
         translate(calc(-50% * (1 - ${scaleFactor})), -50%)
@@ -1834,17 +1867,23 @@ let zoomP = 1;
 forPuzzle.addEventListener('wheel', (event) => {
     event.preventDefault();
     if (event.deltaY < 0) {
-        const co = puzzle.relativeMouseCoordinates(event);
-        zoomX = -co.p_x + 1/2;
-        zoomY = -co.p_y + 1/2;
-        zoomP = 2;
-        updateZoomAndPosition();
+        if(zoomP == 1){
+            const co = puzzle.relativeMouseCoordinates(event);
+            zoomX = -co.p_x + 1/2;
+            zoomY = -co.p_y + 1/2;
+            zoomP = 2;
+        }else{
+            const co = puzzle.relativeMouseCoordinates(event);
+            zoomX = 2 * (-co.p_x + 1/2);
+            zoomY = 2 * (-co.p_y + 1/2);
+            zoomP = 3;
+        }
     } else {
         zoomX = 0;
         zoomY = 0;
         zoomP = 1;
-        updateZoomAndPosition();
     }
+    updateZoomAndPosition();
 });
 
 let lastTap = 0;
@@ -1859,13 +1898,16 @@ forPuzzle.addEventListener('touchend', (event) => {
             zoomX = -co.p_x + 1/2;
             zoomY = -co.p_y + 1/2;
             zoomP = 2;
-            updateZoomAndPosition();
-        } else {
+        } else if(window.additional_zoom === 2) {
+            zoomX = 2 * (-co.p_x + 1/2);
+            zoomY = 2 * (-co.p_y + 1/2);
+            zoomP = 3;
+        } else{
             zoomX = 0;
             zoomY = 0;
             zoomP = 1;
-            updateZoomAndPosition();
         }
+        updateZoomAndPosition();
     }
     lastTap = currentTime;
 });

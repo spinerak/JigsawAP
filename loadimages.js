@@ -37,6 +37,7 @@ window.possibleImages = [
     "https://d17c72h1ypygg7.cloudfront.net/subnautica/files/2014/03/CoralReefZone_9_TwistyBridges_HighRes.jpg/Coral_Reef_Zone_9_Twisty_Bridges_High_Res_133b5cefec.jpg",
     "https://images3.alphacoders.com/725/725586.png",
     "https://static1.dualshockersimages.com/wordpress/wp-content/uploads/2019/02/985499.jpg",
+    "https://images2.alphacoders.com/100/thumb-1920-1002525.jpg"
 ]
 console.log("Loaded images!");
 
