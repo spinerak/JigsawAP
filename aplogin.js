@@ -660,4 +660,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.4.2")
+console.log("0.5.0")
