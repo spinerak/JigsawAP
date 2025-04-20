@@ -26,7 +26,9 @@ function random() {
 }
 
 function setRandomSeed(newSeed) {
-    seed = newSeed;
+    if (typeof newSeed === 'number') {
+        seed = newSeed;
+    }
 }
 
 const mhypot = Math.hypot,
@@ -448,6 +450,7 @@ class PolyPiece {
             }
             if(this.hinted){
                 this.hinted = false;
+                // this.polypiece_canvas.classList.remove('hinted');
                 forceRedraw = true;
             }
         } // for k
@@ -903,7 +906,16 @@ class Puzzle {
 
         // Set the seed of Math.random to window.apseed
         if(window.apseed){
-            setRandomSeed(window.apseed % 10000);
+            console.log(window.apseed)
+            if (typeof window.apseed !== 'number' || !Number.isInteger(window.apseed)) {
+                const hash = Array.from(String(window.apseed)).reduce((acc, char) => {
+                    return acc * 31 + char.charCodeAt(0);
+                }, 0);
+                console.log(hash)
+                setRandomSeed((hash + window.slot) % 10000);
+            } else {
+                setRandomSeed((window.apseed + window.slot) % 10000);
+            }
         }
 
         this.container.innerHTML = ""; // forget contents
@@ -1408,11 +1420,13 @@ let moving; // for information about moved piece
                         for (let [key, value] of Object.entries(results)) {
                             let spl = key.split("_")[3];
                             if (spl === "O"){
+                                console.log("value is", value)
                                 if(value){
                                     if(Math.abs(parseFloat(value) - puzzle.srcImage.width / puzzle.srcImage.height) > 0.05){
                                         alert("Warning, you are not using the same aspect ratio as before. Pieces might not be in the correct relative position. You can refresh now to discard this login (if you do ignore this error next time).")
                                     }
                                 }
+                                console.log("put to ", puzzle.srcImage.width / puzzle.srcImage.height)
                                 change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                             }else{
                                 if(value){
@@ -2031,6 +2045,12 @@ async function change_savedata_datastorage(key, value, final) {
 
     //client.storage.prepare(`JIG_PROG_${window.slot}_${key}`, 0).replace(value).commit();
     const key_name = `JIG_PROG_${window.slot}_${key}`;
+
+    if (key == "M" || key == "O") {
+        const client = window.getAPClient();
+        client.storage.prepare(key_name, 0).replace(value).commit();
+        return;
+    }
     
     if(final){ //make sure you only replace it to lower values.
         const client = window.getAPClient();
@@ -2050,7 +2070,6 @@ async function change_savedata_datastorage(key, value, final) {
             // If X is not a list, replace the current value
             client.storage.prepare(key_name, [0,0]).replace(value).commit();
         }
-
     }else{
         const client = window.getAPClient();
         if (!window.bounceTimeout) {
@@ -2139,19 +2158,23 @@ function askForHint(alsoConnect = false){
                     if(!pp1.hinted){
                         pp1.hinted = true;
                         pp1.polypiece_drawImage(false);
+                        // pp1.polypiece_canvas.classList.add('hinted')
                         return;
                     }
                     if(!pp2.hinted){
                         pp2.hinted = true;
                         pp2.polypiece_drawImage(false);
+                        // pp2.polypiece_canvas.classList.add('hinted')
                         return;
                     }
                 }else{
                     // compare polypieces sizes to move smallest one
                     if (pp1.pieces.length > pp2.pieces.length  || (pp1.pieces.length == pp2.pieces.length && pp1.pieces[0].index > pp2.pieces[0].index)) {
                         pp1.merge(pp2);
+                        console.log(pp1)
                     } else {
                         pp2.merge(pp1);
+                        console.log(pp2)
                     }
                     console.log('merged')
                     return;

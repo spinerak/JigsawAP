@@ -421,6 +421,7 @@ function newItems(items, index) {
 }
 
 function openItems(items){
+    console.log(items)
     let itemUnlocked = false;
     for (let i = 0; i < items.length; i++) {
         // console.log(items[i], puzzlePieceOrder)
@@ -433,7 +434,7 @@ function openItems(items){
         if (match) {
             number_of_pieces = parseInt(match[1], 10);
         }
-
+        // console.log(number_of_pieces)
 
         for(let c = 0; c < number_of_pieces; c++){
             if(puzzlePieceOrder){
@@ -659,4 +660,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.4.0a")
+console.log("0.4.2")
