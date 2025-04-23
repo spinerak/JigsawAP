@@ -355,6 +355,15 @@ class Piece {
     } // Piece.scale
 } // class Piece
 //--------------------------------------------------------------
+
+function rotateVector(x, y, rotations) {
+    rotations = (rotations + 4 ) % 4; // Ensure rotations are within 0-3
+    for (let i = 0; i < rotations; i++) {
+        [x, y] = [y, -x]; // Rotate 90 degrees clockwise
+    }
+    return { x, y };
+}
+
 //--------------------------------------------------------------
 class PolyPiece {
 
@@ -370,6 +379,7 @@ class PolyPiece {
         this.puzzle = puzzle;
         this.listLoops();
         this.hinted = false;
+        this.rot = 0;
 
         this.polypiece_canvas = document.createElement('CANVAS');
         // size and z-index will be defined later
@@ -397,6 +407,11 @@ class PolyPiece {
 
         const orgpckxmin = this.pckxmin;
         const orgpckymin = this.pckymin;
+        const orgpckxmax = this.pckxmax;
+        const orgpckymax = this.pckymax;
+
+        const orgcx = this.x + (this.nx-1) * this.puzzle.scalex / 2;
+        const orgcy = this.y + (this.ny-1) * this.puzzle.scaley / 2;
 
         // remove otherPoly from list of polypieces
         const kOther = this.puzzle.polyPieces.indexOf(otherPoly);
@@ -466,39 +481,48 @@ class PolyPiece {
 
         this.polypiece_drawImage(!forceRedraw);
 
-        this.moveTo(this.x + this.puzzle.scalex * (this.pckxmin - orgpckxmin),
-            this.y + this.puzzle.scaley * (this.pckymin - orgpckymin));
+        const r1 =  -(this.pckxmin - orgpckxmin) * this.puzzle.scalex / 2 - (this.pckxmax - orgpckxmax) * this.puzzle.scalex / 2;
+        const r2 =  -(this.pckymin - orgpckymin) * this.puzzle.scaley / 2 - (this.pckymax - orgpckymax) * this.puzzle.scaley / 2;
+        const r = rotateVector(r1, r2, -this.rot);
 
-        // if(window.gameplayStarted){
-        //     // console.log("move after merge")
-        //     change_savedata_datastorage(this.pieces[0].index, [this.x / puzzle.contWidth, this.y / puzzle.contHeight], true);
-        // }
+        this.moveTo(
+            orgcx - (this.nx-1) * this.puzzle.scalex / 2 - r.x,
+            orgcy - (this.ny-1) * this.puzzle.scaley / 2 - r.y
+        );
+
+
+
 
         this.puzzle.evaluateZIndex();
 
         newMerge(changingIndex);
 
-
     } // merge
 
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
-    ifNear(otherPoly, ignoreCloseness = false) {
+    ifNear(otherPoly, ignoreCloseness = false, ignoreRotation = false) {
 
         if(this.pieces.length > otherPoly.pieces.length){
-            return otherPoly.ifNear(this, ignoreCloseness)
+            return otherPoly.ifNear(this, ignoreCloseness, ignoreRotation)
         }
+
+        if(!ignoreRotation && this.rot != otherPoly.rot) return false;
 
         let puzzle = this.puzzle;
 
         // coordinates of origin of full picture for this PolyPieces
-        let x = this.x - puzzle.scalex * this.pckxmin;
-        let y = this.y - puzzle.scaley * this.pckymin;
+        let rotated = rotateVector(this.x + this.nx * puzzle.scalex / 2, this.y + this.ny * puzzle.scaley / 2, this.rot);
+        let pprotated = rotateVector(otherPoly.x + otherPoly.nx * puzzle.scalex / 2, otherPoly.y + otherPoly.ny * puzzle.scaley / 2, otherPoly.rot);
+        
+        let x = rotated.x - puzzle.scalex * (this.pckxmax + this.pckxmin) / 2;
+        let y = rotated.y - puzzle.scaley * (this.pckymax + this.pckymin) / 2;
 
-        let ppx = otherPoly.x - puzzle.scalex * otherPoly.pckxmin;
-        let ppy = otherPoly.y - puzzle.scaley * otherPoly.pckymin;
+        let ppx = pprotated.x - puzzle.scalex * (otherPoly.pckxmax + otherPoly.pckxmin) / 2;
+        let ppy = pprotated.y - puzzle.scaley * (otherPoly.pckymax + otherPoly.pckymin) / 2;
+
 
         if(!ignoreCloseness){
-            if (mhypot(x - ppx, y - ppy) >= puzzle.dConnect) return false; // not close enough
+            if (((x - ppx)**2 + (y - ppy)**2) >= puzzle.dConnect) return false; // not close enough
         }
 
         // this and otherPoly are in good relative position, have they a common side ?
@@ -809,6 +833,61 @@ class PolyPiece {
         this.polypiece_canvas.style.left = (this.x) + 'px';
         this.polypiece_canvas.style.top = (this.y) + 'px';
     } //
+
+    moveAwayFromBorder(){
+        const cx = this.x + (this.nx) * this.puzzle.scalex / 2;
+        const cy = this.y + (this.ny) * this.puzzle.scaley / 2;
+
+        let len = (this.nx) * this.puzzle.scalex / 2 - this.puzzle.scalex;
+        let wid = (this.ny) * this.puzzle.scaley / 2 - this.puzzle.scaley;
+        if(this.rot == 1 || this.rot == 3){
+            len = (this.ny) * this.puzzle.scaley / 2 - this.puzzle.scaley;
+            wid = (this.nx) * this.puzzle.scalex / 2 - this.puzzle.scalex;
+        }
+
+        let dx = 0
+        if(cx - len < 0){
+            dx = cx - len;
+        }
+        if(cx + len > this.puzzle.contWidth){
+            dx = cx + len - this.puzzle.contWidth;
+        }
+        let dy = 0
+        if(cy - wid < 0){
+            dy = cy - wid;
+        }
+        if(cy + wid > this.puzzle.contHeight){
+            dy = cy + wid - this.puzzle.contHeight;
+        }
+
+        if(dx!=0 || dy!=0){
+            this.moveTo(this.x - dx, this.y - dy);
+        }
+    }
+
+    rotate(moving) {
+
+        this.rot = ((this.rot + 1) % 4) | 0;
+        const currentTransform = this.polypiece_canvas.style.transform.replace(/rotate\([-\d.]+deg\)/, '');
+        this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * 90}deg)`;
+
+
+        // Adjust position to ensure the piece stays under the cursor
+        const centerX = this.x + (this.polypiece_canvas.width / 2);
+        const centerY = this.y + (this.polypiece_canvas.height / 2);
+
+        const offsetX = moving.xMouse - centerX;
+        const offsetY = moving.yMouse - centerY;
+
+        const changeX = offsetX + offsetY
+        const changeY = offsetY - offsetX
+
+        moving.ppXInit += changeX;
+        moving.ppYInit += changeY;
+
+        this.moveTo(this.x + changeX, this.y + changeY);
+        this.moveAwayFromBorder();
+    }
 
 } // class PolyPiece
 
@@ -1132,8 +1211,8 @@ class Puzzle {
 
         /* computes the distance below which two pieces connect
             depends on the actual size of pieces, with lower limit */
-        this.dConnect = 0.9 * mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
-
+        this.dConnect = 0.85 * mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
+        this.dConnect *= this.dConnect; // square of distance
 
 
     } // Puzzle.scale
@@ -1588,14 +1667,22 @@ let moving; // for information about moved piece
 
                 moving = {
                     xMouseInit: event_x,
-                    yMouseInit: event_y
+                    yMouseInit: event_y,
+                    xMouse: event_x,
+                    yMouse: event_y
                 }
 
                 /* evaluates if contact inside a PolyPiece, by decreasing z-index */
                 puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
                 for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
                     let pp = puzzle.polyPieces[k];
-                    if (pp.polypiece_ctx.isPointInPath(pp.path, event_x - pp.x, event_y - pp.y)) {
+                    
+                    const cx = pp.x + pp.nx * puzzle.scalex / 2;
+                    const cy = pp.y + pp.ny * puzzle.scaley / 2;
+                    
+                    const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
+
+                    if (pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) { // event_x - pp.x, event_y - pp.y
                         moving.pp = pp;
                         moving.ppXInit = pp.x;
                         moving.ppYInit = pp.y;
@@ -1647,26 +1734,15 @@ let moving; // for information about moved piece
                     case "move":
                         const event2_x = event.position.x;
                         const event2_y = event.position.y;
-                        // console.log(event2_x, event2_y)
+                        moving.xMouse = event2_x;
+                        moving.yMouse = event2_y;
                         let to_x = event2_x - moving.xMouseInit + moving.ppXInit;
                         let to_y = event2_y - moving.yMouseInit + moving.ppYInit;
-                        to_x = mmin(
-                            mmax(
-                                to_x, 
-                                - (moving.pp.nx-1) * puzzle.scalex
-                            ),
-                            puzzle.contWidth - puzzle.scalex
-                        );
-                        to_y = mmin(
-                            mmax(
-                                to_y, 
-                                - (moving.pp.ny-1) * puzzle.scaley
-                            ),
-                            puzzle.contHeight - puzzle.scaley
-                        );
+
 
                         
                         moving.pp.moveTo(to_x, to_y);
+                        moving.pp.moveAwayFromBorder();
                         if (window.gameplayStarted && !window.play_solo) {
                             // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                        
                             change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
@@ -1857,8 +1933,6 @@ function updateZoomAndPosition() {
     // Extract scale and translate values using regex
     const scaleFactor = 1 / parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
     
-    console.log(zoomX, zoomY)
-
     // Build the new transform string
     const newTransform = `
         translate(calc(-50% * (1 - ${scaleFactor})), -50%)
@@ -2153,7 +2227,7 @@ function askForHint(alsoConnect = false){
             if (!unlocked_pieces.includes(pp1.pieces[0].index)) continue;
             if (!unlocked_pieces.includes(pp2.pieces[0].index)) continue;
             
-            if (pp1.ifNear(pp2, true)) { // a match !
+            if (pp1.ifNear(pp2, true, true)) { // a match !
                 if(!alsoConnect){
                     if(!pp1.hinted){
                         pp1.hinted = true;
@@ -2182,14 +2256,24 @@ function askForHint(alsoConnect = false){
             }
         }
     } // for k
-    document.getElementById("m13").textContent = "That's it...";
+    document.getElementById("m13").textContent = "That's it... 🧩";
     setTimeout(() => {
-        document.getElementById("m13").textContent = "Hint";
+        document.getElementById("m13").textContent = "💡✏️🧩";
     }, 2000);
 }
 
 window.debug = localStorage.getItem("debug") == "yes";
 
+document.addEventListener('keydown', function(event) {
+    if(event.key === 'R' || event.key === 'r'){
+        if(moving && moving.pp){
+            moving.pp.rotate(moving);
+        }
+    }
+});
+
+
+// debug :)
 document.addEventListener('keydown', function(event) {
     if(!window.debug) return;
     if (event.key === 'S' || event.key === 's' || event.key === 'H' || event.key === 'h') {
