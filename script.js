@@ -1,8 +1,10 @@
 "use strict";
 
-// var downsize_to_fit = localStorage.getItem("option_downsize");
-// if (downsize_to_fit === null) downsize_to_fit = 0.85;
-var downsize_to_fit = 0.85;
+window.downsize_to_fit = 0.85;
+window.show_clue = true;
+window.rotations = 360;
+window.zero_list = [0,0];
+
 var accept_pending_actions = false;
 var process_pending_actions = false;
 
@@ -865,28 +867,40 @@ class PolyPiece {
         }
     }
 
-    rotate(moving) {
+    rotateTo(rot){
+        this.rotate(null, rot - this.rot);
+    }
 
-        this.rot = ((this.rot + 1) % 4) | 0;
+    rotate(moving, increase = 1) {
+
+        this.rot = ((this.rot + increase + 4) % 4) | 0;
         const currentTransform = this.polypiece_canvas.style.transform.replace(/rotate\([-\d.]+deg\)/, '');
         this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * 90}deg)`;
 
+        if(moving){
+            increase = (increase + 4) % 4;
 
-        // Adjust position to ensure the piece stays under the cursor
-        const centerX = this.x + (this.polypiece_canvas.width / 2);
-        const centerY = this.y + (this.polypiece_canvas.height / 2);
+            for(let i = 0; i < increase; i++){
+                // Adjust position to ensure the piece stays under the cursor
+                const centerX = this.x + (this.polypiece_canvas.width / 2);
+                const centerY = this.y + (this.polypiece_canvas.height / 2);
 
-        const offsetX = moving.xMouse - centerX;
-        const offsetY = moving.yMouse - centerY;
+                const offsetX = moving.xMouse - centerX;
+                const offsetY = moving.yMouse - centerY;
 
-        const changeX = offsetX + offsetY
-        const changeY = offsetY - offsetX
+                const changeX = offsetX + offsetY
+                const changeY = offsetY - offsetX
 
-        moving.ppXInit += changeX;
-        moving.ppYInit += changeY;
+                moving.ppXInit += changeX;
+                moving.ppYInit += changeY;
 
-        this.moveTo(this.x + changeX, this.y + changeY);
-        this.moveAwayFromBorder();
+                this.x = this.x + changeX;
+                this.y = this.y + changeY;
+
+                this.moveTo(this.x, this.y);
+                this.moveAwayFromBorder();
+            }
+        }
     }
 
 } // class PolyPiece
@@ -919,30 +933,43 @@ class Puzzle {
         */
         this.container.addEventListener("mousedown", event => {
             event.preventDefault();
-            events.push({ event: 'touch', position: this.relativeMouseCoordinates(event) });
-            // console.log(event);
+            events.push({ event: 'touch', button: event.button, position: this.relativeMouseCoordinates(event) });
+
+        });
+        this.container.addEventListener("contextmenu", event => {
+            event.preventDefault();
         });
         this.container.addEventListener("touchstart", event => {
             event.preventDefault();
+            if(event.touches.length == 2) {
+                rotateCurrentPiece(); return;
+            }
             if (event.touches.length != 1) return;
             let ev = event.touches[0];
-            events.push({ event: 'touch', position: this.relativeMouseCoordinates(ev) });
+            events.push({ event: 'touch', button: 0, position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
         this.container.addEventListener("mouseup", event => {
             event.preventDefault();
             handleLeave();
         });
-        this.container.addEventListener("touchend", handleLeave);
-        this.container.addEventListener("touchleave", handleLeave);
-        this.container.addEventListener("touchcancel", handleLeave);
+
+        this.container.addEventListener("touchend", event => {
+            if (event.touches.length == 0) handleLeave();
+        });
+        this.container.addEventListener("touchleave", event => {
+            if (event.touches.length == 0) handleLeave();
+        });
+        this.container.addEventListener("touchcancel", event => {
+            if (event.touches.length == 0) handleLeave();
+        });
 
         this.container.addEventListener("mousemove", event => {
             event.preventDefault();
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
             
-            events.push({ event: 'move', position: this.relativeMouseCoordinates(event) })
+            events.push({ event: 'move', button: event.button, position: this.relativeMouseCoordinates(event) })
         });
         this.container.addEventListener("touchmove", event => {
             event.preventDefault();
@@ -951,7 +978,7 @@ class Puzzle {
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
             // console.log("touch", event.offsetX, event.offsetY, event)
-            events.push({ event: 'move', position: this.relativeMouseCoordinates(ev) });
+            events.push({ event: 'move', button: 0, position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
         /* create canvas to contain picture - will be styled later */
@@ -1031,6 +1058,9 @@ class Puzzle {
 
             let ppp = new PolyPiece(pieces_in_group, this);
             ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
+            if(coordinates[key][2]){
+                ppp.rotate(null, coordinates[key][2]);
+            }
             this.polyPieces.push(ppp);
         }
         console.log("done making pieces")
@@ -1188,8 +1218,8 @@ class Puzzle {
             this.srcImage, 
             0, 
             0, 
-            this.gameWidth * downsize_to_fit, 
-            this.gameHeight * downsize_to_fit
+            this.gameWidth * window.downsize_to_fit, 
+            this.gameHeight * window.downsize_to_fit
         ); //safe
         
 
@@ -1197,8 +1227,8 @@ class Puzzle {
         this.gameCanvas.style.zIndex = 100000002;
 
         /* scale pieces */
-        this.scalex = downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
-        this.scaley = downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
+        this.scalex = window.downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
+        this.scaley = window.downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
         
 
         this.pieces.forEach(row => {
@@ -1221,17 +1251,17 @@ class Puzzle {
 
     relativeMouseCoordinates(event) {
 
-    /* takes mouse coordinates from mouse event
-        returns coordinates relative to container, even if page is scrolled or zoommed */
+        /* takes mouse coordinates from mouse event
+            returns coordinates relative to container, even if page is scrolled or zoommed */
 
-    const br = this.container.getBoundingClientRect();
-    
-    return {
-        x: (event.clientX - br.x) * window.scaleFactor / window.additional_zoom,
-        y: (event.clientY - br.y) * window.scaleFactor / window.additional_zoom,
-        p_x: (event.clientX - br.x) / br.width,
-        p_y: (event.clientY - br.y) / br.height
-    };
+        const br = this.container.getBoundingClientRect();
+        
+        return {
+            x: (event.clientX - br.x) * window.scaleFactor / window.additional_zoom,
+            y: (event.clientY - br.y) * window.scaleFactor / window.additional_zoom,
+            p_x: (event.clientX - br.x) / br.width,
+            p_y: (event.clientY - br.y) / br.height
+        };
     } // Puzzle.relativeMouseCoordinates
 
     
@@ -1359,7 +1389,7 @@ let moving; // for information about moved piece
             // remember dimensions of container before resize
             puzzle.getContainerSize();
             if (state == 15 || state > 60) { // resize initial or final picture
-                fitImage(tmpImage, puzzle.contWidth * downsize_to_fit, puzzle.contHeight * downsize_to_fit);
+                fitImage(tmpImage, puzzle.contWidth * window.downsize_to_fit, puzzle.contHeight * window.downsize_to_fit);
             }
             else if (state >= 25) { // resize pieces
                 
@@ -1523,9 +1553,16 @@ let moving; // for information about moved piece
 
                     unlocked_pieces.sort(() => Math.random() - 0.5).forEach(index => {
                         if (window.save_file[index] === undefined) {
+                            let random_rotation = 0
+                            if(window.rotations == 90){
+                                random_rotation = (index * 2345.1234) % 4;
+                            }else if (window.rotations == 180){
+                                random_rotation = int(2 * ((index * 2345.1234) % 2));
+                            }
+                            console.log("ROTATE TO", random_rotation)
                             window.save_file[index] = 
                             [
-                                (index * 4321.1234) % 0.10, (index * 1234.4321) % 0.5
+                                (index * 4321.1234) % 0.10, (index * 1234.4321) % 0.5, random_rotation
                             ];
                         }
                     });
@@ -1661,40 +1698,43 @@ let moving; // for information about moved piece
                 
                 if (event.event != "touch") return;
 
-                const event_x = event.position.x;
-                const event_y = event.position.y;
-                // console.log(event_x, event_y)
-
-                moving = {
-                    xMouseInit: event_x,
-                    yMouseInit: event_y,
-                    xMouse: event_x,
-                    yMouse: event_y
-                }
-
-                /* evaluates if contact inside a PolyPiece, by decreasing z-index */
-                puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
-                for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
-                    let pp = puzzle.polyPieces[k];
-                    
-                    const cx = pp.x + pp.nx * puzzle.scalex / 2;
-                    const cy = pp.y + pp.ny * puzzle.scaley / 2;
-                    
-                    const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
-
-                    if (pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) { // event_x - pp.x, event_y - pp.y
-                        moving.pp = pp;
-                        moving.ppXInit = pp.x;
-                        moving.ppYInit = pp.y;
-                        // move selected piece to top of polypieces stack
-                        puzzle.polyPieces.splice(k, 1);
-                        puzzle.polyPieces.push(pp);
-                        pp.polypiece_canvas.style.zIndex = 100000001; // to foreground
-                        
-                        state = 55;
-                        return;
+                console.log(event)
+                if(event.button == 0){
+                    const event_x = event.position.x;
+                    const event_y = event.position.y;
+                    // console.log(event_x, event_y)
+    
+                    moving = {
+                        xMouseInit: event_x,
+                        yMouseInit: event_y,
+                        xMouse: event_x,
+                        yMouse: event_y
                     }
-                } // for k
+    
+                    /* evaluates if contact inside a PolyPiece, by decreasing z-index */
+                    puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+                    for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
+                        let pp = puzzle.polyPieces[k];
+                        
+                        const cx = pp.x + pp.nx * puzzle.scalex / 2;
+                        const cy = pp.y + pp.ny * puzzle.scaley / 2;
+                        
+                        const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
+    
+                        if (pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) { // event_x - pp.x, event_y - pp.y
+                            moving.pp = pp;
+                            moving.ppXInit = pp.x;
+                            moving.ppYInit = pp.y;
+                            // move selected piece to top of polypieces stack
+                            puzzle.polyPieces.splice(k, 1);
+                            puzzle.polyPieces.push(pp);
+                            pp.polypiece_canvas.style.zIndex = 100000001; // to foreground
+                            
+                            state = 55;
+                            return;
+                        }
+                    } // for k
+                }
 
                 if(zoomP == 1) return;
 
@@ -1717,6 +1757,7 @@ let moving; // for information about moved piece
                         
                         break;
                     case "leave":
+                        moving = null;
                         state = 50;
                         break;
                 }
@@ -1744,8 +1785,12 @@ let moving; // for information about moved piece
                         moving.pp.moveTo(to_x, to_y);
                         moving.pp.moveAwayFromBorder();
                         if (window.gameplayStarted && !window.play_solo) {
-                            // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                        
-                            change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                            // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                 
+                            if(window.rotations == 360){
+                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                            }else{
+                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+                            }    
                         }
 
                         break;
@@ -1771,8 +1816,12 @@ let moving; // for information about moved piece
                         } // for k
 
                         if (window.gameplayStarted && !window.play_solo) {
-                            // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                        
-                            change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
+                            
+                            if(window.rotations == 360){
+                                change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
+                            }else{
+                                change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], true);
+                            }    
                             
                             const currentPieceIndex = moving.pp.pieces[0].index;
                             window.ignore_bounce_pieces.push(currentPieceIndex);
@@ -1837,7 +1886,11 @@ let menu = (function () {
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
         document.getElementById("m10").style.display = "block"
-        document.getElementById("m13").style.display = "block"
+
+        console.log(window.show_clue)
+        if(window.show_clue){
+            document.getElementById("m13").style.display = "block"
+        }
     }
     menu.opened = true;
     }
@@ -1953,30 +2006,36 @@ let zoomX = 0;
 let zoomY = 0;
 let zoomP = 1;
 forPuzzle.addEventListener('wheel', (event) => {
-    event.preventDefault();
-    if (event.deltaY < 0) {
-        if(zoomP == 1){
-            const co = puzzle.relativeMouseCoordinates(event);
-            zoomX = -co.p_x + 1/2;
-            zoomY = -co.p_y + 1/2;
-            zoomP = 2;
-        }else{
-            const co = puzzle.relativeMouseCoordinates(event);
-            zoomX = 2 * (-co.p_x + 1/2);
-            zoomY = 2 * (-co.p_y + 1/2);
-            zoomP = 3;
+    console.log(event, moving)
+    if(moving){
+        rotateCurrentPiece(event.deltaY < 0);
+    }else{
+        event.preventDefault();
+        if (event.deltaY < 0) {
+            if(zoomP == 1){
+                const co = puzzle.relativeMouseCoordinates(event);
+                zoomX = -co.p_x + 1/2;
+                zoomY = -co.p_y + 1/2;
+                zoomP = 2;
+            }else{
+                const co = puzzle.relativeMouseCoordinates(event);
+                zoomX = 2 * (-co.p_x + 1/2);
+                zoomY = 2 * (-co.p_y + 1/2);
+                zoomP = 3;
+            }
+        } else {
+            zoomX = 0;
+            zoomY = 0;
+            zoomP = 1;
         }
-    } else {
-        zoomX = 0;
-        zoomY = 0;
-        zoomP = 1;
+        updateZoomAndPosition();
     }
-    updateZoomAndPosition();
+
 });
 
 let lastTap = 0;
 forPuzzle.addEventListener('touchend', (event) => {
-    console.log("HEYO")
+    if (event.touches.length != 0) return;
     const currentTime = new Date().getTime();
     const tapLength = currentTime - lastTap;
     if (tapLength < 300 && tapLength > 0) {
@@ -2050,6 +2109,13 @@ function unlockPiece(index) {
             (index*43.2345) % (0.05 * puzzle.contWidth),
             (index*73.6132) % (0.05 * puzzle.contHeight)
         );
+        let random_rotation = 0
+        if(window.rotations == 90){
+            random_rotation = (index * 2345.1234) % 4;
+        }else if (window.rotations == 180){
+            random_rotation = 2 * ((index * 2345.1234) % 2);
+        }
+        pp.rotateTo(random_rotation);
     }else if (accept_pending_actions){
         console.log("Adding to pending actions", index)
         pending_actions.push([`x_x_x_${index}`, "unlock", "x"]);
@@ -2106,18 +2172,16 @@ function setImagePath(l){
 
 window.setImagePath = setImagePath;
 
-function move_piece_bounced(pp_index, x, y){
-    do_action(`x_x_x_${pp_index}`, [x,y], [0,0], true);
+function move_piece_bounced(data){ // pp_index, x, y, (r)
+    do_action(`x_x_x_${data[0]}`, data[1], window.zero_list, true);
 }
 
 window.move_piece_bounced = move_piece_bounced;
 
 async function change_savedata_datastorage(key, value, final) {
-    // console.log("change_savedata_datastorage", key, value, final)
     
     if(window.play_solo) return;
 
-    //client.storage.prepare(`JIG_PROG_${window.slot}_${key}`, 0).replace(value).commit();
     const key_name = `JIG_PROG_${window.slot}_${key}`;
 
     if (key == "M" || key == "O") {
@@ -2133,22 +2197,22 @@ async function change_savedata_datastorage(key, value, final) {
         currentValue = currentValue[key_name];
         console.log("currentValue", currentValue, key_name)
         if (currentValue === null) {
-            client.storage.prepare(key_name, [0,0]).replace(value).commit();
+            client.storage.prepare(key_name, window.zero_list).replace(value).commit();
         } else if (Array.isArray(currentValue) && Array.isArray(value)) {
             // Only replace if both are lists
-            client.storage.prepare(key_name, [0,0]).replace(value).commit();
+            client.storage.prepare(key_name, window.zero_list).replace(value).commit();
         } else if (typeof currentValue === "number" && typeof value === "number") {
             // Replace only if value < currentValue
             client.storage.prepare(key_name, 999999).replace(Math.min(currentValue, value)).commit();
         } else if (!Array.isArray(value)) {
             // If X is not a list, replace the current value
-            client.storage.prepare(key_name, [0,0]).replace(value).commit();
+            client.storage.prepare(key_name, window.zero_list).replace(value).commit();
         }
     }else{
         const client = window.getAPClient();
         if (!window.bounceTimeout) {
             // console.log("sending bounce", [key, value[0], value[1]])
-            client.bounce({"slots": [window.slot]}, [key, value[0], value[1]]);
+            client.bounce({"slots": [window.slot]}, [key, value]);
             window.bounceTimeout = setTimeout(() => {
                 window.bounceTimeout = null;
             }, 50);
@@ -2177,20 +2241,34 @@ function do_action(key, value, oldValue, bounce){
             if(moving_that_piece){
                 return;
             }
-            let [x,y] = [0,0];
+            let [x,y,r] = [0,0,0];
             if(value == "unlock"){
-                [x,y] = 
+                let random_rotation = 0
+                if(window.rotations == 90){
+                    random_rotation = (index * 2345.1234) % 4;
+                }else if (window.rotations == 180){
+                    random_rotation = 2 * ((index * 2345.1234) % 2);
+                }
+                [x,y,r] = 
                     [
                         (pp_index*43.2345) % 0.05,
-                        (pp_index*73.6132) % 0.05
+                        (pp_index*73.6132) % 0.05,
+                        random_rotation
                     ];
             }else{
-                [x, y] = value;
+                if (value.length == 3) {
+                    [x, y, r] = value;
+                } else if (value.length == 2) {
+                    [x, y] = value;
+                    r = 0;
+                }
             }
             if (pp) {
                 if(!bounce || (bounce && !window.ignore_bounce_pieces.includes(pp_index))){
                     // console.log("moving because of action", key, value, bounce);
                     pp.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
+                    pp.rotateTo(r);
+                    console.log("ROTATE TO", r)
                 }
             }
         } else { // value is an int
@@ -2258,17 +2336,37 @@ function askForHint(alsoConnect = false){
     } // for k
     document.getElementById("m13").textContent = "That's it... 🧩";
     setTimeout(() => {
-        document.getElementById("m13").textContent = "💡✏️🧩";
+        document.getElementById("m13").textContent = "Clue 💡✏️🧩";
     }, 2000);
 }
 
 window.debug = localStorage.getItem("debug") == "yes";
 
+function rotateCurrentPiece(counter = false){
+    if(!moving || typeof moving === 'undefined'){
+        return;
+    }
+
+    console.log(moving, counter)
+    if(window.rotations < 360){
+        if(window.rotations == 180){
+            moving.pp.rotate(moving, 2);
+        }
+        if(window.rotations == 90){
+            if(counter){
+                moving.pp.rotate(moving, -1);
+            }else{
+                moving.pp.rotate(moving);
+            }
+        }
+    }
+    
+    change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
+}
+
 document.addEventListener('keydown', function(event) {
     if(event.key === 'R' || event.key === 'r'){
-        if(moving && moving.pp){
-            moving.pp.rotate(moving);
-        }
+        rotateCurrentPiece();
     }
 });
 

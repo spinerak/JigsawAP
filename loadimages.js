@@ -39,7 +39,7 @@ window.possibleImages = [
     "https://static1.dualshockersimages.com/wordpress/wp-content/uploads/2019/02/985499.jpg",
     "https://images2.alphacoders.com/100/thumb-1920-1002525.jpg",
     "https://wallpapersok.com/images/hd/old-school-runescape-skeleton-uihndy4ql6un7wth.jpg",
-    "https://static.wikia.nocookie.net/megaman/images/a/a9/Mm3jp.png/revision/latest/",
+    "https://images.nintendolife.com/aa03cf17c9520/mm3-jp.large.jpg",
     "https://i.ibb.co/yFhNcKdg/2025042.jpg"
 ]
 console.log("Loaded images!");

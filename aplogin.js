@@ -17,6 +17,13 @@ document.getElementById('password').value = getUrlParameter('password') || '';
 document.getElementById("loginbutton").addEventListener("click", pressed_login);
 
 document.getElementById("solobutton").addEventListener("click", pressed_solo);
+document.getElementById("solobutton2").addEventListener("click", () => {
+    window.rotations = 90;
+    if(window.rotations != 360){
+        window.zero_list = [0,0,0];
+    }
+    pressed_solo();
+});
 
 document.getElementById("optionsbutton").addEventListener("click", () => {
     window.open('options.html', '_blank');
@@ -271,6 +278,19 @@ const connectedListener = (packet) => {
 
     console.log("Connected packet:",packet);
     window.set_puzzle_dim(packet.slot_data.nx, packet.slot_data.ny);
+
+    if(packet.slot_data.total_size_of_image){
+        window.downsize_to_fit = packet.slot_data.total_size_of_image / 100;
+    }
+    if (packet.slot_data.enable_clues !== undefined) {
+        window.show_clue = packet.slot_data.enable_clues === 1;
+    }
+    if (packet.slot_data.rotations){
+        window.rotations = packet.slot_data.rotations;
+        if(window.rotations != 360){
+            window.zero_list = [0,0,0];
+        }
+    }
     
     puzzlePieceOrder = packet.slot_data.piece_order;
 
@@ -388,7 +408,7 @@ function setImage(url){
 const bouncedListener = (packet) => {
     if(packet){
         if(packet.data){
-            window.move_piece_bounced(packet.data[0], packet.data[1], packet.data[2]);
+            window.move_piece_bounced(packet.data);
         }
     }
 }
@@ -660,4 +680,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.5.0")
+console.log("0.6.0")
