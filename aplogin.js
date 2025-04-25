@@ -269,9 +269,17 @@ const connectedListener = (packet) => {
         }
         window.location.href = "/index020.html";
         return;
-    }else{
-        console.log("This apworld version should work", packet.slot_data.ap_world_version)
     }
+    if(["0.3.0", "0.4.0", "0.4.1", "0.5.0"].includes(apworld)){
+        if(!localStorage.getItem("referredTo030")){
+            alert("There is a newer apworld with many updates and upgrades, including rotating pieces! But this version works here too :3. You will only see this message once.")
+            localStorage.setItem("referredTo030", true);
+        }
+    }
+    
+
+    console.log("This apworld version should work", packet.slot_data.ap_world_version)
+    
 
     document.getElementById("m6").innerText = apstatus;
     
@@ -310,57 +318,74 @@ const connectedListener = (packet) => {
     }
     window.defaultImagePath = imagePath;
 
+    console.log("Start loading image", apworld)  
     if(apworld == "0.2.0" || apworld == "0.3.0"){
-        if(localStorage.getItem(`image_${window.apseed}_${window.slot}`)){
-            imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
-        }
-    }else{
-        const dbRequest = indexedDB.open("ImageDatabase", 1);
-
-        dbRequest.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains("images")) {
-                db.createObjectStore("images", { keyPath: "id" });
-            }
-        };
-
-        dbRequest.onsuccess = (event) => {
-            const db = event.target.result;
-            const transaction = db.transaction(["images"], "readonly");
-            const store = transaction.objectStore("images");
-            const getRequest = store.get(`${window.apseed}_${window.slot}`);
-
-            getRequest.onsuccess = () => {
-                if (getRequest.result) {
-                    imagePath = getRequest.result.imagePath;
-                } else {
-                    console.log("Image not found in IndexedDB, using default image.");
-                }
-                window.imagePath = imagePath;
-                setImage(imagePath);
-            };
-
-            getRequest.onerror = () => {
-                console.log("Error retrieving image from IndexedDB.");
-                window.imagePath = imagePath;
-                setImage(imagePath);
-            };
-        };
-
-        dbRequest.onerror = () => {
-            console.log("Error opening IndexedDB.");
+        const overrideImage = getUrlParameter('image');
+        if (overrideImage !== '') {
+            imagePath = overrideImage;
             window.imagePath = imagePath;
             setImage(imagePath);
-        };
+            console.log(window.imagePath);
+        }else{
+            if(localStorage.getItem(`image_${window.apseed}_${window.slot}`)){
+                imagePath = localStorage.getItem(`image_${window.apseed}_${window.slot}`);
+            }
+            window.imagePath = imagePath;
+            setImage(imagePath);
+            console.log(window.imagePath);
+        }
+    }else{
+
+        console.log("Start loading image")    
+        const overrideImage = getUrlParameter('image');
+        if (overrideImage !== '') {
+            imagePath = overrideImage;
+            window.imagePath = imagePath;
+            setImage(imagePath);
+            console.log(window.imagePath);
+        }else{
+            const dbRequest = indexedDB.open("ImageDatabase", 1);
+
+            dbRequest.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains("images")) {
+                    db.createObjectStore("images", { keyPath: "id" });
+                }
+            };
+
+            dbRequest.onsuccess = (event) => {
+                const db = event.target.result;
+                const transaction = db.transaction(["images"], "readonly");
+                const store = transaction.objectStore("images");
+                const getRequest = store.get(`${window.apseed}_${window.slot}`);
+
+                getRequest.onsuccess = () => {
+                    if (getRequest.result) {
+                        imagePath = getRequest.result.imagePath;
+                    } else {
+                        console.log("Image not found in IndexedDB, using default image.");
+                    }
+                    window.imagePath = imagePath;
+                    setImage(imagePath);
+                    console.log(window.imagePath);
+                };
+
+                getRequest.onerror = () => {
+                    console.log("Error retrieving image from IndexedDB.");
+                    window.imagePath = imagePath;
+                    setImage(imagePath);
+                };
+            };
+
+            dbRequest.onerror = () => {
+                console.log("Error opening IndexedDB.");
+                window.imagePath = imagePath;
+                setImage(imagePath);
+            };
+        }
     }
 
-    const overrideImage = getUrlParameter('image');
-    if (overrideImage !== '') {
-        imagePath = overrideImage;
-    }
 
-    window.imagePath = imagePath;
-    setImage(imagePath);
     
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
