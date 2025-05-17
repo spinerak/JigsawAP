@@ -227,12 +227,20 @@ function adjustedSize(draggable) {
         const heightVH = parseFloat(draggable.style.height);
         // console.log(`Draggable1 Size: ${widthVW}vw, ${heightVH}vh`);
         localStorage.setItem('draggable1Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+        if(window.is_connected){
+            const suffix = `_${window.apseed}_${window.slot}`;
+            localStorage.setItem('draggable1Size' + suffix, JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+        }
     }
     if (draggable === draggable2) {
         const widthVW = parseFloat(draggable.style.width);
         const heightVH = parseFloat(draggable.style.height);
         // console.log(`Draggable2 Size: ${widthVW}vw, ${heightVH}vh`);
         localStorage.setItem('draggable2Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+        if(window.is_connected){
+            const suffix = `_${window.apseed}_${window.slot}`;
+            localStorage.setItem('draggable2Size' + suffix, JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+        }
     }
 }
 
@@ -242,36 +250,60 @@ function adjustedPosition(draggable) {
         const topVH = parseFloat(draggable.style.top);
         // console.log(`Draggable1 Position: ${leftVW}vw, ${topVH}vh`);
         localStorage.setItem('draggable1Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+        if(window.is_connected){
+            const suffix = `_${window.apseed}_${window.slot}`;
+            localStorage.setItem('draggable1Position' + suffix, JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+        }
     }
     if (draggable === draggable2) {
         const leftVW = parseFloat(draggable.style.left);
         const topVH = parseFloat(draggable.style.top);
         // console.log(`Draggable2 Position: ${leftVW}vw, ${topVH}vh`);
         localStorage.setItem('draggable2Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+        if(window.is_connected){
+            const suffix = `_${window.apseed}_${window.slot}`;
+            localStorage.setItem('draggable2Position' + suffix, JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+        }
     }
 }
 
-// Load saved positions and sizes from localStorage
-if (localStorage.getItem('draggable1Position')) {
-    const draggable1Position = JSON.parse(localStorage.getItem('draggable1Position'));
-    draggable1.style.left = `${draggable1Position.width}`;
-    draggable1.style.top = `${draggable1Position.height}`;
+function getPreviousSizeAndPosition() {
+    let ids = ['draggable1Position', 'draggable1Size', 'draggable2Position', 'draggable2Size'];
+    if(window.is_connected){
+        const suffix = `_${window.apseed}_${window.slot}`;
+        ids = [
+            `draggable1Position${suffix}`,
+            `draggable1Size${suffix}`,
+            `draggable2Position${suffix}`,
+            `draggable2Size${suffix}`
+        ];
+    }
+    // Load saved positions and sizes from localStorage
+    if (localStorage.getItem(ids[0])) {
+        const draggable1Position = JSON.parse(localStorage.getItem(ids[0]));
+        draggable1.style.left = `${draggable1Position.width}`;
+        draggable1.style.top = `${draggable1Position.height}`;
+    }
+    if (localStorage.getItem(ids[1])) {
+        const draggable1Size = JSON.parse(localStorage.getItem(ids[1]));
+        draggable1.style.width = `${draggable1Size.width}`;
+        draggable1.style.height = `${draggable1Size.height}`;
+    }
+    if (localStorage.getItem(ids[2])) {
+        const draggable2Position = JSON.parse(localStorage.getItem(ids[2]));
+        draggable2.style.left = `${draggable2Position.width}`;
+        draggable2.style.top = `${draggable2Position.height}`;
+    }
+    if (localStorage.getItem(ids[3])) {
+        const draggable2Size = JSON.parse(localStorage.getItem(ids[3]));
+        draggable2.style.width = `${draggable2Size.width}`;
+        draggable2.style.height = `${draggable2Size.height}`;
+    }
 }
-if (localStorage.getItem('draggable1Size')) {
-    const draggable1Size = JSON.parse(localStorage.getItem('draggable1Size'));
-    draggable1.style.width = `${draggable1Size.width}`;
-    draggable1.style.height = `${draggable1Size.height}`;
-}
-if (localStorage.getItem('draggable2Position')) {
-    const draggable2Position = JSON.parse(localStorage.getItem('draggable2Position'));
-    draggable2.style.left = `${draggable2Position.width}`;
-    draggable2.style.top = `${draggable2Position.height}`;
-}
-if (localStorage.getItem('draggable2Size')) {
-    const draggable2Size = JSON.parse(localStorage.getItem('draggable2Size'));
-    draggable2.style.width = `${draggable2Size.width}`;
-    draggable2.style.height = `${draggable2Size.height}`;
-}
+window.getPreviousSizeAndPosition = getPreviousSizeAndPosition;
+// Call the function to set the initial size and position
+getPreviousSizeAndPosition();
+
 
 function sendMessage() {
     const messageInput = document.getElementById('messageInput');

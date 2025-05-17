@@ -19,7 +19,7 @@ document.getElementById("loginbutton").addEventListener("click", pressed_login);
 document.getElementById("solobutton").addEventListener("click", pressed_solo);
 document.getElementById("solobutton2").addEventListener("click", () => {
     window.rotations = 90;
-    if(window.rotations != 360){
+    if(window.rotations > 0){
         window.zero_list = [0,0,0];
     }
     pressed_solo();
@@ -251,6 +251,7 @@ const connectedListener = (packet) => {
 
     window.apseed = packet.slot_data.seed_name;
     window.slot = packet.slot;
+    window.fake_pieces_mimic = packet.slot_data.fake_pieces_mimic;
 
     let apworld = packet.slot_data.ap_world_version
     window.apworld = apworld;
@@ -293,9 +294,12 @@ const connectedListener = (packet) => {
     if (packet.slot_data.enable_clues !== undefined) {
         window.show_clue = packet.slot_data.enable_clues === 1;
     }
+    if (packet.slot_data.fake_pieces !== undefined) {
+        window.fake_pieces = packet.slot_data.fake_pieces;
+    }
     if (packet.slot_data.rotations){
         window.rotations = packet.slot_data.rotations;
-        if(window.rotations != 360){
+        if(window.rotations > 0){
             window.zero_list = [0,0,0];
         }
     }
@@ -396,7 +400,7 @@ const connectedListener = (packet) => {
         window.LoginStart = true;
     }
     window.is_connected = true;
-
+    window.getPreviousSizeAndPosition();
 };
 
 document.getElementById("defaultImageIndex").addEventListener("click", (event) => {
@@ -469,25 +473,28 @@ function openItems(items){
     console.log(items)
     let itemUnlocked = false;
     for (let i = 0; i < items.length; i++) {
-        // console.log(items[i], puzzlePieceOrder)
-        let number_of_pieces = 0;
+        if(items[i] == "1 Fake Puzzle Piece"){
+            window.unlockFakePiece();
+            itemUnlocked = true;
+        }else{
+            let number_of_pieces = 0;
 
-        if(items[i] == "Puzzle Piece" || items[i] == "1 Puzzle Piece"){
-            number_of_pieces = 1;
-        }
-        const match = items[i].match(/^(\d+)\s+Puzzle Pieces?$/);
-        if (match) {
-            number_of_pieces = parseInt(match[1], 10);
-        }
-        // console.log(number_of_pieces)
+            if(items[i] == "Puzzle Piece" || items[i] == "1 Puzzle Piece"){
+                number_of_pieces = 1;
+            }
+            const match = items[i].match(/^(\d+)\s+Puzzle Pieces?$/);
+            if (match) {
+                number_of_pieces = parseInt(match[1], 10);
 
-        for(let c = 0; c < number_of_pieces; c++){
-            if(puzzlePieceOrder){
-                let piece = puzzlePieceOrder.shift();
-                // console.log("Unlocking piece", piece);
-                if (piece !== undefined) {
-                    window.unlockPiece(piece, c == number_of_pieces - 1);
-                    itemUnlocked = true;
+                for(let c = 0; c < number_of_pieces; c++){
+                    if(puzzlePieceOrder){
+                        let piece = puzzlePieceOrder.shift();
+                        // console.log("Unlocking piece", piece);
+                        if (piece !== undefined) {
+                            window.unlockPiece(piece, c == number_of_pieces - 1);
+                            itemUnlocked = true;
+                        }
+                    }
                 }
             }
         }

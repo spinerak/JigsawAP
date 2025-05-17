@@ -40,7 +40,16 @@ window.possibleImages = [
     "https://images2.alphacoders.com/100/thumb-1920-1002525.jpg",
     "https://wallpapersok.com/images/hd/old-school-runescape-skeleton-uihndy4ql6un7wth.jpg",
     "https://images.nintendolife.com/aa03cf17c9520/mm3-jp.large.jpg",
-    "https://i.ibb.co/yFhNcKdg/2025042.jpg"
+    "https://i.ibb.co/yFhNcKdg/2025042.jpg",
+    "https://images4.alphacoders.com/793/793280.jpg",
+    "https://www.mariowiki.com/images/c/c9/DK64_group_wallpaper.jpg",
+    "https://i.imgur.com/MPEMoFi.jpeg",
+    "https://www.mariowiki.com/images/c/c8/Pmw1_800w.jpg",
+    "https://www.mariowiki.com/images/9/9e/Poster_PMTTYD.jpg",
+    "https://static1.thegamerimages.com/wordpress/wp-content/uploads/2019/12/VVVVVV.jpg"
+
+
+
 ]
 console.log("Loaded images!");
 
