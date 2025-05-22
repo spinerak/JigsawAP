@@ -46,8 +46,8 @@ window.possibleImages = [
     "https://i.imgur.com/MPEMoFi.jpeg",
     "https://www.mariowiki.com/images/c/c8/Pmw1_800w.jpg",
     "https://www.mariowiki.com/images/9/9e/Poster_PMTTYD.jpg",
-    "https://static1.thegamerimages.com/wordpress/wp-content/uploads/2019/12/VVVVVV.jpg"
-
+    "https://static1.thegamerimages.com/wordpress/wp-content/uploads/2019/12/VVVVVV.jpg",
+    "https://i.ibb.co/XZJqvqDn/Yoku-s-Island-Express.jpg"
 
 
 ]

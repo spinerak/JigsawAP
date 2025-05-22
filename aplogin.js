@@ -481,10 +481,14 @@ function openItems(items){
 
             if(items[i] == "Puzzle Piece" || items[i] == "1 Puzzle Piece"){
                 number_of_pieces = 1;
+            }else{
+                const match = items[i].match(/^(\d+)\s+Puzzle Pieces?$/);
+                if(match){
+                    number_of_pieces = parseInt(match[1], 10);
+                }
             }
-            const match = items[i].match(/^(\d+)\s+Puzzle Pieces?$/);
-            if (match) {
-                number_of_pieces = parseInt(match[1], 10);
+            if (number_of_pieces > 0) {
+                
 
                 for(let c = 0; c < number_of_pieces; c++){
                     if(puzzlePieceOrder){
@@ -712,4 +716,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.6.0")
+console.log("0.6.2")

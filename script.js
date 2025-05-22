@@ -27,6 +27,10 @@ function random() {
     return x - Math.floor(x);
 }
 
+function randomIn(inputNumber) {
+    return Math.abs(Math.sin(inputNumber * inputNumber));
+}
+
 function setRandomSeed(newSeed) {
     if (typeof newSeed === 'number') {
         seed = newSeed;
@@ -1042,7 +1046,7 @@ class Puzzle {
         */
         this.relativeHeight = (this.srcImage.naturalHeight / this.ny) / (this.srcImage.naturalWidth / this.nx);
 
-        this.defineShapes({ coeffDecentr: 0.12, twistf: [twist0, twist1, twist2, twist3, twist4][document.getElementById("shape").value - 1] });
+        this.defineShapes({ coeffDecentr: 0.12, twistf: [twist0, twist1, twist2, twist3, twist4, null][document.getElementById("shape").value - 1] });
 
         this.polyPieces = [];
 
@@ -1050,7 +1054,6 @@ class Puzzle {
             console.log("coordinates and groups do not have the same length?", coordinates, groups)
         }
 
-        console.log("started making pieces", this.pieces)
         for (let key in coordinates) {
             let pieces_in_group = [];
             for (let ind of groups[key]) {
@@ -1061,14 +1064,12 @@ class Puzzle {
                     w = -ind;
                     h = -1;
                 }
-                console.log(ind, this.pieces, w, h, this.pieces[h], this.pieces[h][w])
                 
                 pieces_in_group.push(this.pieces[h][w]);
                 if(ind != key){
                     newMerge(ind, false);
                 }
             }
-            console.log("pieces in group", pieces_in_group)
             let ppp = new PolyPiece(pieces_in_group, this);
             ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
             if(coordinates[key][2]){
@@ -1076,7 +1077,6 @@ class Puzzle {
             }
             this.polyPieces.push(ppp);
         }
-        console.log("done making pieces", this.polyPieces)
 
         this.evaluateZIndex();
 
@@ -1146,6 +1146,10 @@ class Puzzle {
         for (let ky = -1; ky <= ny+1; ++ky) {
             corners[ky] = [];
             for (let kx = -1; kx <= nx+1; ++kx) {
+                // Randomize coeffDecentr between 0 and 0.5 for each piece
+                if(document.getElementById("shape").value == 6){
+                    coeffDecentr = randomIn(ky * nx + kx + 1 + 1) * .5;
+                }
                 corners[ky][kx] = new Point(kx + alea(-coeffDecentr, coeffDecentr),
                     ky + alea(-coeffDecentr, coeffDecentr));
                 if (kx == 0) corners[ky][kx].x = 0;
@@ -1160,6 +1164,11 @@ class Puzzle {
         for (let ky = 0; ky < ny; ++ky) {
             this.pieces[ky] = [];
             for (let kx = 0; kx < nx; ++kx) {
+                // Randomly select a twist function for this piece
+                if(document.getElementById("shape").value == 6){
+                    let twistFunctions = [twist0, twist1, twist2, twist3];
+                    twistf = twistFunctions[Math.floor(randomIn(ky * nx + kx + 1) * twistFunctions.length)];
+                }
                 this.pieces[ky][kx] = np = new Piece(kx, ky, ky * nx + kx + 1);
                 // top side
                 if (ky == 0) {
