@@ -277,6 +277,12 @@ const connectedListener = (packet) => {
             localStorage.setItem("referredTo030", true);
         }
     }
+    if(["0.6.0", "0.6.1"].includes(apworld)){
+        if(!localStorage.getItem("referredTo060")){
+            alert("There is a newer apworld with chaos piece shape and a surprise. Your yaml should still work for it! ALso this version still works too I guess :3")
+            localStorage.setItem("referredTo060", true);
+        }
+    }
     
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version)
@@ -704,6 +710,17 @@ function jsonListener(text, nodes) {
 }
 window.jsonListener = jsonListener;
 
+const shapeParam = getUrlParameter("shape");
+if (shapeParam) {
+    const shapeSelect = document.getElementById("shape");
+    if (shapeSelect) {
+        const index = parseInt(shapeParam, 10) - 1;
+        if (index >= 0 && index < shapeSelect.options.length) {
+            shapeSelect.selectedIndex = index;
+            console.log("SET!s")
+        }
+    }
+}
 
 if(getUrlParameter("go") == "LS"){
     pressed_login();
