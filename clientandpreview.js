@@ -38,14 +38,13 @@ document.addEventListener('mouseup', () => { isDragging1 = false; });
 
 document.addEventListener('touchend', () => { isDragging1 = false; });
 
-function minimizeDiv1() {
-    draggable1.style.display = 'none';
-    taskbar1.style.display = 'flex';
-}
-
 function restoreDiv1() {
-    draggable1.style.display = 'block';
-    taskbar1.style.display = 'none';
+    draggable1.style.display = (draggable1.style.display === 'none') ? 'block' : 'none';
+    if (draggable1.style.display === 'block' || draggable1.style.display === '') {
+        taskbar1.style.backgroundColor = '#909090'; // lighter color
+    } else {
+        taskbar1.style.backgroundColor = ''; // reset to default
+    }
 }
 
 const draggable2 = document.getElementById('draggable2');
@@ -71,20 +70,20 @@ document.addEventListener('touchmove', (e) => handleDrag(draggable2, isDragging2
 document.addEventListener('mouseup', () => { isDragging2 = false; });
 document.addEventListener('touchend', () => { isDragging2 = false; });
 
-function minimizeDiv2() {
-    draggable2.style.display = 'none';
-    taskbar2.style.display = 'flex';
-}
 
 function restoreDiv2() {
-    draggable2.style.display = 'block';
-    taskbar2.style.display = 'none';
+    draggable2.style.display = (draggable2.style.display === 'none') ? 'block' : 'none';
+    if (draggable2.style.display === 'block' || draggable2.style.display === '') {
+        taskbar2.style.backgroundColor = '#909090'; // lighter color
+    } else {
+        taskbar2.style.backgroundColor = ''; // reset to default
+    }
 }
 
 
-document.getElementById('control-btn1').addEventListener('click', minimizeDiv1);
+document.getElementById('control-btn1').addEventListener('click', restoreDiv1);
 document.getElementById('taskbar1').addEventListener('click', restoreDiv1);
-document.getElementById('control-btn2a').addEventListener('click', minimizeDiv2);
+document.getElementById('control-btn2a').addEventListener('click', restoreDiv2);
 document.getElementById('taskbar2').addEventListener('click', restoreDiv2);
 
 

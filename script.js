@@ -2212,6 +2212,59 @@ function unlockFakePiece() {
     console.log(puzzle.polyPieces)
 }
 
+function doSwapTrap(){
+    let pps = getRandomUnmergesPieces(2);
+    if(pps.length < 2) return;
+    let pp1 = pps[0];
+    let pp2 = pps[1];
+    let x1 = pp1.x;
+    let y1 = pp1.y;
+    let x2 = pp2.x;
+    let y2 = pp2.y;
+    pp1.moveTo(x2, y2);
+    pp2.moveTo(x1, y1);
+    if(window.rotations == 0){
+        change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight], true);
+        change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight], true);
+    }else{
+        change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight, pp1.rot], true);
+        change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight, pp2.rot], true);
+    }   
+}
+function doRotateTrap(){
+    let pps = getRandomUnmergesPieces(1);
+    if(pps.length < 1) return;
+    let pp = pps[0];
+    if(window.rotations == 180){
+        pp.rotate(false, 2);
+    }
+    if(window.rotations == 90){
+        if(Math.random() < 0.333){
+            pp.rotate(false, -1);
+        }else if (Math.random() < 0.5){
+            pp.rotate(false, 1);
+        }else{
+            pp.rotate(false, 2);
+        }
+    }
+    if(window.rotations == 0){
+        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight], true);
+    }else{
+        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
+    }   
+}
+
+function getRandomUnmergesPieces(numberOfPieces) {
+    // Get all PolyPieces that have only one piece (i.e., not merged)
+    if(!puzzle || !puzzle.polyPieces) return [];
+    const singlePieces = puzzle.polyPieces.filter(pp => pp.pieces.length === 1);
+    const singleUnlockedPieces = singlePieces.filter(pp => unlocked_pieces.includes(pp.pieces[0].index) || unlocked_fake_pieces.includes(pp.pieces[0].index));
+    // Shuffle the array
+    const shuffled = singleUnlockedPieces.sort(() => Math.random() - 0.5);
+    // Return up to numberOfPieces PolyPieces
+    return shuffled.slice(0, numberOfPieces);
+}
+
 function updateMergesLabels(){
     document.getElementById("m9").innerText = "Merges in logic: " + window.possible_merges[unlocked_pieces.length];
     document.getElementById("m10").innerText = "Merges possible: " + window.actual_possible_merges[unlocked_pieces.length];
@@ -2219,7 +2272,9 @@ function updateMergesLabels(){
 
 window.unlockPiece = unlockPiece;
 window.unlockFakePiece = unlockFakePiece;
-window.updateMergesLabels = updateMergesLabels
+window.updateMergesLabels = updateMergesLabels;
+window.doSwapTrap = doSwapTrap;
+window.doRotateTrap = doRotateTrap;
 
 var mergedKeys = [];
 
@@ -2393,10 +2448,11 @@ function askForHint(alsoConnect = false){
             let pp1 = puzzle.polyPieces[k];
             let pp2 = puzzle.polyPieces[l];
             if (pp1 == pp2) continue; // don't match with myself
-            if (!unlocked_pieces.includes(pp1.pieces[0].index)) continue;
-            if (!unlocked_pieces.includes(pp2.pieces[0].index)) continue;
+            if (!unlocked_pieces.includes(pp1.pieces[0].index) || pp1.pieces[0].index < 0) continue;
+            if (!unlocked_pieces.includes(pp2.pieces[0].index) || pp2.pieces[0].index < 0) continue;
             
             if (pp1.ifNear(pp2, true, true)) { // a match !
+                console.log("MATCH FOUND!", pp1, pp2);
                 if(!alsoConnect){
                     if(!pp1.hinted){
                         pp1.hinted = true;
@@ -2475,6 +2531,9 @@ document.addEventListener('keydown', function(event) {
     }
     if(event.key === 'Q' || event.key === 'q'){
         window.goTo8888State = true;
+    }
+    if (event.key === 'D' || event.key === 'd') {
+        doRotateTrap();
     }
     if (event.key === 'A' || event.key === 'a') {
         const interval = () => {

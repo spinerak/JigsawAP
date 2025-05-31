@@ -283,6 +283,18 @@ const connectedListener = (packet) => {
             localStorage.setItem("referredTo060", true);
         }
     }
+    if(["0.6.2"].includes(apworld)){
+        if(!localStorage.getItem("referredTo062")){
+            alert("There was a small bug with piece order type, new apworld version is out. But this version still plays fine :3")
+            localStorage.setItem("referredTo062", true);
+        }
+    }
+    if(["0.6.3", "0.6.4", "0.6.5"].includes(apworld)){
+        if(!localStorage.getItem("referredTo063")){
+            alert("There is a newer apworld. Traps are off by default and there are now also Swap and Rotation traps! But this version still works :3")
+            localStorage.setItem("referredTo063", true);
+        }
+    }
     
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version)
@@ -482,6 +494,10 @@ function openItems(items){
         if(items[i] == "1 Fake Puzzle Piece"){
             window.unlockFakePiece();
             itemUnlocked = true;
+        }else if(items[i] == "Rotate Trap"){
+            window.doRotateTrap();
+        }else if(items[i] == "Swap Trap"){
+            window.doSwapTrap();
         }else{
             let number_of_pieces = 0;
 
@@ -494,8 +510,6 @@ function openItems(items){
                 }
             }
             if (number_of_pieces > 0) {
-                
-
                 for(let c = 0; c < number_of_pieces; c++){
                     if(puzzlePieceOrder){
                         let piece = puzzlePieceOrder.shift();
