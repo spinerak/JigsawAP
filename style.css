@@ -60,8 +60,12 @@
 
 
 
-    #m7, #m8, #m9, #m9a, #m10, #m11, #m13 {
+    #m7, #m8, #m9, #m9a, #m10, #m11, #m13, #m13b, #m13c {
       display: none;
+    }
+    #m13, #m13b, #m13c {
+      margin: 0;
+      padding: 0;
     }
 
     #puzzleDIV {

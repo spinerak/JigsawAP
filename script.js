@@ -827,7 +827,7 @@ class PolyPiece {
         
         // Draw a red outline
         if(this.hinted){
-            this.polypiece_ctx.strokeStyle = "red";
+            this.polypiece_ctx.strokeStyle = hint_color;
             this.polypiece_ctx.lineWidth = Math.max(.02 * puzzle.scalex, 5);
             this.polypiece_ctx.stroke(this.path);
         }
@@ -1673,10 +1673,13 @@ let moving; // for information about moved piece
                     } else {
                         let refer_to = value;
                         let groupKey = Object.keys(groups).find(groupKey => groups[groupKey].includes(refer_to));
+                        // console.log(key, refer_to)
                         if (groupKey) {
                             groups[groupKey].push(parseInt(key));
                         } else {
-                            console.log(refer_to, "not found")
+                            console.log(key, refer_to, "not found, gonna go ahead and put it at 0,0")
+                            coordinates[key] = [0,0];
+                            groups[key] = [parseInt(key)];
                         }
                     }
                 }
@@ -1964,7 +1967,9 @@ let menu = (function () {
 
         console.log(window.show_clue)
         if(window.show_clue){
-            document.getElementById("m13").style.display = "block"
+            document.getElementById("m13").style.display = "inline-block"
+            document.getElementById("m13b").style.display = "inline-block"
+            document.getElementById("m13c").style.display = "inline-block"
         }
     }
     menu.opened = true;
@@ -1996,6 +2001,22 @@ document.getElementById("m5a").addEventListener("click", () => {
 
 document.getElementById("m13").addEventListener("click", () => {  
     askForHint(false);
+});
+let hint_color = "red";
+document.getElementById("m13b").addEventListener("click", () => {  
+    if(hint_color == "red"){
+        hint_color = "green";
+        document.getElementById("m13b").style.backgroundColor = "#00ff00";
+    }else if(hint_color == "green"){
+        hint_color = "blue";
+        document.getElementById("m13b").style.backgroundColor = "#0000ff";
+    }else{
+        hint_color = "red";
+        document.getElementById("m13b").style.backgroundColor = "#ff0000";
+    }
+});
+document.getElementById("m13c").addEventListener("click", () => {  
+    removeAllHints();
 });
 
 
@@ -2437,6 +2458,16 @@ function do_action(key, value, oldValue, bounce){
     }
 }
 
+function removeAllHints(){
+    puzzle.polyPieces.forEach(pp => {
+        if(pp.hinted){
+            pp.hinted = false;
+            pp.polypiece_drawImage(false);
+            // pp.polypiece_canvas.classList.remove('hinted')
+        }
+    });
+}
+
 function askForHint(alsoConnect = false){
     if(!window.play_solo && !window.is_connected) return;
     const shuffledIndices = [...Array(puzzle.polyPieces.length).keys()].sort(() => Math.random() - 0.5);
@@ -2481,9 +2512,9 @@ function askForHint(alsoConnect = false){
             }
         }
     } // for k
-    document.getElementById("m13").textContent = "That's it... 🧩";
+    document.getElementById("m13").textContent = "That's it💡";
     setTimeout(() => {
-        document.getElementById("m13").textContent = "Clue 💡✏️🧩";
+        document.getElementById("m13").textContent = "Clue 💡✏️";
     }, 2000);
 }
 
