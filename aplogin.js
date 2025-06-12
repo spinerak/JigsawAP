@@ -40,21 +40,20 @@ function toggleFullscreen() {
         } else if (document.documentElement.webkitRequestFullscreen) { 
             document.documentElement.webkitRequestFullscreen(); // Safari
         }
-        document.getElementById('m11').textContent = 'Exit full screen';
     } else {
         if (document.exitFullscreen) {
             document.exitFullscreen();
         } else if (document.webkitExitFullscreen) { 
             document.webkitExitFullscreen(); // Safari
         }
-        document.getElementById('m11').textContent = 'Go full screen';
     }
 }
 
 // Show the fullscreen button only on mobile devices
 window.addEventListener('load', () => {
     if (isMobile()) {
-        document.getElementById('m11').style.display = 'block';
+        document.getElementById('m11').style.display = 'inline-block';
+        document.getElementById('m11a').style.display = 'inline-block';
         setTimeout(() => window.scrollTo(0, 1), 100); // URL bar hiding trick
     }
 });
@@ -77,6 +76,7 @@ function pressed_solo(){
 
     window.actual_possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 
+    window.fake_pieces_mimic = []
 
     closeMenus();
 
@@ -251,7 +251,11 @@ const connectedListener = (packet) => {
 
     window.apseed = packet.slot_data.seed_name;
     window.slot = packet.slot;
-    window.fake_pieces_mimic = packet.slot_data.fake_pieces_mimic;
+    if(packet.slot_data.fake_pieces_mimic){
+        window.fake_pieces_mimic = packet.slot_data.fake_pieces_mimic;
+    }else{
+        window.fake_pieces_mimic = [];
+    }
 
     let apworld = packet.slot_data.ap_world_version
     window.apworld = apworld;
@@ -312,9 +316,7 @@ const connectedListener = (packet) => {
     if (packet.slot_data.enable_clues !== undefined) {
         window.show_clue = packet.slot_data.enable_clues === 1;
     }
-    if (packet.slot_data.fake_pieces !== undefined) {
-        window.fake_pieces = packet.slot_data.fake_pieces;
-    }
+
     if (packet.slot_data.rotations){
         window.rotations = packet.slot_data.rotations;
         if(window.rotations > 0){
@@ -491,36 +493,42 @@ function openItems(items){
     console.log(items)
     let itemUnlocked = false;
     for (let i = 0; i < items.length; i++) {
-        if(items[i] == "1 Fake Puzzle Piece"){
-            window.unlockFakePiece();
-            itemUnlocked = true;
-        }else if(items[i] == "Rotate Trap"){
-            window.doRotateTrap();
-        }else if(items[i] == "Swap Trap"){
-            window.doSwapTrap();
-        }else{
-            let number_of_pieces = 0;
+        // Normalize "Puzzle Piece" to "1 Puzzle Piece"
+        if (items[i] === "Puzzle Piece") {
+            items[i] = "1 Puzzle Piece";
+        }
+        if (items[i] === "Rotate Trap") {
+            items[i] = "1 Rotate Trap";
+        }
+        if (items[i] === "Swap Trap") {
+            items[i] = "1 Swap Trap";
+        }
 
-            if(items[i] == "Puzzle Piece" || items[i] == "1 Puzzle Piece"){
-                number_of_pieces = 1;
-            }else{
-                const match = items[i].match(/^(\d+)\s+Puzzle Pieces?$/);
-                if(match){
-                    number_of_pieces = parseInt(match[1], 10);
-                }
-            }
-            if (number_of_pieces > 0) {
-                for(let c = 0; c < number_of_pieces; c++){
-                    if(puzzlePieceOrder){
+        // Handle plural and singular forms for Puzzle Piece, Fake Puzzle Piece, Rotate Trap, Swap Trap
+        // Patterns: "{i} Puzzle Piece(s)", "{i} Fake Puzzle Piece(s)", "{i} Rotate Trap(s)", "{i} Swap Trap(s)"
+        let match = items[i].match(/^(\d+)\s+(Puzzle Piece|Fake Puzzle Piece|Rotate Trap|Swap Trap)s?$/);
+        if (match) {
+            const count = parseInt(match[1], 10);
+            const type = match[2];
+            for (let n = 0; n < count; n++) {
+                if (type === "Puzzle Piece") {
+                    if (puzzlePieceOrder) {
                         let piece = puzzlePieceOrder.shift();
-                        // console.log("Unlocking piece", piece);
                         if (piece !== undefined) {
-                            window.unlockPiece(piece, c == number_of_pieces - 1);
+                            window.unlockPiece(piece, n === count - 1);
                             itemUnlocked = true;
                         }
                     }
+                } else if (type === "Fake Puzzle Piece") {
+                    window.unlockFakePiece();
+                    itemUnlocked = true;
+                } else if (type === "Rotate Trap") {
+                    window.doRotateTrap();
+                } else if (type === "Swap Trap") {
+                    window.doSwapTrap();
                 }
             }
+            continue;
         }
     }
     if(itemUnlocked){

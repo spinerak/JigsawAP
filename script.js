@@ -14,6 +14,37 @@ if (bevel_size === null) bevel_size = 0.1;
 var shadow_size = localStorage.getItem("option_shadow_2");
 if (shadow_size === null) shadow_size = 0;
 
+// Set starting values from localStorage or defaults
+document.addEventListener('DOMContentLoaded', function() {
+    const borderSelect = document.getElementById('options_bt');
+    const shadowSelect = document.getElementById('options_st');
+
+    // Load from localStorage or use default
+    function formatValue(val, def) {
+        val = parseFloat(localStorage.getItem(val));
+        if (isNaN(val)) val = def;
+        return (val % 1 === 0) ? val.toString() : val.toFixed(1);
+    }
+    borderSelect.value = formatValue('option_bevel_2', 0.1);
+    shadowSelect.value = formatValue('option_shadow_2', 0);
+    console.log((parseFloat(localStorage.getItem('option_bevel_2')) || 0.1).toFixed(1))
+
+    // Save to localStorage on change
+    borderSelect.addEventListener('change', function() {
+        localStorage.setItem('option_bevel_2', borderSelect.value);
+    });
+    shadowSelect.addEventListener('change', function() {
+        localStorage.setItem('option_shadow_2', shadowSelect.value);
+    });
+});
+
+let allow_zoom = true;
+const zoomBtn = document.getElementById('m11a');
+zoomBtn.addEventListener('click', function() {
+    allow_zoom = !allow_zoom;
+    zoomBtn.innerHTML = allow_zoom ? '🔍✅' : '🔍❌';
+});
+
 
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
@@ -1205,30 +1236,22 @@ class Puzzle {
             } // for kx
         } // for ky
 
-        if(window.fake_pieces == 1){
-            // let mimic_piece_x = intAlea(1, nx-1);
-            // window.fake_pieces_mimic = [12, 85];
-            let mimic_piece_x = (window.fake_pieces_mimic[0]-1) % nx;
-            let mimic_piece_y = Math.floor((window.fake_pieces_mimic[0]-1) / nx);
-
+        if(window.fake_pieces_mimic.length >= 1){
             this.pieces[-1] = [];
-            this.pieces[-1][1] = np = new Piece(mimic_piece_x, mimic_piece_y, -1);
 
-            // top side
-            np.ts = this.pieces[mimic_piece_y][mimic_piece_x].ts;
-            np.ls = this.pieces[mimic_piece_y][mimic_piece_x].ls;
-            np.bs = this.pieces[mimic_piece_y][mimic_piece_x].bs;
-            np.rs = this.pieces[mimic_piece_y][mimic_piece_x].rs;
+            for(let i = 0; i < window.fake_pieces_mimic.length; i++){
+                let mimic_piece_x = (window.fake_pieces_mimic[i]-1) % nx;
+                let mimic_piece_y = Math.floor((window.fake_pieces_mimic[i]-1) / nx);
 
+                this.pieces[-1][i+1] = np = new Piece(mimic_piece_x, mimic_piece_y, -i - 1);
 
-            mimic_piece_x = (window.fake_pieces_mimic[1]-1) % nx;
-            mimic_piece_y = Math.floor((window.fake_pieces_mimic[1]-1) / nx);
-
-            this.pieces[-1][2] = np = new Piece(mimic_piece_x, mimic_piece_y, -2);
-            np.ts = this.pieces[mimic_piece_y][mimic_piece_x].ts;
-            np.ls = this.pieces[mimic_piece_y][mimic_piece_x].ls;
-            np.bs = this.pieces[mimic_piece_y][mimic_piece_x].bs;
-            np.rs = this.pieces[mimic_piece_y][mimic_piece_x].rs;
+                // top side
+                np.ts = this.pieces[mimic_piece_y][mimic_piece_x].ts;
+                np.ls = this.pieces[mimic_piece_y][mimic_piece_x].ls;
+                np.bs = this.pieces[mimic_piece_y][mimic_piece_x].bs;
+                np.rs = this.pieces[mimic_piece_y][mimic_piece_x].rs;
+                
+            }
         }
 
     } // Puzzle.defineShapes
@@ -1501,6 +1524,12 @@ let moving; // for information about moved piece
                 if ((event && event.event == "nbpieces") || (window.LoginStart && window.is_connected)) {
                     document.getElementById("m4").textContent = "Loading pieces...";
 
+                    bevel_size = localStorage.getItem("option_bevel_2");
+                    if (bevel_size === null) bevel_size = 0.1;
+
+                    shadow_size = localStorage.getItem("option_shadow_2");
+                    if (shadow_size === null) shadow_size = 0;
+
                     state = 17;
                     if(window.is_connected){
                         if(window.apworld == "0.2.0" || window.apworld == "0.3.0"){
@@ -1560,9 +1589,10 @@ let moving; // for information about moved piece
                         for (let p = 1; p <= apnx * apny; p++) {
                             keys.push(`JIG_PROG_${window.slot}_${p}`);
                         }
-                        if(window.fake_pieces == 1){
-                            keys.push(`JIG_PROG_${window.slot}_${-1}`);
-                            keys.push(`JIG_PROG_${window.slot}_${-2}`);
+                        if(window.fake_pieces_mimic.length >= 1){
+                            for (let p = 1; p <= window.fake_pieces_mimic.length; p++) {
+                                keys.push(`JIG_PROG_${window.slot}_${-p}`);
+                            }
                         }
 
                         let client = window.getAPClient();                  
@@ -1613,7 +1643,7 @@ let moving; // for information about moved piece
                             }
                             window.save_file[index] = 
                             [
-                                ((index+10) * 4321.1234) % 0.10, ((index+10) * 1234.4321) % 0.5, random_rotation
+                                ((index+1000) * 4321.1234) % 0.10, ((index+1000) * 1234.4321) % 0.5, random_rotation
                             ];
                         }
                     });
@@ -1628,7 +1658,7 @@ let moving; // for information about moved piece
                             }
                             window.save_file[index] = 
                             [
-                                ((index+10) * 4321.1234) % 0.10, ((index+10) * 1234.4321) % 0.5, random_rotation
+                                ((index+1000) * 4321.1234) % 0.10, ((index+1000) * 1234.4321) % 0.5, random_rotation
                             ];
                         }
                     });
@@ -1659,9 +1689,10 @@ let moving; // for information about moved piece
                 for (let key = 1; key <= window.apnx * window.apny; key++) {
                     all_indices.push(key);
                 }
-                if(window.fake_pieces == 1){
-                    all_indices.push(-1);
-                    all_indices.push(-2);
+                if(window.fake_pieces_mimic.length >= 1){
+                    for(let i = 0; i < window.fake_pieces_mimic.length; i++){
+                        all_indices.push(-1 - i);
+                    }
                 }
 
                 for (let [key, value] of Object.entries(window.save_file)) {
@@ -1698,8 +1729,8 @@ let moving; // for information about moved piece
                 document.getElementById("m3").style.display = "none";
                 document.getElementById("m4").style.display = "none";
                 document.getElementById("m5").style.display = "none";
-                document.getElementById("m5a").style.display = "none";
                 document.getElementById("m10b").style.display = "none";
+                document.getElementById("o1a").style.display = "none";
 
                 /* prepare puzzle */
                 puzzle.puzzle_create(coordinates, groups); // create shape of pieces, independant of size
@@ -1955,11 +1986,11 @@ let menu = (function () {
         document.getElementById("m3").style.display = "block"
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
-        document.getElementById("m5a").style.display = "block"
         document.getElementById("m10b").style.display = "block"
     }
     document.getElementById("m6").style.display = "block"
-    document.getElementById("m11").style.display = "block"
+    document.getElementById("m11").style.display = "inline-block"
+    document.getElementById("m11a").style.display = "inline-block"
     if(gameStarted){
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
@@ -1995,9 +2026,6 @@ document.getElementById("m4").addEventListener("click", () => events.push({ even
 document.getElementById("m5").addEventListener("click", () => {
     window.open('credits.html', '_blank');
 });
-document.getElementById("m5a").addEventListener("click", () => {
-    window.open('options.html', '_blank');
-});
 
 document.getElementById("m13").addEventListener("click", () => {  
     askForHint(false);
@@ -2029,8 +2057,8 @@ document.getElementById("m10b").addEventListener("click", () => {
     forPuzzleElement.style.backgroundColor = newColor;
     localStorage.setItem("backgroundColor", newColor);
 
-    const jsonList = [{ type: "text", text: "Example text with new background" }];
-    window.jsonListener("", jsonList);
+    // const jsonList = [{ type: "text", text: "Example text with new background" }];
+    // window.jsonListener("", jsonList);
 });
 
 // Set the initial background color from localStorage if available
@@ -2093,6 +2121,9 @@ forPuzzle.addEventListener('wheel', (event) => {
     if(moving){
         rotateCurrentPiece(event.deltaY < 0);
     }else{
+        if(!allow_zoom){
+            return;
+        }
         event.preventDefault();
         if (event.deltaY < 0) {
             if(zoomP == 1){
@@ -2123,6 +2154,9 @@ forPuzzle.addEventListener('touchend', (event) => {
     const tapLength = currentTime - lastTap;
     if (tapLength < 300 && tapLength > 0) {
         event.preventDefault();
+        if(!allow_zoom){
+            return;
+        }
         const co = puzzle.relativeMouseCoordinates(event.changedTouches[0]);
         if (window.additional_zoom === 1) {
             zoomX = -co.p_x + 1/2;
@@ -2207,6 +2241,10 @@ function unlockPiece(index) {
 
 var unlocked_fake_pieces = [];
 function unlockFakePiece() {
+    if(unlocked_fake_pieces.length >= window.fake_pieces_mimic.length){
+        console.log("No more fake pieces to unlock!");
+        return;
+    }
     let index = - unlocked_fake_pieces.length - 1;
     unlocked_fake_pieces.push(index);
     console.log("unlock fake piece", index)
@@ -2234,7 +2272,7 @@ function unlockFakePiece() {
 }
 
 function doSwapTrap(){
-    let pps = getRandomUnmergesPieces(2);
+    let pps = getRandomPiece(2, 10);
     if(pps.length < 2) return;
     let pp1 = pps[0];
     let pp2 = pps[1];
@@ -2244,6 +2282,8 @@ function doSwapTrap(){
     let y2 = pp2.y;
     pp1.moveTo(x2, y2);
     pp2.moveTo(x1, y1);
+    pp1.moveAwayFromBorder();
+    pp2.moveAwayFromBorder();
     if(window.rotations == 0){
         change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight], true);
         change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight], true);
@@ -2253,7 +2293,7 @@ function doSwapTrap(){
     }   
 }
 function doRotateTrap(){
-    let pps = getRandomUnmergesPieces(1);
+    let pps = getRandomPiece(1, 10);
     if(pps.length < 1) return;
     let pp = pps[0];
     if(window.rotations == 180){
@@ -2268,6 +2308,7 @@ function doRotateTrap(){
             pp.rotate(false, 2);
         }
     }
+    pp.moveAwayFromBorder();
     if(window.rotations == 0){
         change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight], true);
     }else{
@@ -2275,10 +2316,11 @@ function doRotateTrap(){
     }   
 }
 
-function getRandomUnmergesPieces(numberOfPieces) {
+function getRandomPiece(numberOfPieces, maxcluster) {
+
     // Get all PolyPieces that have only one piece (i.e., not merged)
     if(!puzzle || !puzzle.polyPieces) return [];
-    const singlePieces = puzzle.polyPieces.filter(pp => pp.pieces.length === 1);
+    const singlePieces = puzzle.polyPieces.filter(pp => pp.pieces.length <= maxcluster);
     const singleUnlockedPieces = singlePieces.filter(pp => unlocked_pieces.includes(pp.pieces[0].index) || unlocked_fake_pieces.includes(pp.pieces[0].index));
     // Shuffle the array
     const shuffled = singleUnlockedPieces.sort(() => Math.random() - 0.5);
