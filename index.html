@@ -292,6 +292,43 @@
 </div>
 <div class="taskbar" id="taskbar2" style="display: none;">🔍</div>
 
+<div class="draggable" id="draggable3" style="display: none;">
+  <div class="controls">
+      <button class="control-btn" id="control-btn3a">-</button>
+  </div>
+  <div class="button-group">
+    --Drawer-- <button id="btnInfo" onclick="window.open('drawer_info.html', '_blank')">Info</button>
+    <br>
+    Pcs stored: <span id="pcsStored">0</span>
+    <br>
+    <br>
+    
+    <label for="numPieces"># pcs:</label>
+    <select id="numPieces">
+      <option value="1" selected>1</option>
+      <option value="10">10</option>
+      <option value="100">100</option>
+      <option value="all">All</option>
+    </select>
+    <br>
+    <button id="btnWithdraw">Move to drawer</button>
+    <button id="btnWithdrawAll">Move all to drawer</button>
+    <br>
+     
+    <button id="btnDeposit">Move from drawer</button>
+    <select id="depositPosition">
+      <option value="1">Top-left corner</option>
+      <option value="2">Top-left area</option>
+      <option value="3">Top edge</option>
+      <option value="4">Top area</option>
+      <option value="5">Left edge</option>
+      <option value="6">Left area</option>
+      <option value="7">Anywhere</option>
+    </select>
+  </div>
+</div>
+<div class="taskbar" id="taskbar3" style="display: none;">🗄️</div>
+
 
 
 
@@ -302,6 +339,7 @@
   <script type="module" src="./loadimages.js"></script>
   <script type="module" src="./aplogin.js"></script>
   <script  src="./script.js"></script>
+  <script  src="./debug.js"></script>
 
 
 

@@ -29,6 +29,13 @@ document.getElementById("optionsbutton").addEventListener("click", () => {
     window.open('options.html', '_blank');
 });
 
+document.getElementById('name').addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault(); // Prevent the default form submission
+        document.getElementById('loginbutton').click(); // Click the login button
+    }
+});
+
 function isMobile() {
     return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 }
@@ -144,6 +151,7 @@ function pressed_solo(){
 
     // document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
+    document.getElementById('taskbar3').style.display = "flex";
 
     
     const messages = [
@@ -257,7 +265,7 @@ const connectedListener = (packet) => {
         window.fake_pieces_mimic = [];
     }
 
-    let apworld = packet.slot_data.ap_world_version
+    let apworld = packet.slot_data.ap_world_version_2 ? packet.slot_data.ap_world_version_2 : packet.slot_data.ap_world_version;
     window.apworld = apworld;
     if(!apworld || ["0.0.0", "0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.1.0", "0.1.1"].includes(apworld)){
         if(!localStorage.getItem("referredTo011")){
@@ -413,6 +421,7 @@ const connectedListener = (packet) => {
     
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
+    document.getElementById('taskbar3').style.display = "flex";
 
 
     
@@ -755,4 +764,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.6.2")
+console.log("0.6.6T")

@@ -26,18 +26,6 @@
       background-color: #ffff80;
       user-select: none;    
     }
-    
-    #nenu {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      list-style-type: none;
-      padding-right: 5px;
-      z-index: 1000;
-      display: inline-block;
-      text-align: center;
-      padding-inline-start: 0; /* Set padding-inline-start to 0 */
-    }
 
     #n0 {
       margin: 1px;
@@ -217,12 +205,27 @@
       user-select: none; /* Prevent text selection */
       z-index: 99;
     }
+    #draggable3 { 
+      display: inline-block; /* Ensure the element wraps around its content */
+      width: auto; /* Adjust width to fit the image */
+      height: auto; /* Adjust height to fit the image */
+      background: #aaa; 
+      position: absolute; 
+      top: 50px; 
+      left: 50px; 
+      border-radius: 8px; 
+      padding: 0; /* Remove extra padding */
+      cursor: grab; 
+      user-select: none; /* Prevent text selection */
+      z-index: 99;
+      padding: 10px;
+    }
 
 
 
     #taskbar1 { 
         width: 50px; height: 30px; background: #444; color: #fff;
-        position: absolute; bottom: 50px; right: 10px; border-radius: 8px;
+        position: absolute; bottom: 90px; right: 10px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer;
         z-index: 1;
@@ -232,12 +235,19 @@
 
     #taskbar2 { 
         width: 50px; height: 30px; background: #444; color: #fff;
-        position: absolute; bottom: 10px; right: 10px; border-radius: 8px;
+        position: absolute; bottom: 50px; right: 10px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer;
         z-index: 1;
     }
 
+    #taskbar3 { 
+        width: 50px; height: 30px; background: #444; color: #fff;
+        position: absolute; bottom: 10px; right: 10px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        z-index: 1;
+    }
 
 
     .controls { 
