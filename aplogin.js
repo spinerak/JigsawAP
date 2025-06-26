@@ -221,9 +221,10 @@ function connectToServer(firsttime = true) {
     client.socket.on("bounced", bouncedListener);
     
     client.messages.on("message", jsonListener);
+    client.deathLink.on("deathReceived", deathListener)
     
     client
-    .login(connectionInfo.hostport, connectionInfo.name, connectionInfo.game, {password: connectionInfo.password})
+    .login(connectionInfo.hostport, connectionInfo.name, connectionInfo.game, {password: connectionInfo.password, tags: ["DeathLink"]})
         .then(() => {
             console.log("Connected to the server");
             document.getElementById('loginbutton').value = "Connected to the server";
@@ -253,6 +254,7 @@ const receiveditemsListener = (items, index) => {
 };
 
 let puzzlePieceOrder = [];
+let receive_death_link = false;
 
 const connectedListener = (packet) => {
     apstatus = "AP: Connected";
@@ -309,7 +311,7 @@ const connectedListener = (packet) => {
     }
     
 
-    console.log("This apworld version should work", packet.slot_data.ap_world_version)
+    console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
     
 
     document.getElementById("m6").innerText = apstatus;
@@ -337,6 +339,15 @@ const connectedListener = (packet) => {
     window.possible_merges = packet.slot_data.possible_merges;
     window.actual_possible_merges = packet.slot_data.actual_possible_merges;
 
+    receive_death_link = 0
+    if(packet.slot_data.death_link){
+        receive_death_link = packet.slot_data.death_link;
+    }
+    if(receive_death_link > 0){
+        console.log("Receive death link (yes):", receive_death_link);
+    }else{
+        console.log("no death link");
+    }
     let imagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
 
     if(packet.slot_data.orientation < 1){
@@ -465,8 +476,13 @@ function setImage(url){
 
 const bouncedListener = (packet) => {
     if(packet){
-        if(packet.data){
-            window.move_piece_bounced(packet.data);
+        if (packet.data) {
+            console.log(packet.data);
+            if (typeof packet.data[0] === "number") {
+                window.move_piece_bounced(packet.data);
+            }else{
+                gotRandomNumber(packet.data[1]);
+            }
         }
     }
 }
@@ -741,6 +757,52 @@ function jsonListener(text, nodes) {
 }
 window.jsonListener = jsonListener;
 
+let lastrandomnumber = null;
+function deathListener(source, time, cause){
+    if (receive_death_link > 0) {
+        // Only continue this code once every 60 seconds
+        if (!window.lastDeathLinkTime || Date.now() - window.lastDeathLinkTime > 60000) {
+            window.lastDeathLinkTime = Date.now();
+            lastrandomnumber = Math.random() * 4;
+            console.log("my death link random number is", lastrandomnumber);
+            setTimeout(() => {
+                if (lastrandomnumber === null) {
+                    return;
+                }
+                sendBounceDeathLinkRandomNumber(lastrandomnumber);
+            }, lastrandomnumber * 1000);
+        } else {
+            console.log("Death link ignored: cooldown active.");
+        }
+    }
+}
+
+function sendBounceDeathLinkRandomNumber(number){
+    client.bounce({ "slots": [window.slot] }, ["death", number ]);
+    setTimeout(() => {
+        applyDeathLink();
+    }, 1000);
+}
+
+function applyDeathLink(){
+    if(lastrandomnumber !== null){
+        console.log("I sent a trap!")
+        for (let i = 0; i < receive_death_link; i++) {
+            window.doRotateTrap();
+            window.doSwapTrap();
+        }
+        lastrandomnumber = null;
+    }
+}
+
+function gotRandomNumber(number){
+    if(lastrandomnumber !== null){
+        if(number < lastrandomnumber){
+            lastrandomnumber = null;
+        }
+    }
+}
+
 const shapeParam = getUrlParameter("shape");
 if (shapeParam) {
     const shapeSelect = document.getElementById("shape");
@@ -764,4 +826,4 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.6.6T")
+console.log("0.7.0")

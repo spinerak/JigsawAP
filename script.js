@@ -2308,24 +2308,27 @@ function doRotateTrap(){
     let pps = getRandomPiece(1, 10);
     if(pps.length < 1) return;
     let pp = pps[0];
-    if(window.rotations == 180){
-        pp.rotate(false, 2);
-    }
-    if(window.rotations == 90){
-        if(Math.random() < 0.333){
-            pp.rotate(false, -1);
-        }else if (Math.random() < 0.5){
-            pp.rotate(false, 1);
-        }else{
+    if(window.rotations > 0){
+        if(window.rotations == 180){
             pp.rotate(false, 2);
         }
+        if(window.rotations == 90){
+            if(Math.random() < 0.333){
+                pp.rotate(false, -1);
+            }else if (Math.random() < 0.5){
+                pp.rotate(false, 1);
+            }else{
+                pp.rotate(false, 2);
+            }
+        }
+        pp.moveAwayFromBorder();
+        if(window.rotations == 0){
+            change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight], true);
+        }else{
+            change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
+        }  
     }
-    pp.moveAwayFromBorder();
-    if(window.rotations == 0){
-        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight], true);
-    }else{
-        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
-    }   
+     
 }
 
 function getRandomPiece(numberOfPieces, maxcluster) {
@@ -2597,9 +2600,9 @@ function rotateCurrentPiece(counter = false){
                 moving.pp.rotate(moving);
             }
         }
+        change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
     }
     
-    change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
 }
 
 document.addEventListener('keydown', function(event) {
