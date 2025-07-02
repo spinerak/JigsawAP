@@ -475,13 +475,14 @@ function setImage(url){
 }
 
 const bouncedListener = (packet) => {
+    console.log("Bounced packet:", packet);
     if(packet){
         if (packet.data) {
             console.log(packet.data);
             if (typeof packet.data[0] === "number") {
                 window.move_piece_bounced(packet.data);
             }else{
-                gotRandomNumber(packet.data[1]);
+                gotRandomNumber(packet.data[0], packet.data[1]);
             }
         }
     }
@@ -504,7 +505,7 @@ function newItems(items, index) {
             var received_items = [];
             for (let i = lastindex - index; i < items.length; i++) {
                 const item = items[i]; // Get the current item
-                received_items.push(item.toString()); // Add the item name to the 'items' array
+                received_items.push([item.toString(), i, index]); // Add the item name to the 'items' array
             }
             openItems(received_items)
             lastindex = index + items.length;
@@ -518,22 +519,26 @@ function openItems(items){
     console.log(items)
     let itemUnlocked = false;
     for (let i = 0; i < items.length; i++) {
+        let firstIndex = items[i][2];
+        let indexItem = items[i][1];
+        let item = items[i][0];
         // Normalize "Puzzle Piece" to "1 Puzzle Piece"
-        if (items[i] === "Puzzle Piece") {
-            items[i] = "1 Puzzle Piece";
+        if (item === "Puzzle Piece") {
+            item = "1 Puzzle Piece";
         }
-        if (items[i] === "Rotate Trap") {
-            items[i] = "1 Rotate Trap";
+        if (item === "Rotate Trap") {
+            item = "1 Rotate Trap";
         }
-        if (items[i] === "Swap Trap") {
-            items[i] = "1 Swap Trap";
+        if (item === "Swap Trap") {
+            item = "1 Swap Trap";
         }
 
         // Handle plural and singular forms for Puzzle Piece, Fake Puzzle Piece, Rotate Trap, Swap Trap
         // Patterns: "{i} Puzzle Piece(s)", "{i} Fake Puzzle Piece(s)", "{i} Rotate Trap(s)", "{i} Swap Trap(s)"
-        let match = items[i].match(/^(\d+)\s+(Puzzle Piece|Fake Puzzle Piece|Rotate Trap|Swap Trap)s?$/);
+        let match = item.match(/^(\d+)\s+(Puzzle Piece|Fake Puzzle Piece|Rotate Trap|Swap Trap)s?$/);
         if (match) {
-            const count = parseInt(match[1], 10);
+            console.log(connectionInfo.hostport)
+            let count = parseInt(match[1], 10);
             const type = match[2];
             for (let n = 0; n < count; n++) {
                 if (type === "Puzzle Piece") {
@@ -548,9 +553,13 @@ function openItems(items){
                     window.unlockFakePiece();
                     itemUnlocked = true;
                 } else if (type === "Rotate Trap") {
-                    window.doRotateTrap();
+                    if(firstIndex > 0){
+                        doTrap("rotate" + firstIndex, "rotate", count);
+                    }
                 } else if (type === "Swap Trap") {
-                    window.doSwapTrap();
+                    if(firstIndex > 0){
+                        doTrap("swap" + firstIndex, "swap", count);
+                    }
                 }
             }
             continue;
@@ -757,48 +766,59 @@ function jsonListener(text, nodes) {
 }
 window.jsonListener = jsonListener;
 
-let lastrandomnumber = null;
-function deathListener(source, time, cause){
-    if (receive_death_link > 0) {
-        // Only continue this code once every 60 seconds
-        if (!window.lastDeathLinkTime || Date.now() - window.lastDeathLinkTime > 60000) {
-            window.lastDeathLinkTime = Date.now();
-            lastrandomnumber = Math.random() * 4;
-            console.log("my death link random number is", lastrandomnumber);
-            setTimeout(() => {
-                if (lastrandomnumber === null) {
-                    return;
-                }
-                sendBounceDeathLinkRandomNumber(lastrandomnumber);
-            }, lastrandomnumber * 1000);
-        } else {
-            console.log("Death link ignored: cooldown active.");
+let lastrandomnumbers = {};
+function doTrap(name, type, count = 1){
+    lastrandomnumbers[name] = Math.random() * 4;
+    console.log("my trap random number is", lastrandomnumbers[name]);
+    setTimeout(() => {
+        if (lastrandomnumbers[name] === null) {
+            return;
         }
+        sendBounceTrapRandomNumber(name, type, count, lastrandomnumbers[name]);
+    }, lastrandomnumbers[name] * 1000);
+}
+
+function deathListener(source, time, cause){
+    console.log("Received death link from", source, "at time", time, "due to", cause);
+    if (receive_death_link > 0) {
+        doTrap("death"+time, "death");
     }
 }
 
-function sendBounceDeathLinkRandomNumber(number){
-    client.bounce({ "slots": [window.slot] }, ["death", number ]);
+function sendBounceTrapRandomNumber(name, type, count, number){
+    client.bounce({ "slots": [window.slot] }, [name, number]);
     setTimeout(() => {
-        applyDeathLink();
+        applyTrap(name, type, count);
     }, 1000);
 }
 
-function applyDeathLink(){
-    if(lastrandomnumber !== null){
-        console.log("I sent a trap!")
-        for (let i = 0; i < receive_death_link; i++) {
-            window.doRotateTrap();
-            window.doSwapTrap();
+function applyTrap(name, type, count){
+    if(lastrandomnumbers[name] !== null){
+        if(type === "rotate"){
+            for (let i = 0; i < count; i++) {
+                window.doRotateTrap();
+            }
+        } else if(type === "swap"){
+            for (let i = 0; i < count; i++) {
+                window.doSwapTrap();
+            }
+        } else if(type === "death"){
+            for (let i = 0; i < receive_death_link; i++) {
+                window.doRotateTrap();
+                window.doSwapTrap();
+            }
         }
-        lastrandomnumber = null;
+        lastrandomnumbers[name] = null;
+    }else{
+        console.log("Trap", name, "was already applied or was not valid anymore.");
     }
 }
 
-function gotRandomNumber(number){
-    if(lastrandomnumber !== null){
-        if(number < lastrandomnumber){
-            lastrandomnumber = null;
+function gotRandomNumber(name, number){
+    console.log("Got random number for trap", name, number);
+    if(lastrandomnumbers[name] !== null){
+        if(number < lastrandomnumbers[name]){
+            lastrandomnumbers[name] = null;
         }
     }
 }
