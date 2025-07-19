@@ -49,7 +49,11 @@ window.possibleImages = [
     "https://static1.thegamerimages.com/wordpress/wp-content/uploads/2019/12/VVVVVV.jpg",
     "https://i.ibb.co/XZJqvqDn/Yoku-s-Island-Express.jpg",
     "https://pbs.twimg.com/media/D_xf3nGXUAIQzla?format=jpg",
-    "https://cdn5.mtcgame.com/Images/Category/32b631b0-1a02-4acf-9808-6acf47401077.jpg"
+    "https://cdn5.mtcgame.com/Images/Category/32b631b0-1a02-4acf-9808-6acf47401077.jpg",
+    "https://rare-gallery.com/uploads/posts/4549848-touhou-kochiya-sanae-moriya-suwako-reisen-udongein-inaba-shameimaru-aya-kirisame-marisa-hakurei-reimu-yagokoro-eirin-fujiwara-no-mokou-houraisan-kaguya-doremi-sweet-murasa-minamitsu-toramaru-sho.jpg",
+    "https://images.launchbox-app.com/7edee7e4-2564-47c8-a12a-88c4e319492b.jpg",
+    "https://raw.githubusercontent.com/Emerassi/Crystal-Project-Archipelago-Mod-Installer/refs/heads/main/cryprocollage.png"
+
 
 
 ]
