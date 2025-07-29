@@ -17,42 +17,87 @@
 <div class="login-container" id="login-container">
   <div class="login-form">
       <!-- Title with Yacht Dice - Login -->
-      <h2 class="login-heading">Jigsaw Puzzles for Archipelago</h2>
+      <h2 class="login-heading">🧩 Jigsaw Puzzle <br> for Archipelago 🏝️</h2>
 
-      <label id="rotate-device-label" class="login-label" style="display: none;text-align: center; color: rgb(255, 196, 0); font-size: 1.2em;"
-      >Consider rotating your device to landscape!</label>
-      
+      <label id="rotate-device-label" class="login-label" style="display: none;text-align: center; color: rgb(255, 196, 0); font-size: 1.2em;">Consider rotating your device to landscape!</label>
+
       <script>
         window.addEventListener('resize', function() {
           var label = document.getElementById('rotate-device-label');
-          if (window.innerHeight > window.innerWidth) {
-        label.style.display = 'block';
-          } else {
-        label.style.display = 'none';
-          }
+            if (window.innerHeight > window.innerWidth) {
+              label.style.display = 'block';
+              // Start color toggle interval if not already started
+              if (!label._colorInterval) {
+                let colors = ['red', 'yellow'];
+                let i = 0;
+                let toggleCount = 0;
+                label._colorInterval = setInterval(() => {
+                  label.style.color = colors[i % 2];
+                  i++;
+                  console.log("Color toggled to", label.style.color);
+                  if (i >= 10) {
+                    clearInterval(label._colorInterval);
+                    label._colorInterval = null;
+                  }
+                }, 1000);
+              }
+            } else {
+              // Stop color toggle interval if running
+              if (label._colorInterval) {
+                clearInterval(label._colorInterval);
+                label._colorInterval = null;
+              }
+              label.style.display = 'none';
+              label.style.color = 'rgb(255, 196, 0)'; // reset to original
+            }
+          
         });
         // Initial check
         if (window.innerHeight > window.innerWidth) {
-          document.getElementById('rotate-device-label').style.display = 'block';
+          var label = document.getElementById('rotate-device-label');
+          label.style.display = 'block';
+          // Start color toggle interval if not already started
+          if (!label._colorInterval) {
+            let colors = ['red', 'yellow'];
+            let i = 0;
+            let toggleCount = 0;
+            label._colorInterval = setInterval(() => {
+              label.style.color = colors[i % 2];
+              i++;
+              console.log("Color toggled to", label.style.color);
+              if (i >= 10) {
+                clearInterval(label._colorInterval);
+                label._colorInterval = null;
+              }
+            }, 1000);
+          }
         }
       </script>
 
-      <br>
       <div>
-          <label for="hostport" class="login-label">Host and Port</label>
-          <input type="text" id="hostport" name="hostport" class="login-input" value="archipelago.gg:38281" placeholder="Example: archipelago.gg:38281">
-          <label for="name" class="login-label">Player Name</label>
-          <input type="text" id="name" name="name" class="login-input"
-              value="Loading website...." placeholder="Example: Yachty">
-          <label for="name" class="login-label">Password</label>
-          <input type="password" id="password" name="password" class="login-input" value="" placeholder="Leave blank if no password">
-          <input type="submit" value="Login & Connect" id="loginbutton" class="login-submit">
-          <input type="submit" value="Solo (same seed every time, no save)" id="solobutton" class="login-submit">
-          <input type="submit" value="Solo (with rotations)" id="solobutton2" class="login-submit" style="background-color: rgb(255, 160, 7);">
-          <input type="submit" value="Options" id="optionsbutton" class="login-submit" style="background-color: #4dabf7;">
+          <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
+            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">Archipelago</div>
+            <hr style="border: 1px solid #4dabf74d; margin: 8px 0;">
+            <label for="hostport" class="login-label">Host and Port</label>
+            <input type="text" id="hostport" name="hostport" class="login-input" value="archipelago.gg:38281" placeholder="Example: archipelago.gg:38281">
+            <label for="name" class="login-label">Player Name</label>
+            <input type="text" id="name" name="name" class="login-input"
+                value="Loading website...." placeholder="Example: Yachty">
+            <label for="name" class="login-label">Password</label>
+            <input type="password" id="password" name="password" class="login-input" value="" placeholder="Leave blank if no password">
+            <input type="submit" value="Login & Connect" id="loginbutton" class="login-submit">
+          </div>
+          <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
+            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">Try it out solo (fixed seed, no save)</div>
+            <hr style="border: 1px solid #4dabf74d; margin: 8px 0;">
+            <div style="display: flex; gap: 10px;">
+              <input type="submit" value="Normal" id="solobutton" class="login-submit">
+              <input type="submit" value="Rotations" id="solobutton2" class="login-submit">
+            </div>
+          </div>
       </div>
 
-      <div style="margin-top: 20px; font-size: 0.9em; color: white; border: 2px solid #4dabf7; padding: 10px; text-align: center; border-radius: 10px;">
+      <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
         The images displayed on this website are loaded directly from external sources and are not hosted or distributed by this site.
       </div>
         
@@ -123,6 +168,9 @@
         <option value="49">49</option>
         <option value="50">50</option>
         <option value="51">51</option>
+        <option value="52">52</option>
+        <option value="53">53</option>
+        <option value="54">54</option>
       </select>
     </li>
     <li id="m2">load custom image</li>

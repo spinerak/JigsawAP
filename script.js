@@ -1,5 +1,8 @@
 "use strict";
 
+window.pieceSides = 4;
+const corner_to_shape_dist = (1-Math.sqrt(3)/3) * 0.5; // distance from corner to shape in hexagonal piece
+
 window.downsize_to_fit = 0.85;
 window.show_clue = true;
 window.rotations = 0;
@@ -190,9 +193,9 @@ class Side {
             ctx.lineTo(this.scaledPoints[1].x + shiftx, this.scaledPoints[1].y + shifty);
         } else { // edge zigzag
             for (let k = 1; k < this.scaledPoints.length - 1; k += 3) {
-            ctx.bezierCurveTo(this.scaledPoints[k].x + shiftx, this.scaledPoints[k].y + shifty,
-                this.scaledPoints[k + 1].x + shiftx, this.scaledPoints[k + 1].y + shifty,
-                this.scaledPoints[k + 2].x + shiftx, this.scaledPoints[k + 2].y + shifty);
+                ctx.bezierCurveTo(this.scaledPoints[k].x + shiftx, this.scaledPoints[k].y + shifty,
+                    this.scaledPoints[k + 1].x + shiftx, this.scaledPoints[k + 1].y + shifty,
+                    this.scaledPoints[k + 2].x + shiftx, this.scaledPoints[k + 2].y + shifty);
             } // for k
         } // if jigsaw side
 
@@ -205,13 +208,17 @@ class Side {
     The change is done towards the opposite side (side between corners ca and cb)
 */
 
-function twist0(side, ca, cb) {
+function twist0(side, ca, cb, howFar = 1) {
 
     const seg0 = new Segment(side.points[0], side.points[1]);
     const dxh = seg0.dx();
     const dyh = seg0.dy();
 
-    const seg1 = new Segment(ca, cb);
+    let seg1 = new Segment(ca, cb);
+    if(howFar < 1){
+        seg1 = new Segment(new Point(howFar * ca.x + (1-howFar) * side.points[0].x, howFar * ca.y + (1-howFar) * side.points[0].y), 
+            new Point(howFar * cb.x + (1-howFar) * side.points[1].x, howFar * cb.y + (1-howFar) * side.points[1].y));
+    }
     const mid0 = seg0.pointOnRelative(0.5);
     const mid1 = seg1.pointOnRelative(0.5);
 
@@ -276,13 +283,17 @@ function twist0(side, ca, cb) {
     The change is done towards the opposite side (side between corners ca and cb)
 */
 
-function twist1(side, ca, cb) {
+function twist1(side, ca, cb, howFar = 1) {
 
     const seg0 = new Segment(side.points[0], side.points[1]);
     const dxh = seg0.dx();
     const dyh = seg0.dy();
 
-    const seg1 = new Segment(ca, cb);
+    let seg1 = new Segment(ca, cb);
+    if(howFar < 1){
+        seg1 = new Segment(new Point(howFar * ca.x + (1-howFar) * side.points[0].x, howFar * ca.y + (1-howFar) * side.points[0].y), 
+            new Point(howFar * cb.x + (1-howFar) * side.points[1].x, howFar * cb.y + (1-howFar) * side.points[1].y));
+    }
     const mid0 = seg0.pointOnRelative(0.5);
     const mid1 = seg1.pointOnRelative(0.5);
 
@@ -314,13 +325,17 @@ function twist1(side, ca, cb) {
     The change is done towards the opposite side (side between corners ca and cb)
 */
 
-function twist2(side, ca, cb) {
+function twist2(side, ca, cb, howFar = 1) {
 
     const seg0 = new Segment(side.points[0], side.points[1]);
     const dxh = seg0.dx();
     const dyh = seg0.dy();
 
-    const seg1 = new Segment(ca, cb);
+    let seg1 = new Segment(ca, cb);
+    if(howFar < 1){
+        seg1 = new Segment(new Point(howFar * ca.x + (1-howFar) * side.points[0].x, howFar * ca.y + (1-howFar) * side.points[0].y), 
+            new Point(howFar * cb.x + (1-howFar) * side.points[1].x, howFar * cb.y + (1-howFar) * side.points[1].y));
+    }
     const mid0 = seg0.pointOnRelative(0.5);
     const mid1 = seg1.pointOnRelative(0.5);
 
@@ -353,17 +368,8 @@ function twist2(side, ca, cb) {
     The change is done towards the opposite side (side between corners ca and cb)
 */
 
-function twist3(side, ca, cb) {
+function twist3(side, ca, cb, howFar = 1) {
 
-    side.points = [side.points[0], side.points[1]];
-
-} // twist3
-
-function twist4(side, ca, cb) {
-    side.points[0].x = Math.round(side.points[0].x)
-    side.points[0].y = Math.round(side.points[0].y)
-    side.points[1].x = Math.round(side.points[1].x)
-    side.points[1].y = Math.round(side.points[1].y)
     side.points = [side.points[0], side.points[1]];
 
 } // twist3
@@ -371,11 +377,11 @@ function twist4(side, ca, cb) {
 
 //-----------------------------------------------------------------------------
 class Piece {
-    constructor(kx, ky, index) { // object with 4 sides
-        this.ts = new Side(); // top side
-        this.rs = new Side(); // right side
-        this.bs = new Side(); // bottom side
-        this.ls = new Side(); // left side
+    constructor(kx, ky, index) {
+        this.sides = [];
+        for (let i = 0; i < (window.pieceSides); i++) {
+            this.sides[i] = new Side();
+        }
         this.kx = kx;
         this.ky = ky;
         this.index = index;
@@ -384,10 +390,7 @@ class Piece {
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     piece_scale(puzzle) {
-        this.ts.side_scale(puzzle);
-        this.rs.side_scale(puzzle);
-        this.bs.side_scale(puzzle);
-        this.ls.side_scale(puzzle);
+        this.sides.forEach(side => side.side_scale(puzzle));
     } // Piece.scale
 } // class Piece
 //--------------------------------------------------------------
@@ -437,7 +440,6 @@ class PolyPiece {
     */
 
     merge(otherPoly, notifyMerge = true) {
-        // console.log("Call merge", this.pieces[0].index, otherPoly.pieces[0].index);
         if(this == otherPoly){
             return;
         }
@@ -553,7 +555,8 @@ class PolyPiece {
         // coordinates of origin of full picture for this PolyPieces
         let rotated = rotateVector(this.x + this.nx * puzzle.scalex / 2, this.y + this.ny * puzzle.scaley / 2, this.rot);
         let pprotated = rotateVector(otherPoly.x + otherPoly.nx * puzzle.scalex / 2, otherPoly.y + otherPoly.ny * puzzle.scaley / 2, otherPoly.rot);
-        
+
+
         let x = rotated.x - puzzle.scalex * (this.pckxmax + this.pckxmin) / 2;
         let y = rotated.y - puzzle.scaley * (this.pckymax + this.pckymin) / 2;
 
@@ -567,13 +570,40 @@ class PolyPiece {
 
         // this and otherPoly are in good relative position, have they a common side ?
         let neighs = [];
-        for (let k = this.pieces.length - 1; k >= 0; --k) {
-            let p1 = this.pieces[k].index;
-            if (p1 <= apnx * (apny - 1)) neighs.push(p1 + apnx)
-            if (p1 > apnx) neighs.push(p1 - apnx)
-            if (p1 % apnx != 1) neighs.push(p1 - 1)
-            if (p1 % apnx != 0) neighs.push(p1 + 1)
+        if (window.pieceSides == 6) {
+            for (let k = this.pieces.length - 1; k >= 0; --k) {
+                let p1 = this.pieces[k].index;
+                neighs.push(p1 + apnx);
+                neighs.push(p1 - apnx);
+                if (p1 % apnx != 1){
+                    if( (p1 % apnx) % 2 == 1) { // note starts at 1 so not the % you would expect
+                        neighs.push(p1 - 1 - apnx);
+                    }else{
+                        neighs.push(p1 - 1 + apnx);
+                    }
+                    neighs.push(p1 - 1);
+                }
+                if (p1 % apnx != 0){
+                    if( (p1 % apnx) % 2 == 1) {
+                        neighs.push(p1 + 1 - apnx);
+                    }else{
+                        neighs.push(p1 + 1 + apnx);
+                    }
+                    neighs.push(p1 + 1);
+                }
+            }
+        }else{
+            for (let k = this.pieces.length - 1; k >= 0; --k) {
+                let p1 = this.pieces[k].index;
+                neighs.push(p1 + apnx);
+                neighs.push(p1 - apnx);
+                if (p1 % apnx != 1) neighs.push(p1 - 1);
+                if (p1 % apnx != 0) neighs.push(p1 + 1);
+            }
         }
+
+        neighs = neighs.filter(n => n >= 0);
+        
         if (neighs.some(neigh => otherPoly.pieces.some(piece => piece.index === neigh))) {
             return true;
         }
@@ -601,20 +631,62 @@ class PolyPiece {
     */
 
     listLoops() {
-
         // internal : checks if an edge given by kx, ky is common with another cell
         // returns true or false
         const that = this;
         function edgeIsCommon(kx, ky, edge) {
+            let ogkx = kx; // original kx
+            let ogky = ky; // original ky
             let k;
-            switch (edge) {
-            case 0: ky--; break; // top edge
-            case 1: kx++; break; // right edge
-            case 2: ky++; break; // bottom edge
-            case 3: kx--; break; // left edge
-            } // switch
+            if(window.pieceSides == 6) {
+                switch (edge) {
+                    case 0: ky--; break; // top edge
+                    case 1:  // top-right edge
+                        if(kx % 2 == 0) {
+                            kx++;
+                            ky--;
+                        } else {
+                            kx++;
+                        }
+                        break;
+                    
+                    case 2: // bottom-left edge
+                        if(kx % 2 == 0) {
+                            kx++;
+                        } else {
+                            ky++;
+                            kx++;
+                        }
+                        break;
+                    case 3: ky++; break; // left edge
+                    case 4: // bottom-left edge
+                        if(kx % 2 == 0) {
+                            kx--;
+                        } else {
+                            kx--;
+                            ky++;
+                        }
+                        break;
+                    case 5: // top-left edge
+                        if(kx % 2 == 0) {
+                            kx--;
+                            ky--;
+                        } else {
+                            kx--;
+                        }
+                } // switch
+            } else {
+                switch (edge) {
+                    case 0: ky--; break; // top edge
+                    case 1: kx++; break; // right edge
+                    case 2: ky++; break; // bottom edge
+                    case 3: kx--; break; // left edge
+                } // switch
+            }
             for (k = 0; k < that.pieces.length; k++) {
-            if (kx == that.pieces[k].kx && ky == that.pieces[k].ky) return true; // we found the neighbor
+                if (kx == that.pieces[k].kx && ky == that.pieces[k].ky) {
+                    return true; // we found the neighbor
+                }
             }
             return false; // not a common edge
         } // function edgeIsCommon
@@ -626,7 +698,7 @@ class PolyPiece {
         function edgeIsInTbEdges(kx, ky, edge) {
             let k;
             for (k = 0; k < tbEdges.length; k++) {
-            if (kx == tbEdges[k].kx && ky == tbEdges[k].ky && edge == tbEdges[k].edge) return k; // found it
+                if (kx == tbEdges[k].kx && ky == tbEdges[k].ky && edge == tbEdges[k].edge) return k; // found it
             }
             return false; // not found
         } // function edgeIsInTbEdges
@@ -636,7 +708,7 @@ class PolyPiece {
         let tbLoops = []; // for the result
         let tbEdges = []; // set of edges which are not shared by 2 pieces of input
         let k;
-        let kEdge; // to count 4 edges
+        let kEdge;
         let lp; // for loop during its creation
         let currEdge; // current edge
         let tries; // tries counter
@@ -645,58 +717,97 @@ class PolyPiece {
 
         // table of tries
 
-        let tbTries = [
-            // if we are on edge 0 (top)
-            [
-            { dkx: 0, dky: 0, edge: 1 }, // try # 0
-            { dkx: 1, dky: 0, edge: 0 }, // try # 1
-            { dkx: 1, dky: -1, edge: 3 } // try # 2
-            ],
-            // if we are on edge 1 (right)
-            [
-            { dkx: 0, dky: 0, edge: 2 },
-            { dkx: 0, dky: 1, edge: 1 },
-            { dkx: 1, dky: 1, edge: 0 }
-            ],
-            // if we are on edge 2 (bottom)
-            [
-            { dkx: 0, dky: 0, edge: 3 },
-            { dkx: - 1, dky: 0, edge: 2 },
-            { dkx: - 1, dky: 1, edge: 1 }
-            ],
-            // if we are on edge 3 (left)
-            [
-            { dkx: 0, dky: 0, edge: 0 },
-            { dkx: 0, dky: - 1, edge: 3 },
-            { dkx: - 1, dky: - 1, edge: 2 }
-            ],
-        ];
+        let tbTries;
+        if(window.pieceSides == 6) {
+            tbTries = [
+                // kx % 2 == 0 (even columns shifted DOWN)
+                [
+                    [ { dkx: 0, dky: 0, edge: 1 }, { dkx: +1, dky: -1, edge: 5 } ], // edge 0
+                    [ { dkx: 0, dky: 0, edge: 2 }, { dkx: +1, dky: 0, edge: 0 } ], // edge 1
+                    [ { dkx: 0, dky: 0, edge: 3 }, { dkx: 0, dky: +1, edge: 1 } ],  // edge 2
+                    [ { dkx: 0, dky: 0, edge: 4 }, { dkx: -1, dky: 0, edge: 2 } ],  // edge 3
+                    [ { dkx: 0, dky: 0, edge: 5 }, { dkx: -1, dky: -1, edge: 3 } ],  // edge 4
+                    [ { dkx: 0, dky: 0, edge: 0 }, { dkx: 0, dky: -1, edge: 4 } ], // edge 5
+                ],
+                // kx % 2 == 1 (odd columns shifted UP)
+                [
+                    [ { dkx: 0, dky: 0, edge: 1 }, { dkx: +1, dky: 0, edge: 5 } ], // edge 0
+                    [ { dkx: 0, dky: 0, edge: 2 }, { dkx: +1, dky: +1, edge: 0 } ], // edge 1
+                    [ { dkx: 0, dky: 0, edge: 3 }, { dkx: 0, dky: +1, edge: 1 } ], // edge 2
+                    [ { dkx: 0, dky: 0, edge: 4 }, { dkx: -1, dky: +1, edge: 2 } ], // edge 3
+                    [ { dkx: 0, dky: 0, edge: 5 }, { dkx: -1, dky: 0, edge: 3 } ], // edge 4 
+                    [ { dkx: 0, dky: 0, edge: 0 }, { dkx: 0, dky: -1, edge: 4 } ], // edge 5
+                ]
+            ];
+        }else{
+            tbTries = [[
+                // if we are on edge 0 (top)
+                [
+                    { dkx: 0, dky: 0, edge: 1 }, // try # 0
+                    { dkx: 1, dky: 0, edge: 0 }, // try # 1
+                    { dkx: 1, dky: -1, edge: 3 } // try # 2
+                ],
+                // if we are on edge 1 (right)
+                [
+                    { dkx: 0, dky: 0, edge: 2 },
+                    { dkx: 0, dky: 1, edge: 1 },
+                    { dkx: 1, dky: 1, edge: 0 }
+                ],
+                // if we are on edge 2 (bottom)
+                [
+                    { dkx: 0, dky: 0, edge: 3 },
+                    { dkx: - 1, dky: 0, edge: 2 },
+                    { dkx: - 1, dky: 1, edge: 1 }
+                ],
+                // if we are on edge 3 (left)
+                [
+                    { dkx: 0, dky: 0, edge: 0 },
+                    { dkx: 0, dky: - 1, edge: 3 },
+                    { dkx: - 1, dky: - 1, edge: 2 }
+                ],
+            ]];
+        }
 
         // create list of not shared edges (=> belong to boundary)
         for (k = 0; k < this.pieces.length; k++) {
-            for (kEdge = 0; kEdge < 4; kEdge++) {
-            if (!edgeIsCommon(this.pieces[k].kx, this.pieces[k].ky, kEdge))
-                tbEdges.push({ kx: this.pieces[k].kx, ky: this.pieces[k].ky, edge: kEdge, kp: k })
+            for (kEdge = 0; kEdge < (window.pieceSides); kEdge++) {
+                if (!edgeIsCommon(this.pieces[k].kx, this.pieces[k].ky, kEdge)){
+                    tbEdges.push({ kx: this.pieces[k].kx, ky: this.pieces[k].ky, edge: kEdge, kp: k });
+                }
             } // for kEdge
         } // for k
 
+        let loopcount = 0;
         while (tbEdges.length > 0) {
+            loopcount++;
+            if(loopcount > 1){
+                console.log("PANIC!")
+            }
             lp = []; // new loop
             currEdge = tbEdges[0];   // we begin with first available edge
             lp.push(currEdge);       // add it to loop
             tbEdges.splice(0, 1);    // remove from list of available sides
             do {
-            for (tries = 0; tries < 3; tries++) {
-                potNext = tbTries[currEdge.edge][tries];
-                edgeNumber = edgeIsInTbEdges(currEdge.kx + potNext.dkx, currEdge.ky + potNext.dky, potNext.edge);
-                if (edgeNumber === false) continue; // can't here
-                // new element in loop
-                currEdge = tbEdges[edgeNumber];     // new current edge
-                lp.push(currEdge);              // add it to loop
-                tbEdges.splice(edgeNumber, 1);  // remove from list of available sides
-                break; // stop tries !
-            } // for tries
-            if (edgeNumber === false) break; // loop is closed
+                let parity = 0;
+                if(window.pieceSides == 6){
+                    if (currEdge.kx % 2 == 1) {
+                        parity = 1;
+                    }
+                }
+                let toTry = tbTries[parity][currEdge.edge]; // possible next edges
+                for (tries = 0; tries < toTry.length; tries++) {
+                    potNext = toTry[tries];
+                    edgeNumber = edgeIsInTbEdges(currEdge.kx + potNext.dkx, currEdge.ky + potNext.dky, potNext.edge);
+                    
+                    if (edgeNumber === false) continue; // can't here
+                    // new element in loop
+                    currEdge = tbEdges[edgeNumber];     // new current edge
+                    lp.push(currEdge);              // add it to loop
+                    tbEdges.splice(edgeNumber, 1);  // remove from list of available sides
+                    
+                    break; // stop tries !
+                } // for tries
+                if (edgeNumber === false) break; // loop is closed
             } while (1); // do-while exited by break
             tbLoops.push(lp); // add this loop to loops list
         } // while tbEdges...
@@ -704,10 +815,7 @@ class PolyPiece {
         // replace components of loops by actual pieces sides
         this.tbLoops = tbLoops.map(loop => loop.map(edge => {
             let cell = this.pieces[edge.kp];
-            if (edge.edge == 0) return cell.ts;
-            if (edge.edge == 1) return cell.rs;
-            if (edge.edge == 2) return cell.bs;
-            return cell.ls;
+            return cell.sides[edge.edge];
         }));
     } // polyPiece.listLoops
 
@@ -764,6 +872,7 @@ class PolyPiece {
         let destx = ( (this.pckxmin ? 0 : 1 / 2) ) * puzzle.scalex;
         let desty = ( (this.pckymin ? 0 : 1 / 2) ) * puzzle.scaley;
 
+        // console.log(this, puzzle)
         
         if(this.pieces[0].index < 0){
             if(this.pckxmin == 0){
@@ -817,10 +926,13 @@ class PolyPiece {
                     const path = new Path2D();
                     const shiftx = -this.offsx;
                     const shifty = -this.offsy;
-                    pp.ts.drawPath(path, shiftx, shifty, false);
-                    pp.rs.drawPath(path, shiftx, shifty, true);
-                    pp.bs.drawPath(path, shiftx, shifty, true);
-                    pp.ls.drawPath(path, shiftx, shifty, true);
+                    pp.sides.forEach((side, i) => {
+                        if (i == 0) {
+                            side.drawPath(path, shiftx, shifty, false);
+                        } else {
+                            side.drawPath(path, shiftx, shifty, true);
+                        }
+                    });
                     path.closePath();
 
                     this.polypiece_ctx.clip(path);
@@ -1077,7 +1189,7 @@ class Puzzle {
         */
         this.relativeHeight = (this.srcImage.naturalHeight / this.ny) / (this.srcImage.naturalWidth / this.nx);
 
-        this.defineShapes({ coeffDecentr: 0.12, twistf: [twist0, twist1, twist2, twist3, twist4, null][document.getElementById("shape").value - 1] });
+        this.defineShapes({ coeffDecentr: 0.12, twistf: [twist0, twist1, twist2, twist3, twist3, null][document.getElementById("shape").value - 1] });
 
         this.polyPieces = [];
 
@@ -1095,20 +1207,23 @@ class Puzzle {
                     w = -ind;
                     h = -1;
                 }
-                
-                pieces_in_group.push(this.pieces[h][w]);
-                if(ind != key){
-                    newMerge(ind, false);
+                if(this.pieces[h][w]){
+                    pieces_in_group.push(this.pieces[h][w]);
+                    if(ind != key){
+                        newMerge(ind, false);
+                    }
                 }
             }
-            let ppp = new PolyPiece(pieces_in_group, this);
-            ppp.hasMovedEver = hasmoved[key];
-            ppp.unlocked = unlocked[key];
-            ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
-            if(coordinates[key][2]){
-                ppp.rotate(null, coordinates[key][2]);
+            if(pieces_in_group.length > 0) {
+                let ppp = new PolyPiece(pieces_in_group, this);
+                ppp.hasMovedEver = hasmoved[key];
+                ppp.unlocked = unlocked[key];
+                ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
+                if(coordinates[key][2]){
+                    ppp.rotate(null, coordinates[key][2]);
+                }
+                this.polyPieces.push(ppp);
             }
-            this.polyPieces.push(ppp);
         }
 
         this.evaluateZIndex();
@@ -1169,9 +1284,35 @@ class Puzzle {
         /* first, place the corners of the pieces
             at some distance of their theoretical position, except for edges
         */
+        let np;
+
+        if(window.pieceSides == 6){
+            this.corners_and_sides_6(shapeDesc);
+        }else{
+            this.corners_and_sides_4(shapeDesc);
+        }
+
+        if(window.fake_pieces_mimic.length >= 1){
+            this.pieces[-1] = [];
+
+            for(let i = 0; i < window.fake_pieces_mimic.length; i++){
+                let mimic_piece_x = (window.fake_pieces_mimic[i]-1) % this.nx;
+                let mimic_piece_y = Math.floor((window.fake_pieces_mimic[i]-1) / this.nx);
+
+                this.pieces[-1][i+1] = np = new Piece(mimic_piece_x, mimic_piece_y, -i - 1);
+
+                for (let sideIndex = 0; sideIndex < this.pieces[mimic_piece_y][mimic_piece_x].sides.length; sideIndex++) {
+                    np.sides[sideIndex] = this.pieces[mimic_piece_y][mimic_piece_x].sides[sideIndex];
+                }
+
+            }
+        }
+
+    } // Puzzle.defineShapes
+
+    corners_and_sides_4(shapeDesc) {
 
         let { coeffDecentr, twistf } = shapeDesc;
-
         const corners = [];
         const nx = this.nx, ny = this.ny;
         let np;
@@ -1183,12 +1324,15 @@ class Puzzle {
                 if(document.getElementById("shape").value == 6){
                     coeffDecentr = randomIn(ky * nx + kx + 1 + 1) * .5;
                 }
+                if(document.getElementById("shape").value == 5){
+                    coeffDecentr = 0;
+                }
                 corners[ky][kx] = new Point(kx + alea(-coeffDecentr, coeffDecentr),
                     ky + alea(-coeffDecentr, coeffDecentr));
-                if (kx == 0) corners[ky][kx].x = 0;
-                if (kx == nx) corners[ky][kx].x = nx;
-                if (ky == 0) corners[ky][kx].y = 0;
-                if (ky == ny) corners[ky][kx].y = ny;
+                if (kx <= 0) corners[ky][kx].x = 0;
+                if (kx >= nx) corners[ky][kx].x = nx;
+                if (ky <= 0) corners[ky][kx].y = 0;
+                if (ky >= ny) corners[ky][kx].y = ny;
             } // for kx
         } // for ky
 
@@ -1205,58 +1349,182 @@ class Puzzle {
                 this.pieces[ky][kx] = np = new Piece(kx, ky, ky * nx + kx + 1);
                 // top side
                 if (ky == 0) {
-                    np.ts.points = [corners[ky][kx], corners[ky][kx + 1]];
-                    np.ts.type = "d";
+                    np.sides[0].points = [corners[ky][kx], corners[ky][kx + 1]];
+                    np.sides[0].type = "d";
                 } else {
-                    np.ts = this.pieces[ky - 1][kx].bs.reversed();
+                    np.sides[0] = this.pieces[ky - 1][kx].sides[2].reversed();
                 }
                 // right side
-                np.rs.points = [corners[ky][kx + 1], corners[ky + 1][kx + 1]];
-                np.rs.type = "d";
+                np.sides[1].points = [corners[ky][kx + 1], corners[ky + 1][kx + 1]];
+                np.sides[1].type = "d";
                 if (kx < nx - 1) {
                     if (intAlea(2)) // randomly twisted on one side of the side
-                    twistf(np.rs, corners[ky][kx], corners[ky + 1][kx]);
+                    twistf(np.sides[1], corners[ky][kx], corners[ky + 1][kx]);
                     else
-                    twistf(np.rs, corners[ky][kx + 2], corners[ky + 1][kx + 2]);
+                    twistf(np.sides[1], corners[ky][kx + 2], corners[ky + 1][kx + 2]);
+                }
+                // bottom side
+                np.sides[2].points = [corners[ky + 1][kx + 1], corners[ky + 1][kx]];
+                np.sides[2].type = "d";
+                if (ky < ny - 1) {
+                    if (intAlea(2)) // randomly twisted on one side of the side
+                    twistf(np.sides[2], corners[ky][kx + 1], corners[ky][kx]);
+                    else
+                    twistf(np.sides[2], corners[ky + 2][kx + 1], corners[ky + 2][kx]);
                 }
                 // left side
                 if (kx == 0) {
-                    np.ls.points = [corners[ky + 1][kx], corners[ky][kx]];
-                    np.ls.type = "d";
+                    np.sides[3].points = [corners[ky + 1][kx], corners[ky][kx]];
+                    np.sides[3].type = "d";
                 } else {
-                    np.ls = this.pieces[ky][kx - 1].rs.reversed()
-                }
-                // bottom side
-                np.bs.points = [corners[ky + 1][kx + 1], corners[ky + 1][kx]];
-                np.bs.type = "d";
-                if (ky < ny - 1) {
-                    if (intAlea(2)) // randomly twisted on one side of the side
-                    twistf(np.bs, corners[ky][kx + 1], corners[ky][kx]);
-                    else
-                    twistf(np.bs, corners[ky + 2][kx + 1], corners[ky + 2][kx]);
+                    np.sides[3] = this.pieces[ky][kx - 1].sides[1].reversed()
                 }
             } // for kx
         } // for ky
+    }
 
-        if(window.fake_pieces_mimic.length >= 1){
-            this.pieces[-1] = [];
+    
+    corners_and_sides_6(shapeDesc) {
 
-            for(let i = 0; i < window.fake_pieces_mimic.length; i++){
-                let mimic_piece_x = (window.fake_pieces_mimic[i]-1) % nx;
-                let mimic_piece_y = Math.floor((window.fake_pieces_mimic[i]-1) / nx);
 
-                this.pieces[-1][i+1] = np = new Piece(mimic_piece_x, mimic_piece_y, -i - 1);
+        let { coeffDecentr, twistf } = shapeDesc;
+        const corners = [];
+        const nx = this.nx, ny = this.ny;
 
-                // top side
-                np.ts = this.pieces[mimic_piece_y][mimic_piece_x].ts;
-                np.ls = this.pieces[mimic_piece_y][mimic_piece_x].ls;
-                np.bs = this.pieces[mimic_piece_y][mimic_piece_x].bs;
-                np.rs = this.pieces[mimic_piece_y][mimic_piece_x].rs;
-                
+        for (let ky = -1; ky <= 2*ny+2; ++ky) {
+            corners[ky] = [];
+            for (let kx = -1; kx <= nx+2; ++kx) {
+                if(document.getElementById("shape").value == 6){
+                    coeffDecentr = randomIn(ky * nx + kx + 1 + 1) * .5;
+                }
+                if(document.getElementById("shape").value == 5){
+                    coeffDecentr = 0;
+                }
+                if(ky % 2 == 0){
+                    if(kx % 2 == 0){
+                        corners[ky][kx] = new Point(corner_to_shape_dist + kx, ky * 0.5);
+                    }else{
+                        corners[ky][kx] = new Point(kx, ky * 0.5);
+                    }
+                }else{
+                    if(kx % 2 == 0){
+                        corners[ky][kx] = new Point(kx, ky * 0.5);
+                    }else{
+                        corners[ky][kx] = new Point(kx + corner_to_shape_dist, ky * 0.5);
+                    }
+                }
+                if(ky > 1 && ky < 2*ny && kx > 0 && kx < nx){
+                    corners[ky][kx].y += alea(-coeffDecentr, coeffDecentr);
+                    corners[ky][kx].x += alea(-coeffDecentr, coeffDecentr);
+                }
             }
         }
 
-    } // Puzzle.defineShapes
+        let np;
+
+        // Array of pieces
+        this.pieces = [];
+        for (let ky = 0; ky < ny; ++ky) {
+            this.pieces[ky] = [];
+        }
+        for (let kx = 0; kx < nx; ++kx) {
+            for (let ky = 0; ky < ny; ++ky) {
+                if(document.getElementById("shape").value == 6){
+                    let twistFunctions = [twist0, twist1, twist2, twist3];
+                    twistf = twistFunctions[Math.floor(randomIn(ky * nx + kx + 1) * twistFunctions.length)];
+                }
+                const upy = (kx % 2 == 1) ? 1 : 0; // offset for odd columns
+
+                this.pieces[ky][kx] = np = new Piece(kx, ky + upy/2, ky * nx + kx + 1);
+
+
+                const idy0 = 2 * ky + upy;
+                const idx0 = kx;
+                const c0 = corners[idy0][idx0];
+                const idy1 = 2 * ky + upy;
+                const idx1 = kx + 1;
+                const c1 = corners[idy1][idx1];
+                const idy2 = 2 * ky + 1 + upy;
+                const idx2 = kx + 1;
+                const c2 = corners[idy2][idx2];
+                const idy3 = 2 * ky + 2 + upy;
+                const idx3 = kx + 1;
+                const c3 = corners[idy3][idx3];
+                const idy4 = 2 * ky + 2 + upy;
+                const idx4 = kx;
+                const c4 = corners[idy4][idx4];
+                const idy5 = 2 * ky + 1 + upy;
+                const idx5 = kx;
+                const c5 = corners[idy5][idx5];
+
+                // top side
+                np.sides[0].points = [c0, c1];
+                np.sides[0].type = "d";
+                if(ky > 0){
+                    np.sides[0] = this.pieces[ky - 1][kx].sides[3].reversed();
+                }
+
+                // top-right side, never already exists because y is iterated first
+                np.sides[1].points = [c1, c2];
+                np.sides[1].type = "d";
+                if(kx < nx - 1 && (ky > 0 || kx % 2 == 1)) { // if not last column, and not first row or odd column
+                    if (intAlea(2)){
+                        twistf(np.sides[1], corners[idy1-1][idx1+1], corners[idy2-1][idx2+1], 0.6);
+                    } else {
+                        twistf(np.sides[1], corners[idy1+1][idx1-1], corners[idy2+1][idx2-1], 0.6);
+                    }
+                }
+
+                // bottom-right side, never already exists because y is iterated first
+                np.sides[2].points = [c2, c3];
+                np.sides[2].type = "d";
+                if(kx < nx - 1 && (ky < ny - 1 || kx % 2 == 0)) { // if not last column, and not last row or even column
+                    if (intAlea(2)){
+                        twistf(np.sides[2], corners[idy2-1][idx2-1], corners[idy3-1][idx3-1], 0.6);
+                    } else {
+                        twistf(np.sides[2], corners[idy2+1][idx2+1], corners[idy3+1][idx3+1], 0.6);
+                    }
+                }
+
+                // bottom side
+                np.sides[3].points = [c3, c4];
+                np.sides[3].type = "d";
+                if(ky < ny - 1){
+                    if (intAlea(2)){
+                        twistf(np.sides[3], corners[idy3-1][idx3], corners[idy4-1][idx4]);
+                    } else {
+                        twistf(np.sides[3], corners[idy3+1][idx3], corners[idy4+1][idx4]);
+                    }   
+                }
+
+                // bottom-left side
+                np.sides[4].points = [c4, c5];
+                np.sides[4].type = "d";
+                if (kx > 0 && (ky < ny - 1 || kx % 2 == 0)) { // if not first column, and not last row or even column
+                    if (kx % 2 == 0){
+                        np.sides[4] = this.pieces[ky][kx - 1].sides[1].reversed();
+                    } else {
+                        np.sides[4] = this.pieces[ky + 1][kx - 1].sides[1].reversed();
+                    }  
+                }
+
+                // top-left side
+                np.sides[5].points = [c5, c0];
+                np.sides[5].type = "d";
+                if (kx > 0 && (ky > 0 || kx % 2 == 1)) { // if not first column, and not first row or odd column
+                    if(kx % 2 == 0){
+                        np.sides[5] = this.pieces[ky - 1][kx - 1].sides[2].reversed();
+                    } else {
+                        np.sides[5] = this.pieces[ky][kx - 1].sides[2].reversed();
+                    }
+                }
+
+            } // for kx
+        } // for ky
+        console.log("pieces defined", this.pieces);
+    }
+
+
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1287,12 +1555,19 @@ class Puzzle {
         this.gameCanvas.height = this.gameHeight;
         this.gameCtx = this.gameCanvas.getContext("2d");
 
+        let image_enlarge = 1;
+        if(window.pieceSides == 6){
+            let image_enlarge_x = (this.nx + corner_to_shape_dist) / (this.nx);
+            let image_enlarge_y = (this.ny + 1/2) / (this.ny);
+            image_enlarge = mmax(image_enlarge_x, image_enlarge_y);
+        }
+
         this.gameCtx.drawImage(
             this.srcImage, 
             0, 
             0, 
-            this.gameWidth * window.downsize_to_fit, 
-            this.gameHeight * window.downsize_to_fit
+            this.gameWidth * window.downsize_to_fit * image_enlarge, 
+            this.gameHeight * window.downsize_to_fit * image_enlarge
         ); //safe
         
 
@@ -1473,10 +1748,10 @@ let moving; // for information about moved piece
                 
                 console.log("start scaling pieces")
                 puzzle.polyPieces.forEach(pp => {                    
-                    let nx = pp.x;
-                    let ny = pp.y;
+                    let nnx = pp.x;
+                    let nny = pp.y;
 
-                    pp.moveTo(nx, ny);
+                    pp.moveTo(nnx, nny);
                     pp.polypiece_drawImage(false);
 
 
@@ -1613,14 +1888,16 @@ let moving; // for information about moved piece
                         for (let [key, value] of Object.entries(results)) {
                             let spl = key.split("_")[3];
                             if (spl === "O"){
-                                console.log("value is", value)
-                                if(value){
-                                    if(Math.abs(parseFloat(value) - puzzle.srcImage.width / puzzle.srcImage.height) > 0.05){
-                                        alert("Warning, you are not using the same aspect ratio as before. Pieces might not be in the correct relative position. You can refresh now to discard this login (if you do ignore this error next time).")
+                                if(!window.ignoreAspectRatio){
+                                    console.log("value is", value)
+                                    if(value){
+                                        if(Math.abs(parseFloat(value) - puzzle.srcImage.width / puzzle.srcImage.height) > 0.05){
+                                            alert("Warning, you are not using the same aspect ratio as before. Pieces might not be in the correct relative position. You can refresh now to discard this login (if you do ignore this error next time).")
+                                        }
                                     }
+                                    console.log("put to ", puzzle.srcImage.width / puzzle.srcImage.height)
+                                    change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                                 }
-                                console.log("put to ", puzzle.srcImage.width / puzzle.srcImage.height)
-                                change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                             }else{
                                 if(value){
                                     if (spl === "M") {
@@ -1740,6 +2017,7 @@ let moving; // for information about moved piece
                 document.getElementById("m5").style.display = "none";
                 document.getElementById("m10b").style.display = "none";
                 document.getElementById("o1a").style.display = "none";
+                document.getElementById("o1b").style.display = "none";
 
                 /* prepare puzzle */
                 puzzle.puzzle_create(coordinates, groups, hasmoved, unlocked); // create shape of pieces, independant of size
@@ -1997,6 +2275,8 @@ let menu = (function () {
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
         document.getElementById("m10b").style.display = "block"
+        document.getElementById("o1a").style.display = "block";
+        document.getElementById("o1b").style.display = "block";
     }
     document.getElementById("m6").style.display = "block"
     document.getElementById("m11").style.display = "inline-block"
@@ -2127,7 +2407,6 @@ let zoomX = 0;
 let zoomY = 0;
 let zoomP = 1;
 forPuzzle.addEventListener('wheel', (event) => {
-    console.log(event, moving)
     if(moving){
         rotateCurrentPiece(event.deltaY < 0);
     }else{
@@ -2232,6 +2511,10 @@ function unlockPiece(index) {
 
     if(process_pending_actions){
         let pp = findPolyPieceUsingPuzzlePiece(index);
+        if(!pp){
+            console.log("PolyPiece not found for index", index);
+            return;
+        }
         pp.moveTo(
             ((index+10)*43.2345) % (0.05 * puzzle.contWidth),
             ((index+10)*73.6132) % (0.05 * puzzle.contHeight)
@@ -2403,7 +2686,7 @@ function move_piece_bounced(data){ // pp_index, x, y, (r)
 window.move_piece_bounced = move_piece_bounced;
 
 async function change_savedata_datastorage(key, value, final) {
-    console.log("change_savedata_datastorage", key, value, final);
+    // console.log("change_savedata_datastorage", key, value, final);
     
     if(window.play_solo) return;
 
@@ -2614,6 +2897,7 @@ document.addEventListener('keydown', function(event) {
 
 // debug :)
 document.addEventListener('keydown', function(event) {
+    return;
     if(!window.debug || !puzzle || !puzzle.polyPieces) return;
     if (event.key === 'S' || event.key === 's' || event.key === 'H' || event.key === 'h') {
         const hint = event.key === 'H' || event.key === 'h';

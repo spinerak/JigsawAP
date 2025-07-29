@@ -25,10 +25,6 @@ document.getElementById("solobutton2").addEventListener("click", () => {
     pressed_solo();
 });
 
-document.getElementById("optionsbutton").addEventListener("click", () => {
-    window.open('options.html', '_blank');
-});
-
 document.getElementById('name').addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
         event.preventDefault(); // Prevent the default form submission
@@ -266,6 +262,9 @@ const connectedListener = (packet) => {
     }else{
         window.fake_pieces_mimic = [];
     }
+    if(packet.slot_data.grid_type == 6){
+        window.pieceSides = 6;
+    }
 
     let apworld = packet.slot_data.ap_world_version_2 ? packet.slot_data.ap_world_version_2 : packet.slot_data.ap_world_version;
     window.apworld = apworld;
@@ -322,6 +321,9 @@ const connectedListener = (packet) => {
 
     if(packet.slot_data.total_size_of_image){
         window.downsize_to_fit = packet.slot_data.total_size_of_image / 100;
+        if(window.pieceSides == 6){
+            window.downsize_to_fit *= Math.min(packet.slot_data.nx / (packet.slot_data.nx + (1-Math.sqrt(3)/3) * 0.5), packet.slot_data.ny / (packet.slot_data.ny + 1));
+        }
     }
     if (packet.slot_data.enable_clues !== undefined) {
         window.show_clue = packet.slot_data.enable_clues === 1;
@@ -335,6 +337,7 @@ const connectedListener = (packet) => {
     }
     
     puzzlePieceOrder = packet.slot_data.piece_order;
+    console.log(puzzlePieceOrder);
 
     window.possible_merges = packet.slot_data.possible_merges;
     window.actual_possible_merges = packet.slot_data.actual_possible_merges;
@@ -537,7 +540,6 @@ function openItems(items){
         // Patterns: "{i} Puzzle Piece(s)", "{i} Fake Puzzle Piece(s)", "{i} Rotate Trap(s)", "{i} Swap Trap(s)"
         let match = item.match(/^(\d+)\s+(Puzzle Piece|Fake Puzzle Piece|Rotate Trap|Swap Trap)s?$/);
         if (match) {
-            console.log(connectionInfo.hostport)
             let count = parseInt(match[1], 10);
             const type = match[2];
             for (let n = 0; n < count; n++) {
@@ -837,6 +839,11 @@ if (shapeParam) {
 
 if(getUrlParameter("go") == "LS"){
     pressed_login();
+}
+
+window.ignoreAspectRatio = false;
+if(getUrlParameter("ratio") == "ignore"){
+    window.ignoreAspectRatio = true;
 }
 
 function sendText(message){
