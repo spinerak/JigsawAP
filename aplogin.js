@@ -308,6 +308,12 @@ const connectedListener = (packet) => {
             localStorage.setItem("referredTo063", true);
         }
     }
+    if(["0.7.0", "0.7.1", "0.7.2"].includes(apworld)){
+        if(!localStorage.getItem("referredTo072")){
+            alert("There is a newer apworld with hexagon puzzles; a brand new puzzle type! It's a yaml option. But this version still works fine too :3")
+            localStorage.setItem("referredTo072", true);
+        }
+    }
     
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
@@ -760,11 +766,14 @@ function jsonListener(text, nodes) {
 
     var logTextarea = document.getElementById("log");
 
+    var isScrolledToBottom = logTextarea.scrollHeight - logTextarea.clientHeight <= logTextarea.scrollTop + 1;
     logTextarea.appendChild(messageElement);
     
     cleanLog();
-
-    logTextarea.scrollTop = logTextarea.scrollHeight - logTextarea.clientHeight;
+    if (isScrolledToBottom) {
+        logTextarea.scrollTop = logTextarea.scrollHeight - logTextarea.clientHeight;
+    }
+    
 }
 window.jsonListener = jsonListener;
 

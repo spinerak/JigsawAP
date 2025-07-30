@@ -875,15 +875,19 @@ class PolyPiece {
         // console.log(this, puzzle)
         
         if(this.pieces[0].index < 0){
-            if(this.pckxmin == 0){
-                srcx += puzzle.scalex * (1+(this.pckymin)%2) / 3;
-            } else { // if(this.pckxmin == this.apnx - 1){            
-                srcx -= puzzle.scalex * (1+(this.pckymin)%2) / 3;
+            if(apnx > 1){
+                if(this.pckxmin == 0){
+                    srcx += puzzle.scalex * (1+(this.pckymin)%2) / 3;
+                } else { // if(this.pckxmin == this.apnx - 1){            
+                    srcx -= puzzle.scalex * (1+(this.pckymin)%2) / 3;
+                }
             }
-            if(this.pckymin == 0){
-                srcy += puzzle.scaley * (1+(this.pckxmin)%2) / 3;
-            } else { // if(this.pckymin == this.apny - 1)
-                srcy -= puzzle.scaley * (1+(this.pckxmin)%2) / 3;
+            if(apny > 1){
+                if(this.pckymin == 0){
+                    srcy += puzzle.scaley * (1+(this.pckxmin)%2) / 3;
+                } else { // if(this.pckymin == this.apny - 1)
+                    srcy -= puzzle.scaley * (1+(this.pckxmin)%2) / 3;
+                }
             }
         }
 
@@ -1218,7 +1222,10 @@ class Puzzle {
                 let ppp = new PolyPiece(pieces_in_group, this);
                 ppp.hasMovedEver = hasmoved[key];
                 ppp.unlocked = unlocked[key];
-                ppp.moveTo(coordinates[key][0] * puzzle.contWidth, coordinates[key][1] * puzzle.contHeight)
+                ppp.moveTo(
+                    coordinates[key][0] * puzzle.contWidth, 
+                    coordinates[key][1] * puzzle.contHeight
+                )
                 if(coordinates[key][2]){
                     ppp.rotate(null, coordinates[key][2]);
                 }
@@ -1922,7 +1929,11 @@ let moving; // for information about moved piece
                             }
                             window.save_file[index] = 
                             [
-                                [((index+1000) * 4321.1234) % 0.10, ((index+1000) * 1234.4321) % 0.5, random_rotation], false
+                                [
+                                    ((index+1000) * 4321.1234) % 0.10, 
+                                    ((index+1000) * 1234.4321) % 0.5, 
+                                    random_rotation
+                                ], false
                             ];
                         }
                     });
@@ -1937,7 +1948,11 @@ let moving; // for information about moved piece
                             }
                             window.save_file[index] = 
                             [
-                                [((index+1000) * 4321.1234) % 0.10, ((index+1000) * 1234.4321) % 0.5, random_rotation], false
+                                [
+                                    ((index+1000) * 4321.1234) % 0.10, 
+                                    ((index+1000) * 1234.4321) % 0.5, 
+                                    random_rotation
+                                ], false
                             ];
                         }
                     });
@@ -2029,6 +2044,15 @@ let moving; // for information about moved piece
                 console.log("done getting backlog of actions")
                 
                 puzzle.puzzle_scale();
+
+                for (let pp of puzzle.polyPieces) {
+                    if (!pp.hasMovedEver) {
+                        const newppx = pp.x - puzzle.scalex / 2;
+                        const newppy = pp.y - puzzle.scaley / 2;
+                        pp.moveTo(newppx, newppy);
+                    }
+                }
+
                 console.log("done scaling puzzle")
                 puzzle.polyPieces.forEach(pp => {
                     pp.polypiece_drawImage(false);
@@ -2516,8 +2540,8 @@ function unlockPiece(index) {
             return;
         }
         pp.moveTo(
-            ((index+10)*43.2345) % (0.05 * puzzle.contWidth),
-            ((index+10)*73.6132) % (0.05 * puzzle.contHeight)
+            ((index+10)*43.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
+            ((index+10)*73.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
         );
         let random_rotation = 0
         if(window.rotations == 90){
@@ -2547,8 +2571,8 @@ function unlockFakePiece() {
         let pp = findPolyPieceUsingPuzzlePiece(index);
         console.log(pp)
         pp.moveTo(
-            ((index+10)*429.2345) % (0.05 * puzzle.contWidth),
-            ((index+10)*723.6132) % (0.05 * puzzle.contHeight)
+            ((index+10)*429.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
+            ((index+10)*723.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
         );
         let random_rotation = 0
         if(window.rotations == 90){

@@ -42,6 +42,9 @@ function restoreDiv1() {
     draggable1.style.display = (draggable1.style.display === 'none') ? 'block' : 'none';
     if (draggable1.style.display === 'block' || draggable1.style.display === '') {
         taskbar1.style.backgroundColor = '#909090'; // lighter color
+        
+        var logTextarea = document.getElementById("log");
+        logTextarea.scrollTop = logTextarea.scrollHeight - logTextarea.clientHeight;
     } else {
         taskbar1.style.backgroundColor = ''; // reset to default
     }
