@@ -230,15 +230,12 @@ function connectToServer(firsttime = true) {
         .catch((error) => {
             console.log("Failed to connect", error)
             let errorMessage = "Failed: " + error;
+
+            document.getElementById('error-label').innerText = errorMessage + "\n Common remedies: refresh room and check login info.";
             
-            document.getElementById('loginbutton').value = errorMessage;
-            document.getElementById('loginbutton').style.backgroundColor = "red";
-
-            document.getElementById('solobutton').value = "Common remedies: refresh room and check login info"
-            document.getElementById('solobutton').style.backgroundColor = "red";
-
-            document.getElementById('optionsbutton').value = "Please refresh this page to try again :)"
-            document.getElementById('optionsbutton').style.backgroundColor = "red";
+            document.getElementById('loginbutton').style.backgroundColor = "#4caf50";
+            document.getElementById('loginbutton').value = "Login & Connect again";
+            
         });
 
 
