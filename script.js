@@ -1,7 +1,7 @@
 "use strict";
 
 window.pieceSides = 4;
-const corner_to_shape_dist = (1-Math.sqrt(3)/3) * 0.5; // distance from corner to shape in hexagonal piece
+const corner_to_shape_dist = 1/3; // distance from corner to shape in hexagonal piece
 
 window.downsize_to_fit = 0.85;
 window.show_clue = true;
@@ -396,10 +396,29 @@ class Piece {
 //--------------------------------------------------------------
 
 function rotateVector(x, y, rotations) {
-    rotations = (rotations + 4 ) % 4; // Ensure rotations are within 0-3
-    for (let i = 0; i < rotations; i++) {
-        [x, y] = [y, -x]; // Rotate 90 degrees clockwise
+    if(window.rotations == 0) return {x, y};
+
+    let degree_rotate;
+    let num_rots = Math.round(360 / window.rotations);
+    if(window.rotations == 180){
+        num_rots = 4;
+        rotations = (rotations + num_rots) % num_rots; // Ensure rotations are within 0-3
+        degree_rotate = rotations * 90;
+    }else{
+        degree_rotate = rotations * window.rotations;
+        rotations = (rotations + num_rots) % num_rots; // Ensure rotations are within 0-3
     }
+    
+    // Calculate current radius and angle
+    const radius = Math.sqrt(x * x + y * y);
+    let angle = Math.atan2(-y, x);
+
+    // Add the rotation in radians
+    angle += degree_rotate * Math.PI / 180;
+
+    // Convert back to x and y
+    x = radius * Math.cos(angle);
+    y = -radius * Math.sin(angle);
     return { x, y };
 }
 
@@ -573,18 +592,19 @@ class PolyPiece {
         if (window.pieceSides == 6) {
             for (let k = this.pieces.length - 1; k >= 0; --k) {
                 let p1 = this.pieces[k].index;
+                let col = (p1 % apnx === 0) ? apnx : (p1 % apnx);
                 neighs.push(p1 + apnx);
                 neighs.push(p1 - apnx);
-                if (p1 % apnx != 1){
-                    if( (p1 % apnx) % 2 == 1) { // note starts at 1 so not the % you would expect
+                if (col != 1){
+                    if(col % 2 == 1) { // note starts at 1 so not the % you would expect
                         neighs.push(p1 - 1 - apnx);
                     }else{
                         neighs.push(p1 - 1 + apnx);
                     }
                     neighs.push(p1 - 1);
                 }
-                if (p1 % apnx != 0){
-                    if( (p1 % apnx) % 2 == 1) {
+                if (col != apnx){
+                    if( col % 2 == 1) {
                         neighs.push(p1 + 1 - apnx);
                     }else{
                         neighs.push(p1 + 1 + apnx);
@@ -1027,34 +1047,39 @@ class PolyPiece {
     }
 
     rotate(moving, increase = 1) {
-
-        this.rot = ((this.rot + increase + 4) % 4) | 0;
+        if(window.rotations == 0) return;
+        let num_rots = Math.round(360 / window.rotations);
+        if(window.rotations == 180){
+            num_rots = 4;
+        }
+        this.rot = ((this.rot + increase + num_rots) % num_rots) | 0;
         const currentTransform = this.polypiece_canvas.style.transform.replace(/rotate\([-\d.]+deg\)/, '');
-        this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * 90}deg)`;
+        let rotamount = window.rotations;
+        if(window.rotations == 180){
+            rotamount = 90;
+        }
+        this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * rotamount}deg)`;
 
         if(moving){
-            increase = (increase + 4) % 4;
+            // Adjust position to ensure the piece stays under the cursor
+            const centerX = this.x + (this.polypiece_canvas.width / 2);
+            const centerY = this.y + (this.polypiece_canvas.height / 2);
 
-            for(let i = 0; i < increase; i++){
-                // Adjust position to ensure the piece stays under the cursor
-                const centerX = this.x + (this.polypiece_canvas.width / 2);
-                const centerY = this.y + (this.polypiece_canvas.height / 2);
+            const offsetX = moving.xMouse - centerX;
+            const offsetY = moving.yMouse - centerY;
 
-                const offsetX = moving.xMouse - centerX;
-                const offsetY = moving.yMouse - centerY;
+            let { x: changeX, y: changeY } = rotateVector(offsetX, offsetY, -increase);
+            changeX = offsetX - changeX;
+            changeY = offsetY - changeY;
 
-                const changeX = offsetX + offsetY
-                const changeY = offsetY - offsetX
+            moving.ppXInit += changeX;
+            moving.ppYInit += changeY;
 
-                moving.ppXInit += changeX;
-                moving.ppYInit += changeY;
+            this.x = this.x + changeX;
+            this.y = this.y + changeY;
 
-                this.x = this.x + changeX;
-                this.y = this.y + changeY;
-
-                this.moveTo(this.x, this.y);
-                this.moveAwayFromBorder();
-            }
+            this.moveTo(this.x, this.y);
+            this.moveAwayFromBorder();
         }
     }
 
@@ -1145,7 +1170,7 @@ class Puzzle {
         this.srcImage.addEventListener("load", () => imageLoaded(this));
 
         function handleLeave() {
-            console.log("HANDLING LEAVE")
+            // console.log("HANDLING LEAVE")
             events.push({ event: 'leave' }); //
         }
 
@@ -1562,19 +1587,20 @@ class Puzzle {
         this.gameCanvas.height = this.gameHeight;
         this.gameCtx = this.gameCanvas.getContext("2d");
 
-        let image_enlarge = 1;
+        let image_enlarge_x=1, image_enlarge_y=1;
         if(window.pieceSides == 6){
-            let image_enlarge_x = (this.nx + corner_to_shape_dist) / (this.nx);
-            let image_enlarge_y = (this.ny + 1/2) / (this.ny);
-            image_enlarge = mmax(image_enlarge_x, image_enlarge_y);
+            image_enlarge_x = (this.nx + corner_to_shape_dist) / (this.nx);
+            image_enlarge_y = (this.ny + 1/2) / (this.ny);
+            image_enlarge_x = mmax(image_enlarge_x, image_enlarge_y);
+            image_enlarge_y = image_enlarge_x;
         }
 
         this.gameCtx.drawImage(
             this.srcImage, 
             0, 
             0, 
-            this.gameWidth * window.downsize_to_fit * image_enlarge, 
-            this.gameHeight * window.downsize_to_fit * image_enlarge
+            this.gameWidth * window.downsize_to_fit * image_enlarge_x, 
+            this.gameHeight * window.downsize_to_fit * image_enlarge_y
         ); //safe
         
 
@@ -1584,6 +1610,27 @@ class Puzzle {
         /* scale pieces */
         this.scalex = window.downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
         this.scaley = window.downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
+
+        if(window.make_pieces_square){
+            if(window.pieceSides == 4){
+                this.scalex = mmin(this.scalex, this.scaley);
+                this.scaley = this.scalex;
+                console.log("made pieces square scalex, scaley", this.scalex, this.scaley);
+            }else{
+                if(this.scalex * Math.sqrt(3) < this.scaley * 2){
+                    let mmm = this.scalex * Math.sqrt(3);
+                    this.scalex = mmm / 2;
+                    this.scaley = mmm / Math.sqrt(3);
+                    console.log("made pieces square scalex, scaley (6)", this.scalex, this.scaley);
+                }else{
+                    let mmm = this.scaley * Math.sqrt(3);
+                    this.scalex = mmm / 2;
+                    this.scaley = mmm / Math.sqrt(3);
+                    console.log("made pieces square scalex, scaley (6)", this.scalex, this.scaley);
+                }
+            }
+        }
+ 
         
 
         this.pieces.forEach(row => {
@@ -1919,13 +1966,16 @@ let moving; // for information about moved piece
                         }
                     }
 
+                    let num_rots = Math.round(360 / window.rotations);
+                    if (window.rotations == 0) num_rots = 1;
+
                     unlocked_pieces.sort(() => Math.random() - 0.5).forEach(index => {
                         if (window.save_file[index] === undefined) {
-                            let random_rotation = 0
-                            if(window.rotations == 90){
-                                random_rotation = Math.floor(((index+10) * 2345.1234) % 4);
-                            }else if (window.rotations == 180){
+                            let random_rotation = 0;
+                            if (window.rotations == 180){
                                 random_rotation = Math.floor(2 * Math.floor((index * 2345.1234) % 2));
+                            }else{
+                                random_rotation = Math.floor(((index+10) * 2345.1234) % num_rots);
                             }
                             window.save_file[index] = 
                             [
@@ -1940,11 +1990,11 @@ let moving; // for information about moved piece
 
                     unlocked_fake_pieces.sort(() => Math.random() - 0.5).forEach(index => {
                         if (window.save_file[index] === undefined) {
-                            let random_rotation = 0
-                            if(window.rotations == 90){
-                                random_rotation = Math.floor(((index+10) * 2345.1234) % 4);
-                            }else if (window.rotations == 180){
+                            let random_rotation = 0;
+                            if (window.rotations == 180){
                                 random_rotation = Math.floor(2 * Math.floor(((index+10) * 2345.1234) % 2));
+                            }else{
+                                random_rotation = Math.floor(((index+10) * 2345.1234) % num_rots);
                             }
                             window.save_file[index] = 
                             [
@@ -2543,13 +2593,16 @@ function unlockPiece(index) {
             ((index+10)*43.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
             ((index+10)*73.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
         );
-        let random_rotation = 0
-        if(window.rotations == 90){
-            random_rotation = Math.floor(((index+10) * 2345.1234) % 4);
-        }else if (window.rotations == 180){
-            random_rotation = Math.floor(2 * Math.floor(((index+10) * 2345.1234) % 2));
+        if (window.rotations > 0) {
+            let num_rots = Math.round(360 / window.rotations);
+            let random_rotation = 0;
+            if (window.rotations == 180){
+                random_rotation = Math.floor(2 * Math.floor(((index+10) * 2345.1234) % 2));
+            }else{
+                random_rotation = Math.floor(((index+10) * 2345.1234) % num_rots);
+            }
+            pp.rotateTo(random_rotation);
         }
-        pp.rotateTo(random_rotation);
         pp.unlocked = true;
     }else if (accept_pending_actions){
         console.log("Adding to pending actions", index)
@@ -2574,13 +2627,16 @@ function unlockFakePiece() {
             ((index+10)*429.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
             ((index+10)*723.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
         );
-        let random_rotation = 0
-        if(window.rotations == 90){
-            random_rotation = Math.floor(((index+10) * 23345.1234) % 4);
-        }else if (window.rotations == 180){
-            random_rotation = Math.floor(2 * Math.floor(((index+10) * 23345.1234) % 2));
+        if (window.rotations > 0) {
+            let num_rots = Math.round(360 / window.rotations);
+            let random_rotation = 0;
+            if (window.rotations == 180){
+                random_rotation = Math.floor(2 * Math.floor(((index+10) * 2345.1234) % 2));
+            }else{
+                random_rotation = Math.floor(((index+10) * 2345.1234) % num_rots);
+                pp.rotateTo(random_rotation);
+            }
         }
-        pp.rotateTo(random_rotation);
         pp.unlocked = true;
     }else if (accept_pending_actions){
         console.log("Adding to pending actions", index)
@@ -2618,24 +2674,13 @@ function doRotateTrap(){
     if(window.rotations > 0){
         if(window.rotations == 180){
             pp.rotate(false, 2);
-        }
-        if(window.rotations == 90){
-            if(Math.random() < 0.333){
-                pp.rotate(false, -1);
-            }else if (Math.random() < 0.5){
-                pp.rotate(false, 1);
-            }else{
-                pp.rotate(false, 2);
-            }
+        }else{
+            let num_rots = Math.round(360 / window.rotations);
+            pp.rotate(false, Math.round(Math.random() * (num_rots)));
         }
         pp.moveAwayFromBorder();
-        if(window.rotations == 0){
-            change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight], true);
-        }else{
-            change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
-        }  
+        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
     }
-     
 }
 
 function getRandomPiece(numberOfPieces, maxcluster) {
@@ -2651,8 +2696,16 @@ function getRandomPiece(numberOfPieces, maxcluster) {
 }
 
 function updateMergesLabels(){
-    document.getElementById("m9").innerText = "Merges in logic: " + window.possible_merges[unlocked_pieces.length];
-    document.getElementById("m10").innerText = "Merges possible: " + window.actual_possible_merges[unlocked_pieces.length];
+    try {
+        document.getElementById("m9").innerText = "Merges in logic: " + (window.possible_merges[unlocked_pieces.length] !== undefined ? window.possible_merges[unlocked_pieces.length] : "?");
+    } catch (e) {
+        document.getElementById("m9").innerText = "Merges in logic: ?";
+    }
+    try {
+        document.getElementById("m10").innerText = "Merges possible: " + (window.actual_possible_merges[unlocked_pieces.length] !== undefined ? window.actual_possible_merges[unlocked_pieces.length] : "?");
+    } catch (e) {
+        document.getElementById("m10").innerText = "Merges possible: ?";
+    }
 }
 
 window.unlockPiece = unlockPiece;
@@ -2775,11 +2828,13 @@ function do_action(key, value, oldValue, bounce){
             }
             let [x,y,r] = [0,0,0];
             if(value == "unlock"){
-                let random_rotation = 0
-                if(window.rotations == 90){
-                    random_rotation = Math.floor((index * 2345.1234) % 4);
-                }else if (window.rotations == 180){
+                let num_rots = Math.round(360 / window.rotations);
+                if (window.rotations == 0) num_rots = 1;
+                let random_rotation = 0;
+                if (window.rotations == 180){
                     random_rotation = Math.floor(2 * Math.floor((index * 2345.1234) % 2));
+                }else{
+                    random_rotation = Math.floor((index * 2345.1234) % num_rots);
                 }
                 [x,y,r] = 
                     [
@@ -2899,8 +2954,7 @@ function rotateCurrentPiece(counter = false){
     if(window.rotations > 0){
         if(window.rotations == 180){
             moving.pp.rotate(moving, 2);
-        }
-        if(window.rotations == 90){
+        }else{
             if(counter){
                 moving.pp.rotate(moving, -1);
             }else{

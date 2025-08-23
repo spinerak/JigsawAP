@@ -19,9 +19,14 @@ document.getElementById("loginbutton").addEventListener("click", pressed_login);
 document.getElementById("solobutton").addEventListener("click", pressed_solo);
 document.getElementById("solobutton2").addEventListener("click", () => {
     window.rotations = 90;
-    if(window.rotations > 0){
-        window.zero_list = [0,0,0];
-    }
+    window.zero_list = [0,0,0];
+    pressed_solo();
+});
+document.getElementById("solobutton3").addEventListener("click", () => {
+    window.pieceSides = 6;
+    window.rotations = 60;
+    window.make_pieces_square = true;
+    document.getElementById("shape").value = "5";
     pressed_solo();
 });
 
@@ -75,9 +80,13 @@ window.play_solo = false;
 function pressed_solo(){
     window.play_solo = true;
     
-    window.possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23]
-
-    window.actual_possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+    if(window.pieceSides == 6){
+        window.possible_merges = [];
+        window.actual_possible_merges = [];
+    }else{
+        window.possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+        window.actual_possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+    }
 
     window.fake_pieces_mimic = []
 
@@ -506,7 +515,8 @@ function newItems(items, index) {
     setTimeout(() => {
         if (items && items.length) {
             if (index > lastindex) {
-                console.log("Something strange happened, you should have received more items already... Let's reconnect...");
+                alert("Something strange happened, you should have received more items already... Let's reconnect...");
+                console.log("Expected index:", lastindex, "but got:", index, items);
             }
             var received_items = [];
             for (let i = lastindex - index; i < items.length; i++) {
@@ -746,7 +756,6 @@ function jsonListener(text, nodes) {
             case "item": 
                 nodeElement.style.fontWeight = "bold";
                 let typenumber = node.item.progression + 2 * node.item.useful + 4 * node.item.trap
-                console.log(node.item.progression, node.item.useful, node.item.trap, typenumber)
                 nodeElement.style.color = adjustColorBrightness(classaddcolor[typenumber], adjustColor);
                 nodeElement.title = classadddesc[typenumber];
                 break;
