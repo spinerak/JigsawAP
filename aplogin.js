@@ -347,6 +347,24 @@ const connectedListener = (packet) => {
             window.zero_list = [0,0,0];
         }
     }
+
+    if (packet.slot_data.uniform_piece_size !== undefined){
+        window.make_pieces_square = packet.slot_data.uniform_piece_size === 1;
+    }
+
+    const shapeParam2 = getUrlParameter("shape");
+    if (!shapeParam2) {
+        if(packet.slot_data.border_type){
+            const shapeSelect = document.getElementById("shape");
+            if (shapeSelect) {
+                const index = parseInt(packet.slot_data.border_type, 10) - 1;
+                if (index >= 0 && index < shapeSelect.options.length) {
+                    shapeSelect.selectedIndex = index;
+                    console.log("SET!s")
+                }
+            }
+        }
+    }
     
     puzzlePieceOrder = packet.slot_data.piece_order;
     console.log(puzzlePieceOrder);
@@ -468,6 +486,20 @@ document.getElementById("defaultImageIndex").addEventListener("change", (event) 
 });
 
 function setImage(url){
+
+    // If url is just a number, treat it as an index into possibleImages
+    if (!isNaN(url)) {
+        const overrideIndex = Number(url);
+        if (
+            Number.isInteger(overrideIndex) &&
+            overrideIndex >= 1 &&
+            overrideIndex <= window.possibleImages.length
+        ) {
+            setImage(window.possibleImages[overrideIndex - 1]);
+            return;
+        }
+    }
+
     function checkImage(url, callback) {
         let img = new Image();
         img.onload = () => callback(true);  // Image loaded successfully
@@ -868,4 +900,9 @@ function sendText(message){
 }
 window.sendText = sendText;
 
-console.log("0.7.0")
+if(getUrlParameter("go") == "SS"){
+    window.start_solo_immediately = true;
+    pressed_solo();
+}
+
+console.log("0.9.0")

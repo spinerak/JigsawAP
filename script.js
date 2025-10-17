@@ -567,7 +567,7 @@ class PolyPiece {
             return otherPoly.ifNear(this, ignoreCloseness, ignoreRotation)
         }
 
-        if(!ignoreRotation && this.rot != otherPoly.rot) return false;
+        if(!ignoreRotation && (this.rot - otherPoly.rot + 360) % 360 > 5) return false;
 
         let puzzle = this.puzzle;
 
@@ -664,35 +664,39 @@ class PolyPiece {
                     case 1:  // top-right edge
                         if(kx % 2 == 0) {
                             kx++;
-                            ky--;
+                            ky-=1/2;
                         } else {
                             kx++;
+                            ky-=1/2;
                         }
                         break;
                     
                     case 2: // bottom-left edge
                         if(kx % 2 == 0) {
                             kx++;
+                            ky+=1/2;
                         } else {
-                            ky++;
                             kx++;
+                            ky+=1/2;
                         }
                         break;
                     case 3: ky++; break; // left edge
                     case 4: // bottom-left edge
                         if(kx % 2 == 0) {
                             kx--;
+                            ky+=1/2;
                         } else {
                             kx--;
-                            ky++;
+                            ky+=1/2;
                         }
                         break;
                     case 5: // top-left edge
                         if(kx % 2 == 0) {
                             kx--;
-                            ky--;
+                            ky-=1/2;
                         } else {
                             kx--;
+                            ky-=1/2;
                         }
                 } // switch
             } else {
@@ -703,6 +707,7 @@ class PolyPiece {
                     case 3: kx--; break; // left edge
                 } // switch
             }
+            console.log("final", kx, ky);
             for (k = 0; k < that.pieces.length; k++) {
                 if (kx == that.pieces[k].kx && ky == that.pieces[k].ky) {
                     return true; // we found the neighbor
@@ -742,20 +747,20 @@ class PolyPiece {
             tbTries = [
                 // kx % 2 == 0 (even columns shifted DOWN)
                 [
-                    [ { dkx: 0, dky: 0, edge: 1 }, { dkx: +1, dky: -1, edge: 5 } ], // edge 0
-                    [ { dkx: 0, dky: 0, edge: 2 }, { dkx: +1, dky: 0, edge: 0 } ], // edge 1
+                    [ { dkx: 0, dky: 0, edge: 1 }, { dkx: +1, dky: -1/2, edge: 5 } ], // edge 0
+                    [ { dkx: 0, dky: 0, edge: 2 }, { dkx: +1, dky: 1/2, edge: 0 } ], // edge 1
                     [ { dkx: 0, dky: 0, edge: 3 }, { dkx: 0, dky: +1, edge: 1 } ],  // edge 2
-                    [ { dkx: 0, dky: 0, edge: 4 }, { dkx: -1, dky: 0, edge: 2 } ],  // edge 3
-                    [ { dkx: 0, dky: 0, edge: 5 }, { dkx: -1, dky: -1, edge: 3 } ],  // edge 4
+                    [ { dkx: 0, dky: 0, edge: 4 }, { dkx: -1, dky: 1/2, edge: 2 } ],  // edge 3
+                    [ { dkx: 0, dky: 0, edge: 5 }, { dkx: -1, dky: -1/2, edge: 3 } ],  // edge 4
                     [ { dkx: 0, dky: 0, edge: 0 }, { dkx: 0, dky: -1, edge: 4 } ], // edge 5
                 ],
                 // kx % 2 == 1 (odd columns shifted UP)
                 [
-                    [ { dkx: 0, dky: 0, edge: 1 }, { dkx: +1, dky: 0, edge: 5 } ], // edge 0
-                    [ { dkx: 0, dky: 0, edge: 2 }, { dkx: +1, dky: +1, edge: 0 } ], // edge 1
+                    [ { dkx: 0, dky: 0, edge: 1 }, { dkx: +1, dky: -1/2, edge: 5 } ], // edge 0
+                    [ { dkx: 0, dky: 0, edge: 2 }, { dkx: +1, dky: +1/2, edge: 0 } ], // edge 1
                     [ { dkx: 0, dky: 0, edge: 3 }, { dkx: 0, dky: +1, edge: 1 } ], // edge 2
-                    [ { dkx: 0, dky: 0, edge: 4 }, { dkx: -1, dky: +1, edge: 2 } ], // edge 3
-                    [ { dkx: 0, dky: 0, edge: 5 }, { dkx: -1, dky: 0, edge: 3 } ], // edge 4 
+                    [ { dkx: 0, dky: 0, edge: 4 }, { dkx: -1, dky: 1/2, edge: 2 } ], // edge 3
+                    [ { dkx: 0, dky: 0, edge: 5 }, { dkx: -1, dky: -1/2, edge: 3 } ], // edge 4 
                     [ { dkx: 0, dky: 0, edge: 0 }, { dkx: 0, dky: -1, edge: 4 } ], // edge 5
                 ]
             ];
@@ -1852,7 +1857,7 @@ let moving; // for information about moved piece
                     return;
                 } 
                 
-                if ((event && event.event == "nbpieces") || (window.LoginStart && window.is_connected)) {
+                if ((event && event.event == "nbpieces") || (window.LoginStart && window.is_connected) || (window.start_solo_immediately)) {
                     document.getElementById("m4").textContent = "Loading pieces...";
 
                     bevel_size = localStorage.getItem("option_bevel_2");
@@ -2950,7 +2955,7 @@ function rotateCurrentPiece(counter = false){
         return;
     }
 
-    console.log(moving, counter)
+    // console.log(moving, counter)
     if(window.rotations > 0){
         if(window.rotations == 180){
             moving.pp.rotate(moving, 2);
