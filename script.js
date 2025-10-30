@@ -707,7 +707,7 @@ class PolyPiece {
                     case 3: kx--; break; // left edge
                 } // switch
             }
-            console.log("final", kx, ky);
+            // console.log("final", kx, ky);
             for (k = 0; k < that.pieces.length; k++) {
                 if (kx == that.pieces[k].kx && ky == that.pieces[k].ky) {
                     return true; // we found the neighbor
@@ -919,6 +919,9 @@ class PolyPiece {
         let w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
         let h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
 
+        let offsetw = puzzle.diff_scalex * (1 + this.pckxmax - this.pckxmin) / 2;
+        let offseth = puzzle.diff_scaley * (1 + this.pckymax - this.pckymin) / 2;
+
         // Create an offscreen canvas the size of your destination draw area
         if(!this.maskCanvas){
             this.maskCanvas = document.createElement("canvas");
@@ -936,8 +939,9 @@ class PolyPiece {
         // 2. Set composite mode to keep only pixels inside the shape
         maskCtx.globalCompositeOperation = "source-in";
 
+        // console.log(w, h, offsetw, offseth);
         // 3. Draw the source image (only visible inside the shape now)
-        maskCtx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, 0, 0, w, h);
+        maskCtx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, -offsetw, -offseth, w + offsetw, h + offseth);
 
         // 4. Draw the final result onto your main canvas
         this.polypiece_ctx.drawImage(this.maskCanvas, destx, desty);
@@ -1615,26 +1619,37 @@ class Puzzle {
         /* scale pieces */
         this.scalex = window.downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
         this.scaley = window.downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
+        this.diff_scalex = 0;
+        this.diff_scaley = 0;
+
 
         if(window.make_pieces_square){
             if(window.pieceSides == 4){
-                this.scalex = mmin(this.scalex, this.scaley);
-                this.scaley = this.scalex;
+                let newx = mmin(this.scalex, this.scaley);
+                let newy = newx;
+                this.diff_scalex = this.scalex - newx;
+                this.diff_scaley = this.scaley - newy;
+                this.scalex = newx;
+                this.scaley = newy;
                 console.log("made pieces square scalex, scaley", this.scalex, this.scaley);
             }else{
+                let newx, newy, mmm;
                 if(this.scalex * Math.sqrt(3) < this.scaley * 2){
-                    let mmm = this.scalex * Math.sqrt(3);
-                    this.scalex = mmm / 2;
-                    this.scaley = mmm / Math.sqrt(3);
-                    console.log("made pieces square scalex, scaley (6)", this.scalex, this.scaley);
+                    mmm = this.scalex * Math.sqrt(3);
                 }else{
-                    let mmm = this.scaley * Math.sqrt(3);
-                    this.scalex = mmm / 2;
-                    this.scaley = mmm / Math.sqrt(3);
-                    console.log("made pieces square scalex, scaley (6)", this.scalex, this.scaley);
+                    mmm = this.scaley * Math.sqrt(3);
                 }
+                newx = mmm / 2;
+                newy = mmm / Math.sqrt(3);
+                this.diff_scalex = this.scalex - newx;
+                this.diff_scaley = this.scaley - newy;
+                this.scalex = newx;
+                this.scaley = newy;
+                console.log("made pieces square scalex, scaley (6)", this.scalex, this.scaley);
             }
         }
+
+        console.log(this.diff_scalex, this.diff_scaley)
  
         
 

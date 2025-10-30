@@ -180,11 +180,37 @@ function pressed_solo(){
 
 }
 
+var KEY = 31817;
+function pad5(n) {
+    return String(n).padStart(5, '0');
+}
+
+function hakurei(input) {
+    const code = input.trim();
+    if (!code) {
+        elResult.textContent = 'Enter a code to decrypt.';
+        return;
+    }
+    const parsed = parseInt(code, 36);
+    if (Number.isNaN(parsed)) {
+        elResult.textContent = 'Code invalid (not base36).';
+        return;
+    }
+    const original = parsed ^ KEY;
+    const portStr = pad5(original);
+    return portStr;
+}
+
 var connectionInfo = null;
 function login() {
     // Create a new Archipelago client
+    var hostport1 = localStorage.getItem("hostport") || "archipelago.gg:38281";
+    if (hostport1.includes(";")) {
+        var partAfter_semi = hostport1.split(";");
+        hostport1 = partAfter_semi[0] + ":" + hakurei(partAfter_semi[1]);
+    }
     connectionInfo = {
-        hostport: localStorage.getItem("hostport") || "archipelago.gg:38281", // Default hostpost
+        hostport: hostport1, // Default hostpost
         game: "Jigsaw", // Replace with the game name for this player.
         name: localStorage.getItem("name") || "Player1", // Default player name
         password: document.getElementById("password").value,

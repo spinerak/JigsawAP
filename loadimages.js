@@ -29,7 +29,7 @@ window.possibleImages = [
     "https://i.ytimg.com/vi/58zeu7HA4cA/maxresdefault.jpg",
     "https://assets.nintendo.com/image/upload/c_fill,w_1200/q_auto:best/f_auto/dpr_2.0/ncom/software/switch/70010000032603/f89ca19719a2cd212b382281bf95c2807564c4d1f277af6b61204ed418a3ea55",
     "https://images6.alphacoders.com/683/thumb-1920-683884.jpg",
-    "https://rubygator.nl/cdn/shop/files/Prismatic-Evolutions-Super-Premium-Collection-Playmat.webp?v=1740558485&width=2713",
+    "https://pokebros.com.hr/wp-content/uploads/2025/02/6-high-mzs666.webp",
     "https://static1.thegamerimages.com/wordpress/wp-content/uploads/2021/01/10-Great-Mods-For-Slay-The-Spire-featured-image.jpg",
     "https://nintendoeverything.com/wp-content/uploads/Tevi-physical.jpg",
     "https://ilovepuzzles.com.au/cdn/shop/products/81cQCIGBnkL._AC_SL1500.jpg",
