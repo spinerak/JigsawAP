@@ -317,33 +317,39 @@ const connectedListener = (packet) => {
         return;
     }
     if(["0.3.0", "0.4.0", "0.4.1", "0.5.0"].includes(apworld)){
-        if(!localStorage.getItem("referredTo030")){
-            alert("There is a newer apworld with many updates and upgrades, including rotating pieces! But this version works here too :3. You will only see this message once.")
-            localStorage.setItem("referredTo030", true);
+        if(!localStorage.getItem("1referredTo030")){
+            alert("This apworld is VERY old, please update it.")
+            localStorage.setItem("1referredTo030", true);
         }
     }
     if(["0.6.0", "0.6.1"].includes(apworld)){
-        if(!localStorage.getItem("referredTo060")){
-            alert("There is a newer apworld with chaos piece shape and a surprise. Your yaml should still work for it! ALso this version still works too I guess :3")
-            localStorage.setItem("referredTo060", true);
+        if(!localStorage.getItem("1referredTo060")){
+            alert("This apworld is VERY old, please update it.")
+            localStorage.setItem("1referredTo060", true);
         }
     }
     if(["0.6.2"].includes(apworld)){
-        if(!localStorage.getItem("referredTo062")){
-            alert("There was a small bug with piece order type, new apworld version is out. But this version still plays fine :3")
-            localStorage.setItem("referredTo062", true);
+        if(!localStorage.getItem("1referredTo062")){
+            alert("This apworld is VERY old, please update it.")
+            localStorage.setItem("1referredTo062", true);
         }
     }
     if(["0.6.3", "0.6.4", "0.6.5"].includes(apworld)){
-        if(!localStorage.getItem("referredTo063")){
-            alert("There is a newer apworld. Traps are off by default and there are now also Swap and Rotation traps! But this version still works :3")
-            localStorage.setItem("referredTo063", true);
+        if(!localStorage.getItem("1referredTo063")){
+            alert("This apworld is very old, please update it.")
+            localStorage.setItem("1referredTo063", true);
         }
     }
     if(["0.7.0", "0.7.1", "0.7.2"].includes(apworld)){
-        if(!localStorage.getItem("referredTo072")){
-            alert("There is a newer apworld with hexagon puzzles; a brand new puzzle type! It's a yaml option. But this version still works fine too :3")
-            localStorage.setItem("referredTo072", true);
+        if(!localStorage.getItem("1referredTo072")){
+            alert("This apworld is old, please update it if you can. The new version has hexagons! You will need a new yaml.")
+            localStorage.setItem("1referredTo072", true);
+        }
+    }
+    if(["0.8.0"].includes(apworld)){
+        if(!localStorage.getItem("1referredTo080")){
+            alert("New apworld version released with proper rotations for hexagons and other stuff! You will need a new yaml. Please update if you can, this version still works though :3")
+            localStorage.setItem("1referredTo080", true);
         }
     }
     
