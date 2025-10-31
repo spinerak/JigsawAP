@@ -919,9 +919,6 @@ class PolyPiece {
         let w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
         let h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
 
-        let offsetw = puzzle.diff_scalex * (1 + this.pckxmax - this.pckxmin) / 2;
-        let offseth = puzzle.diff_scaley * (1 + this.pckymax - this.pckymin) / 2;
-
         // Create an offscreen canvas the size of your destination draw area
         if(!this.maskCanvas){
             this.maskCanvas = document.createElement("canvas");
@@ -941,7 +938,7 @@ class PolyPiece {
 
         // console.log(w, h, offsetw, offseth);
         // 3. Draw the source image (only visible inside the shape now)
-        maskCtx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, -offsetw, -offseth, w + offsetw, h + offseth);
+        maskCtx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, 0,0, w, h);
 
         // 4. Draw the final result onto your main canvas
         this.polypiece_ctx.drawImage(this.maskCanvas, destx, desty);
@@ -1604,17 +1601,7 @@ class Puzzle {
             image_enlarge_y = image_enlarge_x;
         }
 
-        this.gameCtx.drawImage(
-            this.srcImage, 
-            0, 
-            0, 
-            this.gameWidth * window.downsize_to_fit * image_enlarge_x, 
-            this.gameHeight * window.downsize_to_fit * image_enlarge_y
-        ); //safe
-        
 
-        this.gameCanvas.classList.add("gameCanvas");
-        this.gameCanvas.style.zIndex = 100000002;
 
         /* scale pieces */
         this.scalex = window.downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
@@ -1649,7 +1636,20 @@ class Puzzle {
             }
         }
 
-        console.log(this.diff_scalex, this.diff_scaley)
+        console.log(this.diff_scalex, this.gameWidth * window.downsize_to_fit * image_enlarge_x, this.nx)
+
+        this.gameCtx.drawImage(
+            this.srcImage, 
+            - this.diff_scalex * this.nx / 2, 
+            - this.diff_scaley * this.ny / 2, 
+            this.gameWidth * window.downsize_to_fit * image_enlarge_x, 
+            this.gameHeight * window.downsize_to_fit * image_enlarge_y
+        ); //safe
+        
+
+        this.gameCanvas.classList.add("gameCanvas");
+        this.gameCanvas.style.zIndex = 100000002;
+
  
         
 
