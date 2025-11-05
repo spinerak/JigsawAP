@@ -352,6 +352,12 @@ const connectedListener = (packet) => {
             localStorage.setItem("1referredTo080", true);
         }
     }
+    if(["0.9.0"].includes(apworld)){
+        if(!localStorage.getItem("1referredTo090")){
+            alert("New apworld version released, small bugfix for 'meme one row' and 'meme one column' options. This version still works though :3")
+            localStorage.setItem("1referredTo090", true);
+        }
+    }
     
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
