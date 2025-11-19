@@ -1,11 +1,15 @@
     body {
       font-family: Arial, Helvetica, "Liberation Sans", FreeSans, sans-serif;
       background-color: #000;
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: auto 100%; /* Fit vertically: height = 100% of viewport, width scales to preserve aspect ratio */
+      min-height: 100vh; /* ensure body fills viewport height */
       margin: 0;
       padding: 0;
       border-width: 0;
       cursor: pointer;
-     }
+    }
 
     #menu {
       position: absolute;
@@ -111,7 +115,7 @@
       height: 100vh;
     }
     .login-form {
-        background-color: #1f1f1f;
+        background-color: #1f1f1fa2;
         border-radius: 5px;
         padding: 20px;
         width: 300px;
@@ -147,7 +151,7 @@
 
     .login-submit {
         width: 100%;
-        background-color: #4caf50;
+        background-color: #459a45;
         color: white;
         padding: 10px 0;
         border: none;
