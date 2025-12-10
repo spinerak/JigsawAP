@@ -125,6 +125,17 @@ document.getElementById('taskbar2').addEventListener('click', restoreDiv2);
 document.getElementById('control-btn3a').addEventListener('click', restoreDiv3);
 document.getElementById('taskbar3').addEventListener('click', restoreDiv3);
 
+// Call restore functions when pressing number keys 1, 2, 3 (ignore when typing in inputs)
+document.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const tag = active && active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
+
+    if (e.key === '1' || e.code === 'Digit1' || e.code === 'Numpad1') restoreDiv1();
+    if (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2') restoreDiv2();
+    if (e.key === '3' || e.code === 'Digit3' || e.code === 'Numpad3') restoreDiv3();
+});
+
 
 // const resizerRight1 = document.getElementById('resizerRight1');
 // const resizerBottom1 = document.getElementById('resizerBottom1');
