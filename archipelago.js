@@ -386,6 +386,8 @@ class IntermediateDataOperation {
   }
 }
 
+let latestPacket = null;
+let packetUpdateTimer = null;
 // src/classes/managers/DataStorageManager.ts
 class DataStorageManager {
   #client;
@@ -398,9 +400,21 @@ class DataStorageManager {
       this.#subscribers = {};
     }).on("setReply", (packet) => {
       this.#storage[packet.key] = packet.value;
-      const callbacks = this.#subscribers[packet.key];
-      if (callbacks) {
-        callbacks.forEach((callback) => callback(packet.key, packet.value, packet.original_value));
+      latestPacket = packet;
+      if (!packetUpdateTimer) {
+        packetUpdateTimer = setTimeout(() => {
+          const callbacks = this.#subscribers[latestPacket.key];
+          if (callbacks) {
+            callbacks.forEach((callback) => callback(latestPacket.key, latestPacket.value, latestPacket.original_value));
+            if(latestPacket.key == "JIG_PROG_"+this.#client.players.self.slot+"_Q"){
+              console.log(this.#storage[latestPacket.key]);
+              this.#storage[latestPacket.key] = [this.#storage[latestPacket.key][0]+this.#storage[latestPacket.key].length-1];
+              console.log(this.#storage[latestPacket.key]);
+            }
+          }
+          latestPacket = null;
+          packetUpdateTimer = null;
+        }, 1000);
       }
     }).on("connected", () => {
       if (this.#client.options.debugLogVersions) {

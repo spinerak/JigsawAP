@@ -44,7 +44,7 @@
                 label._colorInterval = setInterval(() => {
                   label.style.color = colors[i % 2];
                   i++;
-                  console.log("Color toggled to", label.style.color);
+                  // console.log("Color toggled to", label.style.color);
                   if (i >= 10) {
                     clearInterval(label._colorInterval);
                     label._colorInterval = null;

@@ -566,8 +566,12 @@ const bouncedListener = (packet) => {
     if(packet){
         if (packet.data) {
             console.log(packet.data);
-            if (typeof packet.data[0] === "number") {
-                window.move_piece_bounced(packet.data);
+            if (typeof packet.data[0] === "number" ) {
+                if(typeof packet.data[1] === "number"){
+                    window.move_piece_bounced(packet.data);
+                }else{
+                    alert("Someone is probably using an older version of the site, please tell them to update to the latest version to avoid issues.");
+                }
             }else{
                 gotRandomNumber(packet.data[0], packet.data[1]);
             }

@@ -1975,7 +1975,11 @@ let moving; // for information about moved piece
                                     change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                                 }
                             }else if (spl === "Q"){
-                                last_queue_check = parseInt(value[0]) || 0;
+                                let v = 0;
+                                if(value){
+                                     v = value[0];
+                                }
+                                last_queue_check = parseInt(v) || -1;
                             }else{
                                 if(value){
                                     if (spl === "M") {
@@ -2933,107 +2937,85 @@ async function do_action(key, value, oldValue, bounce){
     }
 }
 
-let last_queue_check = -1;
-let checkTimer
-function setCheckTimer(){
-    if (checkTimer) clearInterval(checkTimer);
-    checkTimer = setInterval(async () => {
-        checkQueue();
-    }, 1000);
+async function setCheckTimer(){
+    let client = window.getAPClient();
+    let keys = [`JIG_PROG_${window.slot}_Q`];
+    await client.storage.notify(keys, (key, value, oldValue) => {
+        console.log("notify", key, value, oldValue);
+        checkQueue(value);
+    });
 }
 window.setCheckTimer = setCheckTimer;
 
-async function checkQueue(){
-    try {
-        if (window.play_solo || !window.is_connected) return;
+let last_queue_check = -1;
 
-        const client = window.getAPClient();
-        const keys = [`JIG_PROG_${window.slot}_Q`];
-
-        const results = await client.storage.fetch(keys, true);
-        
-        let list = results[keys[0]];
-
-        
-
-        if (!Array.isArray(list)) {
-            // clone to avoid mutating the global zero_list
-            list = [0, []];
-        }
-        
-        let index = list[0];
-        let queue = list[1];
-        console.log(index, queue);   
-        
-        let number_of_items_to_shift = 0;
-        let prev_last_queue_check = last_queue_check;
-        for (let i = 0; i < queue.length; i++) {
-            let index_of_item = index + i;
-            if(index_of_item > last_queue_check){
-                do_action(`$X_X_X_${queue[i][0]}`, queue[i][1], window.zero_list, true);
-                console.log("Processed queue item", queue[i], index_of_item);
-            }else{
-                console.log("Skipping already processed queue item", index, i, index_of_item);
-                number_of_items_to_shift += 1;
-            }
-        }
-        last_queue_check = index + queue.length -1;
-        
-        if(queue.length > 0){
-            index += number_of_items_to_shift;
-            console.log(queue, number_of_items_to_shift)
-            queue = queue.slice(number_of_items_to_shift);
-            console.log(queue, number_of_items_to_shift)
-            client.storage.prepare(keys[0], window.zero_list).replace([index, queue]).commit();
-            console.log("Cleaned up queue storage", index, last_queue_check, queue)
-        }else{
-            
-            await client.storage.notify(keys, (key, value, oldValue) => {
-                console.log("notify", key, value, oldValue);
-                do_action(key, value, oldValue, false);
-            });
-            
-            clearInterval(checkTimer);
-            checkTimer = null;
-            console.log("No more queue items, stopped checking and add notify")
-        }
-
-    } catch (err) {
-        console.error("checkTimer error:", err);
-    }
-}
-
-async function updateQueue(key_name, value){
+async function checkQueue(list){
     if (window.play_solo || !window.is_connected) return;
 
-    const client = window.getAPClient();
-    const keys = [`JIG_PROG_${window.slot}_Q`];
-
-    const results = await client.storage.fetch(keys, true);
-    
-    let list = results[keys[0]];
     if (!Array.isArray(list)) {
         // clone to avoid mutating the global zero_list
         list = [0, []];
     }
-    
-    let index = list[0];
-    let queue = list[1];
-
-    if(queue.length == 0){
-        index += 1;
+    let index, queue;
+    if(Array.isArray(list[0])){
+        index = 0;
+        queue = list;
+    }else{
+        index = list[0];
+        queue = list.slice(1);
     }
+        
+    console.log(index, queue);   
     
-    queue.push([key_name, value]);
-    if(queue.length > 100){
-        queue.shift();
-        index += 1;
-    }
+    let number_of_items_to_shift = 0;
 
-    client.storage.prepare(keys[0], window.zero_list).replace([index, queue]).commit();
+    for (let i = 0; i < queue.length; i++) {
+        let index_of_item = index + i;
+        if(index_of_item > last_queue_check){
+            do_action(`$X_X_X_${queue[i][0]}`, queue[i][1], window.zero_list, true);
+            console.log("Processed queue item", queue[i], index_of_item);
+        }else{
+            console.log("Skipping already processed queue item", index, i, index_of_item);
+            number_of_items_to_shift += 1;
+        }
+    }
+    last_queue_check = index + queue.length - 1;
+    
+    // if(queue.length > 0){
+    //     index += number_of_items_to_shift;
+    //     console.log(queue, number_of_items_to_shift)
+    //     queue = queue.slice(number_of_items_to_shift);
+    //     console.log(queue, number_of_items_to_shift)
+    //     client.storage.prepare(keys[0], window.zero_list).replace([index, queue]).commit();
+    //     console.log("Cleaned up queue storage", index, last_queue_check, queue)
+    // }
 }
 
+// async function updateQueue(key_name, value){
+//     if (window.play_solo || !window.is_connected) return;
 
+//     const client = window.getAPClient();
+//     const keys = [`JIG_PROG_${window.slot}_Q`];
+
+//     console.log("updateQueue", key_name, value);
+//     await client.storage.prepare(keys[0], window.zero_list).add([[key_name, value]]).commit();
+// }
+
+async function updateQueue(key, value){
+    if (window.play_solo || !window.is_connected) return;
+
+    const client = window.getAPClient();
+
+    const results = await client.storage.fetch([`JIG_PROG_${window.slot}_Q`], true);
+    let list = results[`JIG_PROG_${window.slot}_Q`] || [0];
+    list.push([key, value]);
+    client.storage.prepare(`JIG_PROG_${window.slot}_Q`, [0]).replace(list).commit();
+
+    // client.storage
+    //     .prepare(`JIG_PROG_${window.slot}_Q`, [0])
+    //     .add([[key, value]])
+    //     .commit();
+}
 
 
 function removeAllHints(){
