@@ -512,6 +512,8 @@ const connectedListener = (packet) => {
     }
     window.is_connected = true;
     window.getPreviousSizeAndPosition();
+
+    window.setCheckTimer();
 };
 
 document.getElementById("defaultImageIndex").addEventListener("click", (event) => {

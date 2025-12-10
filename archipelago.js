@@ -445,6 +445,14 @@ class DataStorageManager {
     });
     return this.fetch(keys, true);
   }
+  async unnotify(keys) {
+    keys.forEach((key) => {
+      const callbacks = this.#subscribers[key];
+      if (callbacks) {
+        this.#subscribers[key] = callbacks.filter(() => false);
+      }
+    });
+  }
   prepare(key, _default) {
     if (key.startsWith("_read_")) {
       throw TypeError("Cannot manipulate read only keys.");

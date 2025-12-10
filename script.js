@@ -1773,6 +1773,7 @@ let gameStarted = false;
 window.gameplayStarted = false;
 let manually_load_save_file = false;
 
+let just_started_dragging_timer;
 
 // Fetch scale factor from CSS
 window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue('--scale-factor').trim();
@@ -1948,13 +1949,14 @@ let moving; // for information about moved piece
 
                         let client = window.getAPClient();                  
 
-                        await client.storage.notify(keys, (key, value, oldValue) => {
-                            console.log("notify", key, value, oldValue);
-                            do_action(key, value, oldValue, false);
-                        });
+                        // await client.storage.notify(keys, (key, value, oldValue) => {
+                        //     console.log("notify", key, value, oldValue);
+                        //     do_action(key, value, oldValue, false);
+                        // });
 
                         keys.push(`JIG_PROG_${window.slot}_M`);
                         keys.push(`JIG_PROG_${window.slot}_O`);
+                        keys.push(`JIG_PROG_${window.slot}_Q`);
 
                         let results = (await client.storage.fetch(keys, true))
                         console.log("results", results)
@@ -1972,6 +1974,8 @@ let moving; // for information about moved piece
                                     console.log("put to ", puzzle.srcImage.width / puzzle.srcImage.height)
                                     change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                                 }
+                            }else if (spl === "Q"){
+                                last_queue_check = parseInt(value[0]) || 0;
                             }else{
                                 if(value){
                                     if (spl === "M") {
@@ -2190,6 +2194,10 @@ let moving; // for information about moved piece
 
                 console.log(event)
                 if(event.button == 0){
+                    just_started_dragging_timer = setTimeout(() => {
+                        just_started_dragging_timer = null;
+                    }, 1000);
+
                     const event_x = event.position.x;
                     const event_y = event.position.y;
                     // console.log(event_x, event_y)
@@ -2230,6 +2238,8 @@ let moving; // for information about moved piece
 
                 startDragX = event.position.p_x;
                 startDragY = event.position.p_y;
+
+
 
                 state = 52;
                 break;
@@ -2276,12 +2286,14 @@ let moving; // for information about moved piece
                         moving.pp.moveAwayFromBorder();
                         moving.pp.hasMovedEver = true;
                         if (window.gameplayStarted && !window.play_solo) {
-                            // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                 
-                            if(window.rotations == 0){
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
-                            }else{
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
-                            }    
+                            if(!just_started_dragging_timer){
+                                // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                 
+                                if(window.rotations == 0){
+                                    change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                                }else{
+                                    change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+                                }    
+                            }
                         }
 
                         break;
@@ -2801,6 +2813,14 @@ async function change_savedata_datastorage(key, value, final) {
         currentValue = await client.storage.fetch([key_name], true);
         currentValue = currentValue[key_name];
         console.log("currentValue", currentValue, key_name)
+
+        if ((currentValue === null || Array.isArray(currentValue))) {
+            if(typeof value === "number"){
+                client.bounce({"slots": [window.slot]}, [key, value]);
+            }
+            updateQueue(key, value);
+        }
+
         if (currentValue === null) {
             client.storage.prepare(key_name, window.zero_list).replace(value).commit();
         } else if (Array.isArray(currentValue) && Array.isArray(value)) {
@@ -2808,7 +2828,9 @@ async function change_savedata_datastorage(key, value, final) {
             client.storage.prepare(key_name, window.zero_list).replace(value).commit();
         } else if (typeof currentValue === "number" && typeof value === "number") {
             // Replace only if value < currentValue
-            client.storage.prepare(key_name, 999999).replace(Math.min(currentValue, value)).commit();
+            if(value < currentValue){
+                client.storage.prepare(key_name, 999999).replace(value).commit();
+            }
         } else if (!Array.isArray(value)) {
             // If X is not a list, replace the current value
             client.storage.prepare(key_name, window.zero_list).replace(value).commit();
@@ -2817,7 +2839,7 @@ async function change_savedata_datastorage(key, value, final) {
         const client = window.getAPClient();
         if (!window.bounceTimeout) {
             // console.log("sending bounce", [key, value[0], value[1]])
-            client.bounce({"slots": [window.slot]}, [key, value]);
+            updateQueue(key, value);
             window.bounceTimeout = setTimeout(() => {
                 window.bounceTimeout = null;
             }, 1000);
@@ -2826,7 +2848,20 @@ async function change_savedata_datastorage(key, value, final) {
 }
 
 let pending_actions = []
-function do_action(key, value, oldValue, bounce){
+async function do_action(key, value, oldValue, bounce){
+
+    if(key == `JIG_PROG_${window.slot}_Q`){
+        setCheckTimer();
+        let client = window.getAPClient();
+
+        let keys = [`JIG_PROG_${window.slot}_Q`];
+        await client.storage.unnotify(keys);
+
+
+        console.log("Got notify for queue, set check timer and remove notify")
+        return;
+    }
+
     // console.log("got response", key, value, oldValue, bounce);
     if(accept_pending_actions){
         if(!bounce){
@@ -2897,6 +2932,109 @@ function do_action(key, value, oldValue, bounce){
         }
     }
 }
+
+let last_queue_check = -1;
+let checkTimer
+function setCheckTimer(){
+    if (checkTimer) clearInterval(checkTimer);
+    checkTimer = setInterval(async () => {
+        checkQueue();
+    }, 1000);
+}
+window.setCheckTimer = setCheckTimer;
+
+async function checkQueue(){
+    try {
+        if (window.play_solo || !window.is_connected) return;
+
+        const client = window.getAPClient();
+        const keys = [`JIG_PROG_${window.slot}_Q`];
+
+        const results = await client.storage.fetch(keys, true);
+        
+        let list = results[keys[0]];
+
+        
+
+        if (!Array.isArray(list)) {
+            // clone to avoid mutating the global zero_list
+            list = [0, []];
+        }
+        
+        let index = list[0];
+        let queue = list[1];
+        console.log(index, queue);   
+        
+        let number_of_items_to_shift = 0;
+        let prev_last_queue_check = last_queue_check;
+        for (let i = 0; i < queue.length; i++) {
+            let index_of_item = index + i;
+            if(index_of_item > last_queue_check){
+                do_action(`$X_X_X_${queue[i][0]}`, queue[i][1], window.zero_list, true);
+                console.log("Processed queue item", queue[i], index_of_item);
+            }else{
+                console.log("Skipping already processed queue item", index, i, index_of_item);
+                number_of_items_to_shift += 1;
+            }
+        }
+        last_queue_check = index + queue.length -1;
+        
+        if(queue.length > 0){
+            index += number_of_items_to_shift;
+            console.log(queue, number_of_items_to_shift)
+            queue = queue.slice(number_of_items_to_shift);
+            console.log(queue, number_of_items_to_shift)
+            client.storage.prepare(keys[0], window.zero_list).replace([index, queue]).commit();
+            console.log("Cleaned up queue storage", index, last_queue_check, queue)
+        }else{
+            
+            await client.storage.notify(keys, (key, value, oldValue) => {
+                console.log("notify", key, value, oldValue);
+                do_action(key, value, oldValue, false);
+            });
+            
+            clearInterval(checkTimer);
+            checkTimer = null;
+            console.log("No more queue items, stopped checking and add notify")
+        }
+
+    } catch (err) {
+        console.error("checkTimer error:", err);
+    }
+}
+
+async function updateQueue(key_name, value){
+    if (window.play_solo || !window.is_connected) return;
+
+    const client = window.getAPClient();
+    const keys = [`JIG_PROG_${window.slot}_Q`];
+
+    const results = await client.storage.fetch(keys, true);
+    
+    let list = results[keys[0]];
+    if (!Array.isArray(list)) {
+        // clone to avoid mutating the global zero_list
+        list = [0, []];
+    }
+    
+    let index = list[0];
+    let queue = list[1];
+
+    if(queue.length == 0){
+        index += 1;
+    }
+    
+    queue.push([key_name, value]);
+    if(queue.length > 100){
+        queue.shift();
+        index += 1;
+    }
+
+    client.storage.prepare(keys[0], window.zero_list).replace([index, queue]).commit();
+}
+
+
+
 
 function removeAllHints(){
     puzzle.polyPieces.forEach(pp => {
