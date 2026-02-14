@@ -1113,6 +1113,12 @@ class Puzzle {
             document.getElementById(params.container) :
             params.container;
 
+        this._releaseHandled = false;
+        this.handleLeave = () => {
+            this._releaseHandled = false;
+            events.push({ event: 'leave' });
+        };
+
         /* the following code will add the event Handlers several times if
             new Puzzle objects are created with same container.
             the presence of previous event listeners is NOT detectable
@@ -1135,20 +1141,33 @@ class Puzzle {
             events.push({ event: 'touch', button: 0, position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
-        this.container.addEventListener("mouseup", event => {
+        this._boundMouseUp = (event) => {
             event.preventDefault();
-            handleLeave();
-        });
+            if (this._releaseHandled) this.handleLeave();
+        };
+        this._boundTouchEnd = (event) => {
+            if (event.touches.length == 0 && this._releaseHandled) this.handleLeave();
+        };
+        this._boundTouchLeave = (event) => {
+            if (event.touches.length == 0 && this._releaseHandled) this.handleLeave();
+        };
+        this._boundTouchCancel = (event) => {
+            if (event.touches.length == 0 && this._releaseHandled) this.handleLeave();
+        };
+        document.addEventListener("mouseup", this._boundMouseUp);
+        document.addEventListener("touchend", this._boundTouchEnd);
+        document.addEventListener("touchleave", this._boundTouchLeave);
+        document.addEventListener("touchcancel", this._boundTouchCancel);
 
-        this.container.addEventListener("touchend", event => {
-            if (event.touches.length == 0) handleLeave();
-        });
-        this.container.addEventListener("touchleave", event => {
-            if (event.touches.length == 0) handleLeave();
-        });
-        this.container.addEventListener("touchcancel", event => {
-            if (event.touches.length == 0) handleLeave();
-        });
+        this._boundPointerDown = (event) => {
+            this.container.setPointerCapture(event.pointerId);
+        };
+        this._boundPointerUp = (event) => {
+            if (this._releaseHandled) this.handleLeave();
+            this.container.releasePointerCapture(event.pointerId);
+        };
+        this.container.addEventListener("pointerdown", this._boundPointerDown);
+        this.container.addEventListener("pointerup", this._boundPointerUp);
 
         this.container.addEventListener("mousemove", event => {
             event.preventDefault();
@@ -1175,14 +1194,18 @@ class Puzzle {
         this.imageLoaded = false;
         this.srcImage.addEventListener("load", () => imageLoaded(this));
 
-        function handleLeave() {
-            // console.log("HANDLING LEAVE")
-            events.push({ event: 'leave' }); //
-        }
-
         this.scale_zoom = 1;
 
     } // Puzzle
+
+    destroy() {
+        document.removeEventListener("mouseup", this._boundMouseUp);
+        document.removeEventListener("touchend", this._boundTouchEnd);
+        document.removeEventListener("touchleave", this._boundTouchLeave);
+        document.removeEventListener("touchcancel", this._boundTouchCancel);
+        this.container.removeEventListener("pointerdown", this._boundPointerDown);
+        this.container.removeEventListener("pointerup", this._boundPointerUp);
+    }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     getContainerSize() {
@@ -2220,6 +2243,7 @@ let moving; // for information about moved piece
                             puzzle.polyPieces.push(pp);
                             pp.polypiece_canvas.style.zIndex = 100000001; // to foreground
                             
+                            puzzle._releaseHandled = true;
                             state = 55;
                             return;
                         }
@@ -2231,6 +2255,7 @@ let moving; // for information about moved piece
                 startDragX = event.position.p_x;
                 startDragY = event.position.p_y;
 
+                puzzle._releaseHandled = true;
                 state = 52;
                 break;
 
