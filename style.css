@@ -50,11 +50,15 @@
       height: auto;
     }
 
-    #m7, #m8, #m9, #m9a, #m10, #m11, #m11a, #m13, #m13b, #m13c, #o1a, #o1b {
+    #m7, #m8, #m9, #m9a, #m10, #m11, #m11a, #m11b, #m13, #m13b, #m13c, #o1a, #o1b {
       display: none;
     }
 
-    #m11, #m11a, #m13, #m13b, #m13c {
+    #m3a, #m3b {
+      display: none;
+    }
+
+    #m11, #m11a, #m11b, #m13, #m13b, #m13c {
       margin: 0;
       padding: 0;
     }
@@ -73,19 +77,96 @@
     
     #forPuzzle {
       position: absolute;
+      /* Content size = viewport × scale-factor so that scale(1/scale-factor) fills viewport and centers pan. JS overrides with image-aspect px when puzzle_scale() runs. */
       width: calc(100% * var(--scale-factor));
-      height: calc(56.25vw * var(--scale-factor)); /* Maintain 16:9 aspect ratio */
-      max-height: calc(100% * var(--scale-factor));
-      max-width: calc(177.78vh * var(--scale-factor)); /* Maintain 16:9 aspect ratio */
+      height: calc(100% * var(--scale-factor));
       top: 50%;
       left: 0;
-      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%) 
+      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%)
                   scale(calc(1 / var(--scale-factor)))
 
                   translate(0%, 0%) /* for zoom */
                   scale(1.0); /* for zoom */
       background-color: transparent;
       overflow: hidden;
+      touch-action: none;
+    }
+
+    #m11b.view-controls-panel {
+      padding: 6px;
+      min-width: 220px;
+    }
+
+    #m11b.view-controls-panel.view-controls-collapsed {
+      padding: 4px 10px;
+    }
+
+    .view-controls-header {
+      color: #111;
+      font-weight: 700;
+      margin-bottom: 4px;
+      font-size: 12px;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #m11b.view-controls-collapsed .view-controls-header {
+      margin-bottom: 0;
+    }
+
+    .view-controls-body {
+      display: block;
+    }
+
+    #m11b.view-controls-collapsed .view-controls-body {
+      display: none;
+    }
+
+    .view-controls-row {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .view-controls-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .view-toggle-btn {
+      flex: 1;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background-color: #f1d29a;
+      color: #111;
+      padding: 4px 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .view-toggle-btn.is-off {
+      background-color: #888;
+      color: #fff;
+    }
+
+    .view-controls-slider {
+      display: grid;
+      grid-template-columns: 72px 100px 40px;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+      color: #111;
+      font-size: 12px;
+    }
+
+    .view-controls-slider input[type="range"] {
+      width: 100%;
+      margin: 0;
+    }
+
+    .view-controls-slider span {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     
     

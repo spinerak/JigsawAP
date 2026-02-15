@@ -56,12 +56,14 @@ function toggleFullscreen() {
         }
     }
 }
+window.toggleFullscreen = toggleFullscreen;
 
 // Show the fullscreen button only on mobile devices
 window.addEventListener('load', () => {
     if (isMobile()) {
-        document.getElementById('m11').style.display = 'inline-block';
-        document.getElementById('m11a').style.display = 'inline-block';
+        document.getElementById('m11').style.display = 'none';
+        document.getElementById('m11a').style.display = 'none';
+        document.getElementById('m11b').style.display = 'inline-block';
         setTimeout(() => window.scrollTo(0, 1), 100); // URL bar hiding trick
     }
 });
@@ -80,53 +82,32 @@ window.play_solo = false;
 function pressed_solo(){
     window.play_solo = true;
     
-    if(window.pieceSides == 6){
-        window.possible_merges = [];
-        window.actual_possible_merges = [];
-    }else{
-        window.possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23];
-        window.actual_possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23];
-    }
+    window.possible_merges = [];
+    window.actual_possible_merges = [];
 
     window.fake_pieces_mimic = []
 
     closeMenus();
 
+    window.slot = window.slot ?? 0;
+    const m3a = document.getElementById("m3a");
+    const m3b = document.getElementById("m3b");
+    if (m3a) m3a.style.display = "block";
+    if (m3b) m3b.style.display = "block";
+    const soloPieceCount = document.getElementById("soloPieceCount");
+    const soloSeed = document.getElementById("soloSeed");
+    if (soloPieceCount) soloPieceCount.value = "24";
+    if (soloSeed) soloSeed.value = "";
+
     window.set_puzzle_dim(6, 4);
 
-    window.unlockPiece(23);
-    window.unlockPiece(2);
-    window.unlockPiece(12);
-    window.unlockPiece(18);
-    window.unlockPiece(7);
-    window.unlockPiece(13);
-    window.unlockPiece(21);
-    window.updateMergesLabels();
-
     function sendCheck(numberOfMerges){
-        let trans = {
-            1: 3,
-            2: 20,
-            3: 5,
-            4: 4,
-            5: 22,
-            6: 14,
-            7: 11,
-            8: 10,
-            9: 8,
-            10: 15,
-            11: 9,
-            12: 16,
-            13: 17,
-            14: 24,
-            15: 19,
-            16: 1,
-            17: 6
-        }
-        let val = trans.hasOwnProperty(numberOfMerges) ? trans[numberOfMerges] : -1;
-        if(val > 0){
+        if (!window.soloUnlockOrder || !window.soloUnlockOrder.length) return;
+        const initialCount = Math.min(7, window.soloUnlockOrder.length);
+        const idx = initialCount + numberOfMerges - 1;
+        if (idx >= 0 && idx < window.soloUnlockOrder.length) {
             setTimeout(() => {
-                window.unlockPiece(val);
+                window.unlockPiece(window.soloUnlockOrder[idx]);
                 playNewItemSound();
                 window.updateMergesLabels();
             }, 300);

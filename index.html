@@ -99,7 +99,7 @@
             <label id="error-label" class="login-label" style="color: red;"></label>
           </div>
           <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
-            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">Try it out solo (fixed seed, no save)</div>
+            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">Try it out solo (no save)</div>
             <hr style="border: 1px solid #4dabf74d; margin: 8px 0;">
             <div style="display: flex; gap: 10px;">
               <input type="submit" value="Normal" id="solobutton" class="login-submit">
@@ -199,6 +199,8 @@
         <option value="6">chaos</option>
       </select>
     </li>
+    <li id="m3a">Seed: <input type="text" id="soloSeed" placeholder="optional"></li>
+    <li id="m3b">Pieces: <input type="number" id="soloPieceCount" min="4" max="500" step="1" value="24"></li>
       
     <li id="m4" style="background-color: green;">Start!</li>
     
@@ -323,6 +325,32 @@
     <li id="m11" style="background-color: #c58e3c;">Full screen 🖥️</li>
     <li id="m11a" style="background-color: #c58e3c; cursor: pointer;" title="Enable/disable zooming">🔍✅</li> 
     
+    <li id="m11b" class="view-controls-panel" style="background-color: #c58e3c;" title="View controls">
+      <div class="view-controls-header" id="viewControlsHeader">View Controls</div>
+      <div class="view-controls-body">
+      <div class="view-controls-row">
+        <button id="viewZoomToggle" class="view-toggle-btn" type="button">Zoom: On</button>
+        <button id="viewPanToggle" class="view-toggle-btn" type="button">Pan: On</button>
+      </div>
+      <div class="view-controls-row">
+        <button id="viewScalingToggle" class="view-toggle-btn" type="button">Scaling: On</button>
+        <button id="viewResetButton" class="view-toggle-btn" type="button">Reset View</button>
+      </div>
+      <div class="view-controls-slider">
+        <label for="viewZoomSensitivity">Zoom speed</label>
+        <input id="viewZoomSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
+        <span id="viewZoomSensitivityValue">1.0x</span>
+      </div>
+      <div class="view-controls-slider">
+        <label for="viewPanSensitivity">Pan speed</label>
+        <input id="viewPanSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
+        <span id="viewPanSensitivityValue">1.0x</span>
+      </div>
+      <div class="view-controls-row">
+        <button id="viewFullscreenButton" class="view-toggle-btn" type="button">Full Screen 🖥️</button>
+      </div>
+      </div>
+    </li>
     <li id="m6" style="background-color: #555;">AP: not connected</li>
   </ul>
   

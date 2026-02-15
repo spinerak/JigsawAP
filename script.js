@@ -4,6 +4,7 @@ window.pieceSides = 4;
 const corner_to_shape_dist = 1/3; // distance from corner to shape in hexagonal piece
 
 window.downsize_to_fit = 0.85;
+window.PUZZLE_AREA_SURFACE_MULTIPLIER = 2;
 window.show_clue = true;
 window.rotations = 0;
 window.zero_list = [0,0];
@@ -40,12 +41,26 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-let allow_zoom = true;
-const zoomBtn = document.getElementById('m11a');
-zoomBtn.addEventListener('click', function() {
-    allow_zoom = !allow_zoom;
-    zoomBtn.innerHTML = allow_zoom ? '🔍✅' : '🔍❌';
-});
+const viewState = {
+    enableZoom: true,
+    enablePan: true,
+    enableScaling: true,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    minZoom: 0.05,
+    maxZoom: 24,
+    zoomStep: 1.2,
+    zoomSensitivity: 1,
+    panSensitivity: 1,
+    fitScaleLocked: null,
+    isScalingLocked: false
+};
+window.viewState = viewState;
+
+let viewControls = null;
+const VIEW_DEBUG = false;
+const sensitivityInteraction = { zoom: false, pan: false };
 
 
 window.save_loaded = false;
@@ -79,6 +94,42 @@ const mhypot = Math.hypot,
     msqrt = Math.sqrt,
     mabs = Math.abs;
 //-----------------------------------------------------------------------------
+
+function clamp(value, min, max) {
+    return mmin(max, mmax(min, value));
+}
+
+function getResponsiveBaseScale() {
+    const cssScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
+    if (!Number.isFinite(cssScale) || cssScale <= 0) return 1;
+    return 1 / cssScale;
+}
+
+function getActiveBaseScale() {
+    if (!viewState.enableScaling && viewState.fitScaleLocked) {
+        return viewState.fitScaleLocked;
+    }
+    return getResponsiveBaseScale();
+}
+
+function getBaseScaleMultiplier() {
+    const activeBase = getActiveBaseScale();
+    if (activeBase === 0) return 1;
+    return 1 / activeBase;
+}
+
+function getZoomedViewScaleMultiplier() {
+    return getBaseScaleMultiplier() * viewState.zoom;
+}
+
+function getEffectiveZoomStep() {
+    return 1 + (viewState.zoomStep - 1) * viewState.zoomSensitivity;
+}
+
+function syncLegacyViewGlobals() {
+    window.scaleFactor = 1 / getActiveBaseScale();
+    window.additional_zoom = viewState.zoom;
+}
 
 function alea(min, max) {
     // random number [min..max[ . If no max is provided, [0..min[
@@ -967,7 +1018,7 @@ class PolyPiece {
 
                     this.polypiece_ctx.clip(path);
                     
-                    let embth = puzzle.scalex * 0.01 * bevel_size * window.scaleFactor * window.additional_zoom;
+                    let embth = puzzle.scalex * 0.01 * bevel_size * getZoomedViewScaleMultiplier();
                     // if(this.hinted){
                     //     embth = puzzle.scalex * 0.01 * window.scaleFactor * window.additional_zoom;
                     // }
@@ -1591,24 +1642,44 @@ class Puzzle {
 
     puzzle_scale() {
 
-        // we suppose we want the picture to fill 90% on width or height and less or same on other dimension
-        // this 90% might be changed and depend on the number of columns / rows.
+        const aspectRatio = this.srcImage ? (this.srcImage.naturalWidth / this.srcImage.naturalHeight) : (16 / 9);
 
-        // suppose image fits in height
-        puzzle.getContainerSize();
-
-        const aspectRatio = this.srcImage.naturalWidth / this.srcImage.naturalHeight;
-        if (this.contWidth / this.contHeight > aspectRatio) {
-            this.gameHeight = this.contHeight;
-            this.gameWidth = this.contHeight * aspectRatio;
+        if (this.srcImage) {
+            const puzzleDIV = this.container.parentElement;
+            const baseScale = getActiveBaseScale();
+            let maxContentW, maxContentH;
+            if (puzzleDIV && baseScale > 0) {
+                maxContentW = puzzleDIV.clientWidth / baseScale;
+                maxContentH = puzzleDIV.clientHeight / baseScale;
+            } else {
+                this.getContainerSize();
+                maxContentW = this.contWidth || 800;
+                maxContentH = this.contHeight || 600;
+            }
+            let contWidth, contHeight;
+            if (maxContentW / maxContentH > aspectRatio) {
+                contHeight = maxContentH;
+                contWidth = maxContentH * aspectRatio;
+            } else {
+                contWidth = maxContentW;
+                contHeight = maxContentW / aspectRatio;
+            }
+            this.container.style.width = contWidth + 'px';
+            this.container.style.height = contHeight + 'px';
+            this.getContainerSize();
+            const sqrtMultiplier = Math.sqrt(window.PUZZLE_AREA_SURFACE_MULTIPLIER || 1.25);
+            this.gameWidth = this.contWidth / sqrtMultiplier;
+            this.gameHeight = this.contHeight / sqrtMultiplier;
         } else {
-            this.gameWidth = this.contWidth;
-            this.gameHeight = this.contWidth / aspectRatio;
+            this.getContainerSize();
+            if (this.contWidth / this.contHeight > aspectRatio) {
+                this.gameHeight = this.contHeight;
+                this.gameWidth = this.contHeight * aspectRatio;
+            } else {
+                this.gameWidth = this.contWidth;
+                this.gameHeight = this.contWidth / aspectRatio;
+            }
         }
-
-        // this.gameWidth *= 2;
-        // this.gameHeight *= 2;
-
 
         /* get a scaled copy of the source picture into a canvas */
         this.gameCanvas = document.createElement('CANVAS');
@@ -1684,29 +1755,54 @@ class Puzzle {
         this.offsx = (this.contWidth - this.gameWidth) / 2;
         this.offsy = (this.contHeight - this.gameHeight) / 2;
 
-        /* computes the distance below which two pieces connect
-            depends on the actual size of pieces, with lower limit */
-        this.dConnect = 0.85 * mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
-        this.dConnect *= this.dConnect; // square of distance
+        this.refreshConnectionDistance();
 
 
     } // Puzzle.scale
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    refreshConnectionDistance() {
+        /* computes the distance below which two pieces connect
+           depends on the actual size of pieces, with lower limit */
+        // Keep merge threshold independent from camera zoom level.
+        this.dConnect = 0.85 * mmax(10, mmin(this.scalex, this.scaley) / 10) * getBaseScaleMultiplier();
+        this.dConnect *= this.dConnect; // square of distance
+    } // Puzzle.refreshConnectionDistance
+
+    getViewMetrics() {
+        const br = this.container.getBoundingClientRect();
+        const baseScale = getActiveBaseScale();
+        const effectiveScale = baseScale * viewState.zoom;
+        return { br, baseScale, effectiveScale };
+    }
+
+    screenToPuzzle(clientX, clientY) {
+        const { br, effectiveScale } = this.getViewMetrics();
+        return {
+            x: (clientX - br.x) / effectiveScale,
+            y: (clientY - br.y) / effectiveScale,
+            p_x: (clientX - br.x) / br.width,
+            p_y: (clientY - br.y) / br.height,
+            clientX,
+            clientY
+        };
+    }
+
+    puzzleToScreen(x, y) {
+        const { br, effectiveScale } = this.getViewMetrics();
+        return {
+            x: br.x + x * effectiveScale,
+            y: br.y + y * effectiveScale
+        };
+    }
+
     relativeMouseCoordinates(event) {
 
         /* takes mouse coordinates from mouse event
             returns coordinates relative to container, even if page is scrolled or zoommed */
 
-        const br = this.container.getBoundingClientRect();
-        
-        return {
-            x: (event.clientX - br.x) * window.scaleFactor / window.additional_zoom,
-            y: (event.clientY - br.y) * window.scaleFactor / window.additional_zoom,
-            p_x: (event.clientX - br.x) / br.width,
-            p_y: (event.clientY - br.y) / br.height
-        };
+        return this.screenToPuzzle(event.clientX, event.clientY);
     } // Puzzle.relativeMouseCoordinates
 
     
@@ -1797,8 +1893,7 @@ window.gameplayStarted = false;
 let manually_load_save_file = false;
 
 
-// Fetch scale factor from CSS
-window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue('--scale-factor').trim();
+syncLegacyViewGlobals();
 
 let tmpImage;
 function loadImageFunction(){
@@ -1820,6 +1915,7 @@ function loadImageFunction(){
 let moving; // for information about moved piece
 { // scope for animate
     let state = 0;
+    let stateAfterPan = 50;
 
     animate = function () {
         requestAnimationFrame(animate);
@@ -1830,6 +1926,16 @@ let moving; // for information about moved piece
         
         // resize event
         if (event && event.event == "resize") {
+
+            if (!viewState.enableScaling) {
+                if (puzzle) {
+                    puzzle.getContainerSize();
+                    puzzle.prevWidth = puzzle.contWidth;
+                    puzzle.prevHeight = puzzle.contHeight;
+                    applyViewTransform();
+                }
+                return;
+            }
 
             // remember dimensions of container before resize
             puzzle.getContainerSize();
@@ -1860,6 +1966,8 @@ let moving; // for information about moved piece
             
             puzzle.prevWidth = puzzle.contWidth;
             puzzle.prevHeight = puzzle.contHeight;
+
+            applyViewTransform();
 
             return;
         } // resize event
@@ -1938,6 +2046,16 @@ let moving; // for information about moved piece
                             };
                         }
                     }
+                }
+
+                /* allow pan during pre-start (preview) phase */
+                if (event && event.event === "touch" && event.button === 0 && viewState.enablePan) {
+                    startDragClientX = event.position.clientX;
+                    startDragClientY = event.position.clientY;
+                    stateAfterPan = 15;
+                    puzzle._releaseHandled = true;
+                    state = 52;
+                    break;
                 }
                 
                 return;
@@ -2121,6 +2239,8 @@ let moving; // for information about moved piece
                 document.getElementById("m1").style.display = "none";
                 document.getElementById("m2").style.display = "none";
                 document.getElementById("m3").style.display = "none";
+                document.getElementById("m3a").style.display = "none";
+                document.getElementById("m3b").style.display = "none";
                 document.getElementById("m4").style.display = "none";
                 document.getElementById("m5").style.display = "none";
                 document.getElementById("m10b").style.display = "none";
@@ -2174,6 +2294,7 @@ let moving; // for information about moved piece
 
                 console.log("DONE WITH INI!", puzzle)
 
+                if (window.play_solo) updateMergesLabels();
                 state = 25;
                 break;
 
@@ -2250,10 +2371,11 @@ let moving; // for information about moved piece
                     } // for k
                 }
 
-                if(zoomP == 1) return;
+                if (!viewState.enablePan) return;
 
-                startDragX = event.position.p_x;
-                startDragY = event.position.p_y;
+                startDragClientX = event.position.clientX;
+                startDragClientY = event.position.clientY;
+                stateAfterPan = 50;
 
                 puzzle._releaseHandled = true;
                 state = 52;
@@ -2263,17 +2385,23 @@ let moving; // for information about moved piece
                 if (!event) return;
                 switch (event.event) {
                     case "move":
-                        // console.log(event.position.p_x, startDragX, zoomX)
-                        zoomX += (event.position.p_x - startDragX) * zoomP;
-                        zoomY += (event.position.p_y - startDragY) * zoomP;
-                        startDragX = event.position.p_x - (event.position.p_x - startDragX);
-                        startDragY = event.position.p_y - (event.position.p_y - startDragY);
-                        updateZoomAndPosition();
+                        // Anchor under cursor: 1:1 pan in screen pixels. Pan translate is applied after scale(zoom), so screen delta = panDelta * contSize * baseScale (zoom does not scale the pan).
+                        const deltaClientX = event.position.clientX - startDragClientX;
+                        const deltaClientY = event.position.clientY - startDragClientY;
+                        if (!puzzle.contWidth || !puzzle.contHeight) puzzle.getContainerSize();
+                        const baseScale = getActiveBaseScale();
+                        const panScaleW = (puzzle.contWidth || 1) * baseScale;
+                        const panScaleH = (puzzle.contHeight || 1) * baseScale;
+                        viewState.panX += (deltaClientX / panScaleW) * viewState.panSensitivity;
+                        viewState.panY += (deltaClientY / panScaleH) * viewState.panSensitivity;
+                        startDragClientX = event.position.clientX;
+                        startDragClientY = event.position.clientY;
+                        applyViewTransform();
                         
                         break;
                     case "leave":
                         moving = null;
-                        state = 50;
+                        state = stateAfterPan;
                         break;
                 }
                 break;
@@ -2391,6 +2519,8 @@ let menu = (function () {
         document.getElementById("m1").style.display = "block"
         document.getElementById("m2").style.display = "block"
         document.getElementById("m3").style.display = "block"
+        document.getElementById("m3a").style.display = "block"
+        document.getElementById("m3b").style.display = "block"
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
         document.getElementById("m10b").style.display = "block"
@@ -2398,8 +2528,9 @@ let menu = (function () {
         document.getElementById("o1b").style.display = "block";
     }
     document.getElementById("m6").style.display = "block"
-    document.getElementById("m11").style.display = "inline-block"
-    document.getElementById("m11a").style.display = "inline-block"
+    document.getElementById("m11").style.display = "none"
+    document.getElementById("m11a").style.display = "none"
+    document.getElementById("m11b").style.display = "inline-block"
     if(gameStarted){
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
@@ -2430,7 +2561,42 @@ let menu = (function () {
 document.getElementById("m1").addEventListener("click", loadInitialFile);
 document.getElementById("m2").addEventListener("click", loadFile);
 document.getElementById("m3").addEventListener("click", () => { });
-document.getElementById("m4").addEventListener("click", () => events.push({ event: "nbpieces", nbpieces: 81 }));
+document.getElementById("m4").addEventListener("click", () => {
+    if (window.play_solo) {
+        const soloSeedEl = document.getElementById("soloSeed");
+        const soloPieceCountEl = document.getElementById("soloPieceCount");
+        if (soloSeedEl && soloSeedEl.value.trim() !== "") {
+            const v = soloSeedEl.value.trim();
+            const num = Number(v);
+            window.apseed = Number.isInteger(num) ? num : v;
+        } else {
+            window.apseed = 0;
+        }
+        const pieceCountVal = soloPieceCountEl ? soloPieceCountEl.value : "";
+        const pieceCountNum = Number(pieceCountVal);
+        if (pieceCountVal === "" || !Number.isInteger(pieceCountNum) || pieceCountNum < 4 || pieceCountNum > 500) {
+            alert("Pieces must be an integer between 4 and 500.");
+            return;
+        }
+        const N = clamp(Math.floor(pieceCountNum), 4, 500);
+        puzzle.nbPieces = N;
+        puzzle.computenxAndny(0, 0);
+        window.set_puzzle_dim(puzzle.nx, puzzle.ny);
+        const slot = (typeof window.slot === 'number' && Number.isInteger(window.slot)) ? window.slot : 0;
+        if (typeof window.apseed !== 'number' || !Number.isInteger(window.apseed)) {
+            const hash = Array.from(String(window.apseed)).reduce((acc, char) => acc * 31 + char.charCodeAt(0), 0);
+            setRandomSeed((hash + slot) % 10000);
+        } else {
+            setRandomSeed((window.apseed + slot) % 10000);
+        }
+        computeSoloUnlockOrder(apnx, apny);
+        unlocked_pieces.length = 0;
+        const K = Math.min(7, window.soloUnlockOrder.length);
+        for (let i = 0; i < K; i++) unlockPiece(window.soloUnlockOrder[i]);
+        updateMergesLabels();
+    }
+    events.push({ event: "nbpieces", nbpieces: 81 });
+});
 
 document.getElementById("m5").addEventListener("click", () => {
     window.open('credits.html', '_blank');
@@ -2498,62 +2664,250 @@ window.addEventListener("resize", event => {
 });
 
 const forPuzzle = document.getElementById('forPuzzle');
-window.additional_zoom = 1;
+window.additional_zoom = viewState.zoom;
 
-function updateZoomAndPosition() {
-    const puzzle = document.getElementById('forPuzzle');
-
-    // Extract scale and translate values using regex
-    const scaleFactor = 1 / parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
-    
-    // Build the new transform string
-    const newTransform = `
-        translate(calc(-50% * (1 - ${scaleFactor})), -50%)
-        scale(${scaleFactor})
-
-        translate(${zoomX*100}%, ${zoomY*100}%)
-        scale(${zoomP})
-    `;
-
-    // Apply the new transform
-    puzzle.style.transform = newTransform;
-    window.additional_zoom = zoomP;
+function clampPanToBounds() {
+    const maxOffset = viewState.zoom / 2;
+    viewState.panX = clamp(viewState.panX, -maxOffset, maxOffset);
+    viewState.panY = clamp(viewState.panY, -maxOffset, maxOffset);
 }
 
-let startDragX = 0;
-let startDragY = 0;
-let zoomX = 0;
-let zoomY = 0;
-let zoomP = 1;
+function applyViewTransform() {
+    clampPanToBounds();
+
+    const baseScale = getActiveBaseScale();
+    const newTransform = `
+        translate(calc(-50% * (1 - ${baseScale})), -50%)
+        scale(${baseScale})
+        translate(${viewState.panX * 100}%, ${viewState.panY * 100}%)
+        scale(${viewState.zoom})
+    `;
+
+    forPuzzle.style.transform = newTransform;
+    syncLegacyViewGlobals();
+
+    if (puzzle && Number.isFinite(puzzle.scalex)) {
+        puzzle.refreshConnectionDistance();
+    }
+}
+
+/**
+ * Maps screen (client) coordinates to normalized content position (wx, wy) in [0,1].
+ * Uses forPuzzle's current getBoundingClientRect() (transformed); no clamping.
+ */
+function screenToContent(clientX, clientY) {
+    const br = forPuzzle.getBoundingClientRect();
+    return {
+        wx: (clientX - br.left) / br.width,
+        wy: (clientY - br.top) / br.height
+    };
+}
+
+function zoomAroundPoint(clientX, clientY, targetZoom) {
+    const newZoom = clamp(targetZoom, viewState.minZoom, viewState.maxZoom);
+    const previousZoom = viewState.zoom;
+    if (newZoom === previousZoom || previousZoom === 0) return;
+
+    const br = forPuzzle.getBoundingClientRect();
+    // Project cursor onto #forPuzzle rect when outside (zoom toward nearest edge/corner)
+    const projX = clamp(clientX, br.left, br.right);
+    const projY = clamp(clientY, br.top, br.bottom);
+
+    let { wx, wy } = screenToContent(projX, projY);
+    wx = clamp(wx, 0, 1);
+    wy = clamp(wy, 0, 1);
+
+    // Keep content (wx, wy) at screen (projX, projY) after zoom: (wx - 0.5)*newZoom + newPanX = (wx - 0.5)*previousZoom + panX => newPanX = (wx - 0.5)*(previousZoom - newZoom) + panX.
+    const panX = viewState.panX;
+    const panY = viewState.panY;
+    viewState.panX = (wx - 0.5) * (previousZoom - newZoom) + panX;
+    viewState.panY = (wy - 0.5) * (previousZoom - newZoom) + panY;
+    viewState.zoom = newZoom;
+    applyViewTransform();
+    updateViewControlLabels();
+}
+
+function resetView() {
+    viewState.zoom = 1;
+    viewState.panX = 0;
+    viewState.panY = 0;
+    applyViewTransform();
+    updateViewControlLabels();
+}
+
+function lockScalingLayout() {
+    if (viewState.isScalingLocked) return;
+    const style = getComputedStyle(forPuzzle);
+    forPuzzle.style.width = style.width;
+    forPuzzle.style.height = style.height;
+    forPuzzle.style.maxWidth = style.maxWidth;
+    forPuzzle.style.maxHeight = style.maxHeight;
+    viewState.fitScaleLocked = getResponsiveBaseScale();
+    viewState.isScalingLocked = true;
+}
+
+function unlockScalingLayout() {
+    if (!viewState.isScalingLocked) return;
+    forPuzzle.style.width = "";
+    forPuzzle.style.height = "";
+    forPuzzle.style.maxWidth = "";
+    forPuzzle.style.maxHeight = "";
+    viewState.fitScaleLocked = null;
+    viewState.isScalingLocked = false;
+}
+
+function updateViewControlLabels() {
+    if (!viewControls) return;
+
+    viewControls.zoom.textContent = `Zoom: ${viewState.enableZoom ? "On" : "Off"}`;
+    viewControls.pan.textContent = `Pan: ${viewState.enablePan ? "On" : "Off"}`;
+    viewControls.scaling.textContent = `Scaling: ${viewState.enableScaling ? "On" : "Off"}`;
+    viewControls.reset.title = `Reset view (zoom ${viewState.zoom.toFixed(2)}x)`;
+    viewControls.zoomValue.textContent = `${viewState.zoomSensitivity.toFixed(1)}x`;
+    viewControls.panValue.textContent = `${viewState.panSensitivity.toFixed(1)}x`;
+
+    [viewControls.zoom, viewControls.pan, viewControls.scaling].forEach((button, index) => {
+        const enabled = [viewState.enableZoom, viewState.enablePan, viewState.enableScaling][index];
+        button.classList.toggle("is-off", !enabled);
+    });
+}
+
+function setScalingEnabled(enabled) {
+    if (viewState.enableScaling === enabled) return;
+    viewState.enableScaling = enabled;
+    if (enabled) {
+        unlockScalingLayout();
+        events.push({ event: "resize" });
+    } else {
+        lockScalingLayout();
+        if (puzzle) {
+            puzzle.getContainerSize();
+            puzzle.prevWidth = puzzle.contWidth;
+            puzzle.prevHeight = puzzle.contHeight;
+        }
+    }
+    applyViewTransform();
+    updateViewControlLabels();
+}
+
+function initViewControls() {
+    const zoomToggle = document.getElementById("viewZoomToggle");
+    const panToggle = document.getElementById("viewPanToggle");
+    const scalingToggle = document.getElementById("viewScalingToggle");
+    const resetButton = document.getElementById("viewResetButton");
+    const zoomSensitivity = document.getElementById("viewZoomSensitivity");
+    const panSensitivity = document.getElementById("viewPanSensitivity");
+    const zoomSensitivityValue = document.getElementById("viewZoomSensitivityValue");
+    const panSensitivityValue = document.getElementById("viewPanSensitivityValue");
+    const fullscreenButton = document.getElementById("viewFullscreenButton");
+    const viewControlsHeader = document.getElementById("viewControlsHeader");
+    const viewControlsPanel = document.getElementById("m11b");
+    if (!zoomToggle || !panToggle || !scalingToggle || !resetButton || !zoomSensitivity || !panSensitivity || !zoomSensitivityValue || !panSensitivityValue || !fullscreenButton) return;
+
+    if (viewControlsHeader && viewControlsPanel) {
+        viewControlsHeader.addEventListener("click", (e) => {
+            e.stopPropagation();
+            viewControlsPanel.classList.toggle("view-controls-collapsed");
+        });
+    }
+
+    viewControls = {
+        zoom: zoomToggle,
+        pan: panToggle,
+        scaling: scalingToggle,
+        reset: resetButton,
+        zoomSensitivity,
+        panSensitivity,
+        zoomValue: zoomSensitivityValue,
+        panValue: panSensitivityValue,
+        fullscreen: fullscreenButton
+    };
+
+    zoomToggle.addEventListener("click", () => {
+        viewState.enableZoom = !viewState.enableZoom;
+        updateViewControlLabels();
+    });
+    panToggle.addEventListener("click", () => {
+        viewState.enablePan = !viewState.enablePan;
+        updateViewControlLabels();
+    });
+    scalingToggle.addEventListener("click", () => {
+        setScalingEnabled(!viewState.enableScaling);
+    });
+    resetButton.addEventListener("click", resetView);
+
+    zoomSensitivity.addEventListener("pointerdown", () => { sensitivityInteraction.zoom = true; });
+    panSensitivity.addEventListener("pointerdown", () => { sensitivityInteraction.pan = true; });
+    document.addEventListener("pointerup", () => {
+        sensitivityInteraction.zoom = false;
+        sensitivityInteraction.pan = false;
+    });
+    document.addEventListener("pointercancel", () => {
+        sensitivityInteraction.zoom = false;
+        sensitivityInteraction.pan = false;
+    });
+
+    zoomSensitivity.addEventListener("input", () => {
+        if (sensitivityInteraction.zoom) {
+            viewState.zoomSensitivity = clamp(parseFloat(zoomSensitivity.value), 0.2, 3);
+            updateViewControlLabels();
+        } else {
+            zoomSensitivity.value = viewState.zoomSensitivity.toFixed(1);
+            if (VIEW_DEBUG) console.log("view zoom slider: ignored input (not dragging), re-synced to", viewState.zoomSensitivity);
+        }
+    });
+    panSensitivity.addEventListener("input", () => {
+        if (sensitivityInteraction.pan) {
+            viewState.panSensitivity = clamp(parseFloat(panSensitivity.value), 0.2, 3);
+            updateViewControlLabels();
+        } else {
+            panSensitivity.value = viewState.panSensitivity.toFixed(1);
+            if (VIEW_DEBUG) console.log("view pan slider: ignored input (not dragging), re-synced to", viewState.panSensitivity);
+        }
+    });
+
+    fullscreenButton.addEventListener("click", () => {
+        if (typeof window.toggleFullscreen === "function") {
+            window.toggleFullscreen();
+            return;
+        }
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.();
+        } else {
+            document.exitFullscreen?.();
+        }
+    });
+    zoomSensitivity.value = viewState.zoomSensitivity.toFixed(1);
+    panSensitivity.value = viewState.panSensitivity.toFixed(1);
+    updateViewControlLabels();
+}
+
+let startDragClientX = 0;
+let startDragClientY = 0;
+initViewControls();
+applyViewTransform();
+
 forPuzzle.addEventListener('wheel', (event) => {
     if(moving){
         rotateCurrentPiece(event.deltaY < 0);
-    }else{
-        if(!allow_zoom){
-            return;
-        }
-        event.preventDefault();
-        if (event.deltaY < 0) {
-            if(zoomP == 1){
-                const co = puzzle.relativeMouseCoordinates(event);
-                zoomX = -co.p_x + 1/2;
-                zoomY = -co.p_y + 1/2;
-                zoomP = 2;
-            }else{
-                const co = puzzle.relativeMouseCoordinates(event);
-                zoomX = 2 * (-co.p_x + 1/2);
-                zoomY = 2 * (-co.p_y + 1/2);
-                zoomP = 3;
-            }
-        } else {
-            zoomX = 0;
-            zoomY = 0;
-            zoomP = 1;
-        }
-        updateZoomAndPosition();
+        return;
     }
 
-});
+    if(!viewState.enableZoom){
+        return;
+    }
+
+    event.preventDefault();
+    const zoomStep = getEffectiveZoomStep();
+    const zoomMultiplier = event.deltaY < 0 ? zoomStep : 1 / zoomStep;
+    zoomAroundPoint(event.clientX, event.clientY, viewState.zoom * zoomMultiplier);
+}, { passive: false });
+
+forPuzzle.addEventListener("touchmove", (event) => {
+    if (viewState.enablePan || viewState.enableZoom) {
+        event.preventDefault();
+    }
+}, { passive: false });
 
 let lastTap = 0;
 forPuzzle.addEventListener('touchend', (event) => {
@@ -2562,26 +2916,20 @@ forPuzzle.addEventListener('touchend', (event) => {
     const tapLength = currentTime - lastTap;
     if (tapLength < 300 && tapLength > 0) {
         event.preventDefault();
-        if(!allow_zoom){
+        if(!viewState.enableZoom){
             return;
         }
-        const co = puzzle.relativeMouseCoordinates(event.changedTouches[0]);
-        if (window.additional_zoom === 1) {
-            zoomX = -co.p_x + 1/2;
-            zoomY = -co.p_y + 1/2;
-            zoomP = 2;
-        } else if(window.additional_zoom === 2) {
-            zoomX = 2 * (-co.p_x + 1/2);
-            zoomY = 2 * (-co.p_y + 1/2);
-            zoomP = 3;
-        } else{
-            zoomX = 0;
-            zoomY = 0;
-            zoomP = 1;
-        }
-        updateZoomAndPosition();
+        const t = event.changedTouches[0];
+        zoomAroundPoint(t.clientX, t.clientY, viewState.zoom * getEffectiveZoomStep());
     }
     lastTap = currentTime;
+}, { passive: false });
+forPuzzle.addEventListener('dblclick', (event) => {
+    if(!viewState.enableZoom){
+        return;
+    }
+    event.preventDefault();
+    zoomAroundPoint(event.clientX, event.clientY, viewState.zoom * getEffectiveZoomStep());
 });
 
 
@@ -2605,6 +2953,55 @@ function set_puzzle_dim(x, y){
     document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
 }
 window.set_puzzle_dim = set_puzzle_dim
+
+/** Returns grid-neighbor piece indices (1-based) for piece p. Uses same rules as ifNear. */
+function getPieceNeighbors(p, apnx, apny) {
+    const N = apnx * apny;
+    const out = [];
+    if (window.pieceSides === 6) {
+        const col = (p % apnx === 0) ? apnx : (p % apnx);
+        const cand = [
+            p + apnx, p - apnx,
+            p - 1, p + 1,
+            col !== 1 ? (col % 2 === 1 ? p - 1 - apnx : p - 1 + apnx) : null,
+            col !== apnx ? (col % 2 === 1 ? p + 1 - apnx : p + 1 + apnx) : null
+        ];
+        cand.forEach(n => { if (n != null && n >= 1 && n <= N) out.push(n); });
+    } else {
+        [p + apnx, p - apnx].forEach(n => { if (n >= 1 && n <= N) out.push(n); });
+        if (p % apnx !== 1) out.push(p - 1);
+        if (p % apnx !== 0) out.push(p + 1);
+    }
+    return out;
+}
+
+/** BFS unlock order for solo: sets window.soloUnlockOrder; returns order. */
+function computeSoloUnlockOrder(apnx, apny) {
+    const N = apnx * apny;
+    const indices = [];
+    for (let i = 1; i <= N; i++) indices.push(i);
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const numSeeds = Math.min(3, N);
+    const seeds = indices.slice(0, numSeeds);
+    const order = [];
+    const visited = new Set(seeds);
+    const queue = [...seeds];
+    while (queue.length) {
+        const p = queue.shift();
+        order.push(p);
+        for (const n of getPieceNeighbors(p, apnx, apny)) {
+            if (!visited.has(n) && n >= 1 && n <= N) {
+                visited.add(n);
+                queue.push(n);
+            }
+        }
+    }
+    window.soloUnlockOrder = order;
+    return order;
+}
 
 
 function findPolyPieceUsingPuzzlePiece(index, needsToBeFirst = false){
@@ -2740,16 +3137,45 @@ function getRandomPiece(numberOfPieces, maxcluster) {
     return shuffled.slice(0, numberOfPieces);
 }
 
-function updateMergesLabels(){
-    try {
-        document.getElementById("m9").innerText = "Merges in logic: " + (window.possible_merges[unlocked_pieces.length] !== undefined ? window.possible_merges[unlocked_pieces.length] : "?");
-    } catch (e) {
-        document.getElementById("m9").innerText = "Merges in logic: ?";
+/** Returns the number of mergeable pairs among unlocked, non-fake poly pieces right now. Solo only.
+ *  Uses grid adjacency (ifNear with ignoreCloseness/ignoreRotation) so "possible" = pairs that
+ *  are neighbors in the grid and would merge if moved together. */
+function countCurrentPossibleMerges() {
+    if (!puzzle || !puzzle.polyPieces || !window.play_solo) return 0;
+    const pps = puzzle.polyPieces.filter(pp => pp.unlocked && pp.pieces && pp.pieces.length > 0 && pp.pieces[0].index > 0);
+    let count = 0;
+    for (let i = 0; i < pps.length; i++) {
+        for (let j = i + 1; j < pps.length; j++) {
+            if (pps[i].ifNear(pps[j], true, true)) count++;
+        }
     }
-    try {
-        document.getElementById("m10").innerText = "Merges possible: " + (window.actual_possible_merges[unlocked_pieces.length] !== undefined ? window.actual_possible_merges[unlocked_pieces.length] : "?");
-    } catch (e) {
-        document.getElementById("m10").innerText = "Merges possible: ?";
+    return count;
+}
+
+function updateMergesLabels(){
+    if (window.play_solo && puzzle) {
+        const value = countCurrentPossibleMerges();
+        try {
+            document.getElementById("m9").innerText = "Merges in logic: " + value;
+        } catch (e) {
+            document.getElementById("m9").innerText = "Merges in logic: ?";
+        }
+        try {
+            document.getElementById("m10").innerText = "Merges possible: " + value;
+        } catch (e) {
+            document.getElementById("m10").innerText = "Merges possible: ?";
+        }
+    } else {
+        try {
+            document.getElementById("m9").innerText = "Merges in logic: " + (window.possible_merges[unlocked_pieces.length] !== undefined ? window.possible_merges[unlocked_pieces.length] : "?");
+        } catch (e) {
+            document.getElementById("m9").innerText = "Merges in logic: ?";
+        }
+        try {
+            document.getElementById("m10").innerText = "Merges possible: " + (window.actual_possible_merges[unlocked_pieces.length] !== undefined ? window.actual_possible_merges[unlocked_pieces.length] : "?");
+        } catch (e) {
+            document.getElementById("m10").innerText = "Merges possible: ?";
+        }
     }
 }
 
@@ -2782,6 +3208,7 @@ function newMerge(key, playSound = true){
         change_savedata_datastorage("M", numberOfMerges, true);
     }
     document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
+    if (window.play_solo) updateMergesLabels();
     if(playSound){
         window.playNewMergeSound();
     }
