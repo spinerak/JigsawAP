@@ -1938,12 +1938,11 @@ let moving; // for information about moved piece
                 fitImage(tmpImage, puzzle.contWidth * window.downsize_to_fit, puzzle.contHeight * window.downsize_to_fit);
             }
             else if (state >= 25) { // resize pieces
-                
+                puzzle.puzzle_scale();
+
                 const x_change = puzzle.contWidth / puzzle.prevWidth;
                 const y_change = puzzle.contHeight / puzzle.prevHeight;
 
-                puzzle.puzzle_scale();
-                
                 console.log("start scaling pieces")
                 puzzle.polyPieces.forEach(pp => {                    
                     let nnx = pp.x;
