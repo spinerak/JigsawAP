@@ -2371,7 +2371,10 @@ let moving; // for information about moved piece
                     } // for k
                 }
 
-                if (!viewState.enablePan) return;
+                if (!viewState.enablePan) {
+                    moving = null;
+                    return;
+                }
 
                 startDragClientX = event.position.clientX;
                 startDragClientY = event.position.clientY;
