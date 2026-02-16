@@ -2519,8 +2519,13 @@ let menu = (function () {
         document.getElementById("m1").style.display = "block"
         document.getElementById("m2").style.display = "block"
         document.getElementById("m3").style.display = "block"
-        document.getElementById("m3a").style.display = "block"
-        document.getElementById("m3b").style.display = "block"
+        if (window.play_solo) {
+            document.getElementById("m3a").style.display = "block"
+            document.getElementById("m3b").style.display = "block"
+        } else {
+            document.getElementById("m3a").style.display = "none"
+            document.getElementById("m3b").style.display = "none"
+        }
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
         document.getElementById("m10b").style.display = "block"
