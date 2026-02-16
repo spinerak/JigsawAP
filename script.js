@@ -1358,33 +1358,28 @@ class Puzzle {
             return;
         }
 
-        let kx, ky, width = this.srcImage.naturalWidth, height = this.srcImage.naturalHeight, npieces = this.nbPieces;
-        let err, errmin = 1e9;
-        let ncv, nch;
+        const pairs = [];
+        for (let nch = 1; nch <= this.nbPieces; nch++) {
+            const ncv = Math.round(this.nbPieces / nch);
+            if (ncv >= 1) pairs.push([nch, ncv]);
+        }
 
+        let best = pairs[0];
+        let bestErr = Infinity;
 
-        let nHPieces = mround(msqrt(npieces * width / height));
-        let nVPieces = mround(npieces / nHPieces);
-        
-        /* based on the above estimation, we will try up to + / - 2 values
-            and evaluate (arbitrary) quality criterion to keep best result
-        */
-
-        for (ky = 0; ky < 5; ky++) {
-            ncv = nVPieces + ky - 2;
-            for (kx = 0; kx < 5; kx++) {
-            nch = nHPieces + kx - 2;
-            err = nch * height / ncv / width;
-            err = (err + 1 / err) - 2; // error on pieces dimensions ratio)
-            err += mabs(1 - nch * ncv / npieces); // adds error on number of pieces
-
-            if (err < errmin) { // keep smallest error
-                errmin = err;
-                this.nx = nch;
-                this.ny = ncv;
+        for (const [nch, ncv] of pairs) {
+            let err;
+            const ratio = (nch * this.srcImage.naturalHeight) / (ncv * this.srcImage.naturalWidth);
+            err = (ratio + 1 / ratio) - 2;
+            if (err < bestErr) {
+                bestErr = err;
+                best = [nch, ncv];
             }
-            } // for kx
-        } // for ky
+        }
+
+        this.nx = best[0];
+        this.ny = best[1];
+        this.nbPieces = this.nx * this.ny;
 
     } // computenxAndny
 
