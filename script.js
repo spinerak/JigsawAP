@@ -2270,6 +2270,8 @@ let moving; // for information about moved piece
                 puzzle.gameCanvas.style.left = puzzle.offsx + "px";
                 puzzle.gameCanvas.style.display = "block";
 
+                applyViewTransform();
+
                 window.save_loaded = true;
 
                 console.log("pending actions:", pending_actions)
@@ -2687,8 +2689,14 @@ function applyViewTransform() {
     clampPanToBounds();
 
     const baseScale = getActiveBaseScale();
+    const parent = forPuzzle.parentElement;
+    const pw = parent ? parent.clientWidth : 0;
+    const ph = parent ? parent.clientHeight : 0;
+    const fw = forPuzzle.offsetWidth || 1;
+    const fh = forPuzzle.offsetHeight || 1;
+    const centerXPercent = (pw > 0 && fw > 0) ? (50 * (pw / fw - 1)) : (50 * (baseScale - 1));
     const newTransform = `
-        translate(calc(-50% * (1 - ${baseScale})), -50%)
+        translate(${centerXPercent}%, -50%)
         scale(${baseScale})
         translate(${viewState.panX * 100}%, ${viewState.panY * 100}%)
         scale(${viewState.zoom})
