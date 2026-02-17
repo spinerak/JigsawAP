@@ -364,19 +364,201 @@
       z-index: 99;
     }
     #draggable3 { 
-      display: inline-block; /* Ensure the element wraps around its content */
-      width: auto; /* Adjust width to fit the image */
-      height: auto; /* Adjust height to fit the image */
-      background: #aaa; 
+      display: inline-block;
+      width: auto;
+      min-width: 260px;
+      height: auto;
+      background: #2d3748;
       position: absolute; 
       top: 50px; 
       left: 50px; 
-      border-radius: 8px; 
-      padding: 0; /* Remove extra padding */
-      cursor: grab; 
-      user-select: none; /* Prevent text selection */
+      border-radius: 10px;
+      padding: 0;
+      cursor: grab;
+      user-select: none;
       z-index: 99;
-      padding: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Drawer panel layout and styling */
+    .drawer-panel {
+      padding: 0 14px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .drawer-header {
+      display: flex;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 0 12px;
+      margin: 0 -14px 0 -14px;
+      padding-left: 14px;
+      padding-right: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .drawer-header .drawer-title {
+      flex: 0 0 auto;
+    }
+    .drawer-header .drawer-info-details {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .drawer-header-minimize {
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .drawer-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      letter-spacing: 0.02em;
+    }
+    .drawer-info-details {
+      display: inline-block;
+    }
+    .drawer-info-summary {
+      font-size: 0.8rem;
+      color: #90cdf4;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      list-style: none;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      user-select: none;
+    }
+    .drawer-info-summary::-webkit-details-marker {
+      display: none;
+    }
+    .drawer-info-summary::marker {
+      content: none;
+    }
+    .drawer-info-summary:hover {
+      background-color: rgba(144, 205, 244, 0.15);
+      color: #bee3f8;
+    }
+    .drawer-info-body {
+      margin-top: 10px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      max-height: 280px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+    }
+    .drawer-info-body .drawer-info-heading {
+      margin: 0 0 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #90cdf4;
+    }
+    .drawer-info-body .drawer-info-heading + ul {
+      margin-top: 0;
+    }
+    .drawer-info-list {
+      margin: 0 0 12px;
+      padding-left: 1.2em;
+    }
+    .drawer-info-list:last-child {
+      margin-bottom: 0;
+    }
+    .drawer-info-body li {
+      margin-bottom: 4px;
+    }
+    .drawer-stat {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .drawer-stat-label {
+      font-size: 0.85rem;
+      color: #a0aec0;
+    }
+    .drawer-stat-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+    .drawer-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .drawer-section-title {
+      margin: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #718096;
+    }
+    .drawer-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .drawer-row .drawer-label {
+      flex: 0 0 auto;
+      font-size: 0.85rem;
+      color: #a0aec0;
+    }
+    .drawer-select {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 10px;
+      font-size: 0.9rem;
+      color: #f1f5f9;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      cursor: pointer;
+      color-scheme: dark;
+    }
+    .drawer-select:hover,
+    .drawer-select:focus {
+      border-color: #64748b;
+      background: #334155;
+      outline: none;
+    }
+    .drawer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .drawer-btn {
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .drawer-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .drawer-btn--primary {
+      background: #45aabe;
+      border-color: #45aabe;
+      color: #fff;
+    }
+    .drawer-btn--primary:hover {
+      background: #52b8cc;
+      border-color: #52b8cc;
     }
 
 

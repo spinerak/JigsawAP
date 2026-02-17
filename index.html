@@ -129,7 +129,7 @@
 <div id=forPuzzle></div>
   <ul id="menu">
     <li id="m0">&#x2630;</li>
-    <li id="m1">default image  | #:
+    <li id="m1">Default image | #:
       <select id="defaultImageIndex">
         <option value="1" selected>1</option>
         <option value="2">2</option>
@@ -188,8 +188,8 @@
         <option value="55">55</option>
       </select>
     </li>
-    <li id="m2">load custom image</li>
-    <li id="m3">shape: 
+    <li id="m2">Load custom image</li>
+    <li id="m3">Shape: 
       <select id="shape">
         <option value="1" selected>classic</option>
         <option value="2">triangle</option>
@@ -371,7 +371,7 @@
   <div class="resizer bottom" id="resizerBottom1"></div> -->
   <div class="resizer corner" id="resizerCorner1"></div>
 </div>
-<div class="taskbar" id="taskbar1" style="display: none;">📝</div>
+<div class="taskbar" id="taskbar1" style="display: none;" title="Chat / Log">📝</div>
 
 
 <div class="draggable" id="draggable2" style="display: none;">
@@ -383,44 +383,77 @@
   <div class="resizer bottom" id="resizerBottom2"></div> -->
   <div class="resizer corner" id="resizerCorner2"></div>
 </div>
-<div class="taskbar" id="taskbar2" style="display: none;">🔍</div>
+<div class="taskbar" id="taskbar2" style="display: none;" title="Image preview">🔍</div>
 
-<div class="draggable" id="draggable3" style="display: none;">
-  <div class="controls">
-      <button class="control-btn" id="control-btn3a">-</button>
-  </div>
-  <div class="button-group">
-    --Drawer-- <button id="btnInfo" onclick="window.open('drawer_info.html', '_blank')">Info</button>
-    <br>
-    Pcs stored: <span id="pcsStored">0</span>
-    <br>
-    <br>
-    
-    <label for="numPieces"># pcs:</label>
-    <select id="numPieces">
-      <option value="1" selected>1</option>
-      <option value="10">10</option>
-      <option value="100">100</option>
-      <option value="all">All</option>
-    </select>
-    <br>
-    <button id="btnWithdraw">Move to drawer</button>
-    <button id="btnWithdrawAll">Move all to drawer</button>
-    <br>
-     
-    <button id="btnDeposit">Move from drawer</button>
-    <select id="depositPosition">
-      <option value="1">Top-left corner</option>
-      <option value="2">Top-left area</option>
-      <option value="3">Top edge</option>
-      <option value="4">Top area</option>
-      <option value="5">Left edge</option>
-      <option value="6">Left area</option>
-      <option value="7">Anywhere</option>
-    </select>
+<div class="draggable drawer-window" id="draggable3" style="display: none;">
+  <div class="drawer-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">Piece drawer</h3>
+      <details class="drawer-info-details" id="drawerInfoDetails">
+        <summary class="drawer-info-summary" id="btnInfo" title="Drawer help">Info</summary>
+        <div class="drawer-info-body">
+          <h4 class="drawer-info-heading">What is the drawer?</h4>
+          <ul class="drawer-info-list">
+            <li>You can store pieces in the drawer so they don’t show on the board.</li>
+            <li>Useful when you want to avoid moving large stacks of pieces by hand.</li>
+          </ul>
+          <h4 class="drawer-info-heading">Good to know</h4>
+          <ul class="drawer-info-list">
+            <li>The drawer only works for pieces that have <strong>never been moved manually</strong>.</li>
+            <li>Drawer actions are local only. Other players don’t see them, and they reset on refresh.</li>
+          </ul>
+          <h4 class="drawer-info-heading">How does it work?</h4>
+          <ul class="drawer-info-list">
+            <li><strong>Pieces stored</strong> shows how many pieces are currently in the drawer.</li>
+            <li>Use <strong># pieces</strong> to choose how many to move (1, 10, 100, or All).</li>
+            <li><strong>Withdraw to drawer:</strong> <em>Move to drawer</em> / <em>Move all to drawer</em> — removes pieces from the board into the drawer.</li>
+            <li><strong>Deposit from drawer:</strong> set <strong>Place at</strong>, then <em>Move to board</em> — returns pieces from the drawer to the board in the chosen area.</li>
+          </ul>
+        </div>
+      </details>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn3a" title="Minimize">−</button>
+    </header>
+    <div class="drawer-stat">
+      <span class="drawer-stat-label">Pieces stored</span>
+      <span id="pcsStored" class="drawer-stat-value" aria-live="polite">0</span>
+    </div>
+    <section class="drawer-section" aria-labelledby="drawer-withdraw-heading">
+      <h4 id="drawer-withdraw-heading" class="drawer-section-title">Withdraw to drawer</h4>
+      <div class="drawer-row">
+        <label for="numPieces" class="drawer-label"># pieces</label>
+        <select id="numPieces" class="drawer-select" aria-label="Number of pieces to withdraw">
+          <option value="1" selected>1</option>
+          <option value="10">10</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" id="btnWithdraw" class="drawer-btn drawer-btn--primary">Move to drawer</button>
+        <button type="button" id="btnWithdrawAll" class="drawer-btn">Move all to drawer</button>
+      </div>
+    </section>
+    <section class="drawer-section" aria-labelledby="drawer-deposit-heading">
+      <h4 id="drawer-deposit-heading" class="drawer-section-title">Deposit from drawer</h4>
+      <div class="drawer-row drawer-row--deposit">
+        <label for="depositPosition" class="drawer-label">Place at</label>
+        <select id="depositPosition" class="drawer-select" aria-label="Where to place pieces from drawer">
+          <option value="1">Top-left corner</option>
+          <option value="2">Top-left area</option>
+          <option value="3">Top edge</option>
+          <option value="4">Top area</option>
+          <option value="5">Left edge</option>
+          <option value="6">Left area</option>
+          <option value="7">Anywhere</option>
+        </select>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" id="btnDeposit" class="drawer-btn drawer-btn--primary">Move to board</button>
+      </div>
+    </section>
   </div>
 </div>
-<div class="taskbar" id="taskbar3" style="display: none;">🗄️</div>
+<div class="taskbar" id="taskbar3" style="display: none;" title="Piece drawer">🗄️</div>
 
 
 
