@@ -53,6 +53,7 @@ const viewState = {
     zoomStep: 1.2,
     zoomSensitivity: 1,
     panSensitivity: 1,
+    panButton: 0,
     fitScaleLocked: null,
     isScalingLocked: false
 };
@@ -2043,7 +2044,7 @@ let moving; // for information about moved piece
                 }
 
                 /* allow pan during pre-start (preview) phase */
-                if (event && event.event === "touch" && event.button === 0 && viewState.enablePan) {
+                if (event && event.event === "touch" && event.button === viewState.panButton && viewState.enablePan) {
                     startDragClientX = event.position.clientX;
                     startDragClientY = event.position.clientY;
                     stateAfterPan = 15;
@@ -2368,6 +2369,10 @@ let moving; // for information about moved piece
                 }
 
                 if (!viewState.enablePan) {
+                    moving = null;
+                    return;
+                }
+                if (event.button !== viewState.panButton) {
                     moving = null;
                     return;
                 }
@@ -2770,6 +2775,9 @@ function updateViewControlLabels() {
     viewControls.reset.title = `Reset view (zoom ${viewState.zoom.toFixed(2)}x)`;
     viewControls.zoomValue.textContent = `${viewState.zoomSensitivity.toFixed(1)}x`;
     viewControls.panValue.textContent = `${viewState.panSensitivity.toFixed(1)}x`;
+    const panButtonNames = ["Left", "Middle", "Right"];
+    viewControls.panButtonToggle.textContent = `Pan with: ${panButtonNames[viewState.panButton]}`;
+    viewControls.panButtonToggle.title = `Choose which mouse button starts panning (Left / Middle / Right). Currently: ${panButtonNames[viewState.panButton]}.`;
 
     [viewControls.zoom, viewControls.pan, viewControls.scaling].forEach((button, index) => {
         const enabled = [viewState.enableZoom, viewState.enablePan, viewState.enableScaling][index];
@@ -2805,6 +2813,7 @@ function initViewControls() {
     const zoomSensitivityValue = document.getElementById("viewZoomSensitivityValue");
     const panSensitivityValue = document.getElementById("viewPanSensitivityValue");
     const fullscreenButton = document.getElementById("viewFullscreenButton");
+    const panButtonToggle = document.getElementById("viewPanButtonToggle");
     const viewControlsHeader = document.getElementById("viewControlsHeader");
     const viewControlsPanel = document.getElementById("m11b");
     if (!zoomToggle || !panToggle || !scalingToggle || !resetButton || !zoomSensitivity || !panSensitivity || !zoomSensitivityValue || !panSensitivityValue || !fullscreenButton) return;
@@ -2825,8 +2834,16 @@ function initViewControls() {
         panSensitivity,
         zoomValue: zoomSensitivityValue,
         panValue: panSensitivityValue,
-        fullscreen: fullscreenButton
+        fullscreen: fullscreenButton,
+        panButtonToggle: panButtonToggle || null
     };
+
+    if (panButtonToggle) {
+        panButtonToggle.addEventListener("click", () => {
+            viewState.panButton = (viewState.panButton + 1) % 3;
+            updateViewControlLabels();
+        });
+    }
 
     zoomToggle.addEventListener("click", () => {
         viewState.enableZoom = !viewState.enableZoom;
