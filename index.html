@@ -326,28 +326,28 @@
     <li id="m11a" style="background-color: #c58e3c; cursor: pointer;" title="Enable/disable zooming">🔍✅</li> 
     
     <li id="m11b" class="view-controls-panel" style="background-color: #c58e3c;" title="View controls">
-      <div class="view-controls-header" id="viewControlsHeader">View Controls</div>
+      <div class="view-controls-header" id="viewControlsHeader" title="Zoom, pan, and scaling options for the puzzle view.">View Controls</div>
       <div class="view-controls-body">
       <div class="view-controls-row">
-        <button id="viewZoomToggle" class="view-toggle-btn" type="button">Zoom: On</button>
-        <button id="viewPanToggle" class="view-toggle-btn" type="button">Pan: On</button>
+        <button id="viewZoomToggle" class="view-toggle-btn" type="button" title="Turn zoom on or off. When on, use scroll/pinch to zoom in and out on the puzzle.">Zoom: On</button>
+        <button id="viewPanToggle" class="view-toggle-btn" type="button" title="Turn panning on or off. When on, drag the puzzle background to move the view.">Pan: On</button>
       </div>
       <div class="view-controls-row">
-        <button id="viewScalingToggle" class="view-toggle-btn" type="button">Scaling: On</button>
-        <button id="viewResetButton" class="view-toggle-btn" type="button">Reset View</button>
+        <button id="viewScalingToggle" class="view-toggle-btn" type="button" title="Turn auto-scaling on or off. When on, the puzzle fits to the window; when off, you can zoom and pan freely.">Scaling: On</button>
+        <button id="viewResetButton" class="view-toggle-btn" type="button" title="Reset zoom and pan to the default view (puzzle centered and fitted).">Reset View</button>
       </div>
-      <div class="view-controls-slider">
+      <div class="view-controls-slider" title="Adjust how fast zooming responds to scroll or pinch.">
         <label for="viewZoomSensitivity">Zoom speed</label>
         <input id="viewZoomSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
         <span id="viewZoomSensitivityValue">1.0x</span>
       </div>
-      <div class="view-controls-slider">
+      <div class="view-controls-slider" title="Adjust how fast panning responds when dragging the puzzle.">
         <label for="viewPanSensitivity">Pan speed</label>
         <input id="viewPanSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
         <span id="viewPanSensitivityValue">1.0x</span>
       </div>
       <div class="view-controls-row">
-        <button id="viewFullscreenButton" class="view-toggle-btn" type="button">Full Screen 🖥️</button>
+        <button id="viewFullscreenButton" class="view-toggle-btn" type="button" title="Switch the puzzle area to full screen (or exit full screen).">Full Screen 🖥️</button>
       </div>
       </div>
     </li>
