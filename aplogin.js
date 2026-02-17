@@ -135,7 +135,7 @@ function pressed_solo(){
     apstatus = "Playing solo";
     document.getElementById("m6").innerText = apstatus;
 
-    // document.getElementById('taskbar1').style.display = "flex";
+    document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
 

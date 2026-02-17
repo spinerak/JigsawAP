@@ -95,7 +95,7 @@
     #view-controls-wrap {
       position: absolute;
       right: 10px;
-      bottom: 90px;
+      bottom: 180px;
       z-index: 1000;
       display: flex;
       flex-direction: column-reverse;
