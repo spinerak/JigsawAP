@@ -92,13 +92,52 @@
       touch-action: none;
     }
 
+    #view-controls-wrap {
+      position: absolute;
+      right: 10px;
+      bottom: 90px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    #viewFullscreenButton.view-fullscreen-btn {
+      width: 50px;
+      height: 30px;
+      padding: 0;
+      border: none;
+      border-radius: 5px;
+      background-color: #c58e3c;
+      font-size: 1.1em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    #viewFullscreenButton.view-fullscreen-btn:hover {
+      filter: brightness(1.1);
+    }
+
     #m11b.view-controls-panel {
       padding: 6px;
       min-width: 220px;
+      border-radius: 5px;
+      box-sizing: border-box;
     }
 
     #m11b.view-controls-panel.view-controls-collapsed {
-      padding: 4px 10px;
+      min-width: 0;
+      width: 50px;
+      height: 30px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
     }
 
     .view-controls-header {
@@ -106,13 +145,42 @@
       font-weight: 700;
       margin-bottom: 4px;
       font-size: 12px;
-      text-transform: uppercase;
+      text-align: center;
       cursor: pointer;
       user-select: none;
     }
 
+    .view-controls-icon {
+      display: none;
+    }
+
+    .view-controls-collapse-icon {
+      margin-left: 4px;
+      font-size: 0.85em;
+      opacity: 0.85;
+    }
+
+    #m11b.view-controls-collapsed .view-controls-icon {
+      display: inline;
+    }
+
+    #m11b.view-controls-collapsed .view-controls-label,
+    #m11b.view-controls-collapsed .view-controls-collapse-icon {
+      display: none;
+    }
+
     #m11b.view-controls-collapsed .view-controls-header {
       margin-bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: 1.1em;
+    }
+
+    #m11b.view-controls-collapsed .view-controls-icon {
+      transform: translateY(-2px); /* camera emoji has short energy */
     }
 
     .view-controls-body {

@@ -324,9 +324,12 @@
     <br>
     <li id="m11" style="background-color: #c58e3c;">Full screen 🖥️</li>
     <li id="m11a" style="background-color: #c58e3c; cursor: pointer;" title="Enable/disable zooming">🔍✅</li> 
-    
-    <li id="m11b" class="view-controls-panel" style="background-color: #c58e3c;" title="View controls">
-      <div class="view-controls-header" id="viewControlsHeader" title="Zoom, pan, and scaling options for the puzzle view.">View Controls</div>
+    <li id="m6" style="background-color: #555;">AP: not connected</li>
+  </ul>
+
+  <div id="view-controls-wrap">
+    <div id="m11b" class="view-controls-panel view-controls-collapsed" style="background-color: #c58e3c;" title="View controls">
+      <div class="view-controls-header" id="viewControlsHeader" title="Zoom, pan, and scaling options for the puzzle view. Click to collapse."><span class="view-controls-icon" aria-hidden="true">📷</span><span class="view-controls-label">View Controls <span class="view-controls-collapse-icon" aria-hidden="true">▼</span></span></div>
       <div class="view-controls-body">
       <div class="view-controls-row">
         <button id="viewZoomToggle" class="view-toggle-btn" type="button" title="Turn zoom on or off. When on, use scroll/pinch to zoom in and out on the puzzle.">Zoom: On</button>
@@ -346,14 +349,10 @@
         <input id="viewPanSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
         <span id="viewPanSensitivityValue">1.0x</span>
       </div>
-      <div class="view-controls-row">
-        <button id="viewFullscreenButton" class="view-toggle-btn" type="button" title="Switch the puzzle area to full screen (or exit full screen).">Full Screen 🖥️</button>
       </div>
-      </div>
-    </li>
-    <li id="m6" style="background-color: #555;">AP: not connected</li>
-  </ul>
-  
+    </div>
+    <button id="viewFullscreenButton" class="view-fullscreen-btn" type="button" title="Switch the puzzle area to full screen (or exit full screen)." aria-label="Full screen">🖥️</button>
+  </div>
 </div>
 
 <div class="draggable" id="draggable1" style="display: none;">
