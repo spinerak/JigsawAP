@@ -244,6 +244,10 @@
       position: absolute;
     }
 
+    .polypiece.moving {
+      filter: drop-shadow(12px 12px 12px rgba(0, 0, 0, 0.35));
+    }
+
     /* .moving {
       transition-property: top, left;
       transition-duration: 1s;

@@ -2321,6 +2321,7 @@ let moving; // for information about moved piece
                 if (!window.is_connected && !window.play_solo) return;
 
                 if (event.event == "leave") {
+                    if (moving && moving.pp && moving.pp.polypiece_canvas) moving.pp.polypiece_canvas.classList.remove('moving');
                     moving = null;
                 }
                 
@@ -2357,6 +2358,7 @@ let moving; // for information about moved piece
                             puzzle.polyPieces.splice(k, 1);
                             puzzle.polyPieces.push(pp);
                             pp.polypiece_canvas.style.zIndex = 100000001; // to foreground
+                            pp.polypiece_canvas.classList.add('moving');
                             
                             puzzle._releaseHandled = true;
                             state = 55;
@@ -2397,6 +2399,7 @@ let moving; // for information about moved piece
                         
                         break;
                     case "leave":
+                        if (moving && moving.pp && moving.pp.polypiece_canvas) moving.pp.polypiece_canvas.classList.remove('moving');
                         moving = null;
                         state = stateAfterPan;
                         break;
@@ -2449,6 +2452,7 @@ let moving; // for information about moved piece
                                 if (pp.pieces.length > moving.pp.pieces.length || (pp.pieces.length == moving.pp.pieces.length && pp.pieces[0].index > moving.pp.pieces[0].index)) {
                                     pp.merge(moving.pp);
                                     moving.pp = pp; // memorize piece to follow
+                                    moving.pp.polypiece_canvas.classList.add('moving');
                                 } else {
                                     moving.pp.merge(pp);
                                 }
@@ -2474,8 +2478,7 @@ let moving; // for information about moved piece
                             }, 1000);
                         }
 
-                        
-
+                        if (moving && moving.pp && moving.pp.polypiece_canvas) moving.pp.polypiece_canvas.classList.remove('moving');
                         moving = null;
 
                         // not at its right place
@@ -3337,6 +3340,7 @@ function do_action(key, value, oldValue, bounce){
             if (typeof oldValue === "number") return; //already merged!
 
             if(moving_that_piece || (moving && moving.pp && moving.pp.pieces && moving.pp.pieces[0].index == value)){
+                if (moving && moving.pp && moving.pp.polypiece_canvas) moving.pp.polypiece_canvas.classList.remove('moving');
                 moving = null; // let go of piece if someone else merges it...
             }
             const pp2 = findPolyPieceUsingPuzzlePiece(value);
