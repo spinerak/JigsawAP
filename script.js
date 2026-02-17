@@ -1018,7 +1018,7 @@ class PolyPiece {
 
                     this.polypiece_ctx.clip(path);
                     
-                    let embth = puzzle.scalex * 0.01 * bevel_size * getZoomedViewScaleMultiplier();
+                    let embth = puzzle.scalex * 0.01 * bevel_size;
                     // if(this.hinted){
                     //     embth = puzzle.scalex * 0.01 * window.scaleFactor * window.additional_zoom;
                     // }
