@@ -358,17 +358,18 @@
   </div>
 </div>
 
-<div class="draggable" id="draggable1" style="display: none;">
-  <div class="controls">
-      <button class="control-btn" id="control-btn1">-</button>
+<div class="draggable drawer-window chat-window" id="draggable1" style="display: none;">
+  <div class="chat-panel">
+    <header class="chat-header">
+      <h3 class="chat-title">Chat / Log</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn1" title="Minimize">−</button>
+    </header>
+    <div id="log" class="chat-log" aria-live="polite"></div>
+    <div class="chat-input-row">
+      <input type="text" id="messageInput" class="chat-input" placeholder="Type a message…" aria-label="Chat message" autocomplete="off">
+      <button type="button" id="sendButton" class="chat-send drawer-btn drawer-btn--primary" title="Send">➜</button>
+    </div>
   </div>
-
-  <div id="log"></div>
-  <input type="text" id="messageInput" placeholder="Type your message here">
-  <button id="sendButton">➜</button>
-  
-  <!-- <div class="resizer right" id="resizerRight1"></div>
-  <div class="resizer bottom" id="resizerBottom1"></div> -->
   <div class="resizer corner" id="resizerCorner1"></div>
 </div>
 <div class="taskbar" id="taskbar1" style="display: none;" title="Chat / Log">📝</div>

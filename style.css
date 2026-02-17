@@ -334,19 +334,23 @@
       pointer-events: none; /* Ignore mouse events */
     }
 
-    #draggable1 { 
-      display: inline-block; /* Ensure the element wraps around its content */
-      width: 300px; /* Adjust width to fit the image */
-      height: 200px; /* Adjust height to fit the image */
-      background: #444; 
-      position: absolute; 
-      top: 50px; 
-      left: 50px; 
-      border-radius: 8px; 
-      padding: 0; /* Remove extra padding */
-      cursor: grab; 
-      user-select: none; /* Prevent text selection */
+    #draggable1 {
+      display: inline-block;
+      width: 320px;
+      min-width: 260px;
+      height: 320px;
+      min-height: 200px;
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      padding: 0;
+      cursor: grab;
+      user-select: none;
       z-index: 99;
+      background: #2d3748;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     #draggable2 { 
@@ -613,40 +617,119 @@
         cursor: nwse-resize; background: #888; border-radius: 3px;
     }
 
-    #log {
-      /* background-color: rgba(32, 32, 0, 0.5); */
-      bottom: 3vh;
-      left: 3vw;
-      width: 100%;
-      height: calc(100% - 27px);    
-      font-size: max(1vw, 2vh);
-      color: rgba(255, 255, 255, 0.9);
-      /* pointer-events: none; */
-      overflow-x: hidden; /* Disable hor scrolling */
+    /* Chat / Log window – themed like the drawer */
+    .chat-panel {
+      padding: 0 14px 14px;
       display: flex;
-      flex-direction: column; /* Display new messages at the bottom */
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 0 12px;
+      margin: 0 -14px 0;
+      padding-left: 14px;
+      padding-right: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      flex-shrink: 0;
+    }
+    .chat-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      letter-spacing: 0.02em;
+    }
+    .chat-window .drawer-header-minimize {
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .chat-log {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.9rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
       text-align: left;
-      /* margin: 10px; */
+    }
+    .chat-log > div {
+      padding: 4px 8px;
+      margin: 1px 0;
+      border-radius: 4px;
+    }
+    .chat-log > div:nth-child(odd) {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .chat-log > div:nth-child(even) {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .chat-input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      color: #f1f5f9;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .chat-input::placeholder {
+      color: #94a3b8;
+    }
+    .chat-input:hover,
+    .chat-input:focus {
+      border-color: #64748b;
+      background: #334155;
+    }
+    .chat-send {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    #log {
+      bottom: auto;
+      left: auto;
+      width: auto;
+      height: auto;
     }
 
     #sendButton {
-      height: 26px;
-      width: 35px;
-      background-color: #777;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      align-items: center; /* Vertically center text */
-      justify-content: center; /* Horizontally center text */
-      font-size: 14px;
-      font-weight: bold;
-      transition: background-color 0.3s ease;
+      height: auto;
+      width: auto;
     }
 
     #messageInput {
-      height: 18px;
-      width: calc(90% - 50px);
+      height: auto;
+      width: auto;
     }
 
     @keyframes myAnim {
