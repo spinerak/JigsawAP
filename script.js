@@ -2600,6 +2600,7 @@ document.getElementById("m4").addEventListener("click", () => {
             setRandomSeed((window.apseed + slot) % 10000);
         }
         computeSoloUnlockOrder(apnx, apny);
+        buildPossibleMergesForSolo(apnx, apny);
         unlocked_pieces.length = 0;
         const K = Math.min(7, window.soloUnlockOrder.length);
         for (let i = 0; i < K; i++) unlockPiece(window.soloUnlockOrder[i]);
@@ -2997,6 +2998,89 @@ function getPieceNeighbors(p, apnx, apny) {
     return out;
 }
 
+/**
+ * Merge simulation board: simulates placing pieces in order and tracks cumulative merge count.
+ * Used only to build possible_merges / actual_possible_merges for local play.
+ * Index i = cell (i % width, i // width) (column, row).
+ */
+class PuzzleBoard {
+    constructor(width, height, hexagonal) {
+        const size = width * height;
+        this.board = Array(size).fill(null);
+        this.mergesCount = 0;
+        this.clusters = {};
+        const maxIsolated = (size >> 1) + (size % 2);
+        this._unusedIds = [];
+        for (let id = 0; id < maxIsolated; id++) this._unusedIds.push(id);
+
+        // Precompute adjacency for each index (0-based). Index i => column i % width, row i // width.
+        this.adjacentPieces = [];
+        for (let i = 0; i < size; i++) {
+            const x = i % width;
+            const y = (i / width) | 0;
+            const neighbors = [];
+            if (x > 0) neighbors.push(i - 1);
+            if (x < width - 1) neighbors.push(i + 1);
+            if (y > 0) neighbors.push(i - width);
+            if (y < height - 1) neighbors.push(i + width);
+            if (hexagonal) {
+                if (x % 2 === 0) {
+                    neighbors.push(i - width - 1, i - width + 1);
+                } else {
+                    neighbors.push(i + width - 1, i + width + 1);
+                }
+            }
+            this.adjacentPieces[i] = neighbors.filter(n => n >= 0 && n < size);
+        }
+    }
+
+    addPiece(pieceIndex) {
+        const adjIds = new Set();
+        for (const n of this.adjacentPieces[pieceIndex]) {
+            const id = this.board[n];
+            if (id != null) adjIds.add(id);
+        }
+        const numAdjacent = adjIds.size;
+
+        if (numAdjacent === 0) {
+            const id = this._unusedIds.pop();
+            this.board[pieceIndex] = id;
+            this.clusters[id] = [pieceIndex];
+            return;
+        }
+        if (numAdjacent === 1) {
+            const id = [...adjIds][0];
+            this.board[pieceIndex] = id;
+            this.clusters[id].push(pieceIndex);
+            this.mergesCount += 1;
+            return;
+        }
+        // 2+ adjacent: merge into largest
+        let largestId = null;
+        let largestSize = -1;
+        for (const id of adjIds) {
+            const len = this.clusters[id].length;
+            if (len > largestSize) {
+                largestSize = len;
+                largestId = id;
+            }
+        }
+        this.board[pieceIndex] = largestId;
+        this.clusters[largestId].push(pieceIndex);
+        for (const id of adjIds) {
+            if (id === largestId) continue;
+            const pieces = this.clusters[id];
+            for (const idx of pieces) {
+                this.board[idx] = largestId;
+                this.clusters[largestId].push(idx);
+            }
+            delete this.clusters[id];
+            this._unusedIds.push(id);
+        }
+        this.mergesCount += numAdjacent;
+    }
+}
+
 /** BFS unlock order for solo: sets window.soloUnlockOrder; returns order. */
 function computeSoloUnlockOrder(apnx, apny) {
     const N = apnx * apny;
@@ -3025,6 +3109,21 @@ function computeSoloUnlockOrder(apnx, apny) {
     return order;
 }
 
+function buildPossibleMergesForSolo(nx, ny) {
+    const hexagonal = (window.pieceSides === 6);
+    const order = window.soloUnlockOrder;
+    if (!order || order.length !== nx * ny) return;
+    const board = new PuzzleBoard(nx, ny, hexagonal);
+    const possible_merges = [0];
+    const actual_possible_merges = [0];
+    for (let k = 0; k < order.length; k++) {
+        board.addPiece(order[k] - 1);
+        possible_merges.push(board.mergesCount);
+        actual_possible_merges.push(board.mergesCount);
+    }
+    window.possible_merges = possible_merges;
+    window.actual_possible_merges = actual_possible_merges;
+}
 
 function findPolyPieceUsingPuzzlePiece(index, needsToBeFirst = false){
     for (let i = 0; i < puzzle.polyPieces.length; i++) {
@@ -3159,45 +3258,20 @@ function getRandomPiece(numberOfPieces, maxcluster) {
     return shuffled.slice(0, numberOfPieces);
 }
 
-/** Returns the number of mergeable pairs among unlocked, non-fake poly pieces right now. Solo only.
- *  Uses grid adjacency (ifNear with ignoreCloseness/ignoreRotation) so "possible" = pairs that
- *  are neighbors in the grid and would merge if moved together. */
-function countCurrentPossibleMerges() {
-    if (!puzzle || !puzzle.polyPieces || !window.play_solo) return 0;
-    const pps = puzzle.polyPieces.filter(pp => pp.unlocked && pp.pieces && pp.pieces.length > 0 && pp.pieces[0].index > 0);
-    let count = 0;
-    for (let i = 0; i < pps.length; i++) {
-        for (let j = i + 1; j < pps.length; j++) {
-            if (pps[i].ifNear(pps[j], true, true)) count++;
-        }
-    }
-    return count;
-}
-
 function updateMergesLabels(){
-    if (window.play_solo && puzzle) {
-        const value = countCurrentPossibleMerges();
-        try {
-            document.getElementById("m9").innerText = "Merges in logic: " + value;
-        } catch (e) {
-            document.getElementById("m9").innerText = "Merges in logic: ?";
-        }
-        try {
-            document.getElementById("m10").innerText = "Merges possible: " + value;
-        } catch (e) {
-            document.getElementById("m10").innerText = "Merges possible: ?";
-        }
-    } else {
-        try {
-            document.getElementById("m9").innerText = "Merges in logic: " + (window.possible_merges[unlocked_pieces.length] !== undefined ? window.possible_merges[unlocked_pieces.length] : "?");
-        } catch (e) {
-            document.getElementById("m9").innerText = "Merges in logic: ?";
-        }
-        try {
-            document.getElementById("m10").innerText = "Merges possible: " + (window.actual_possible_merges[unlocked_pieces.length] !== undefined ? window.actual_possible_merges[unlocked_pieces.length] : "?");
-        } catch (e) {
-            document.getElementById("m10").innerText = "Merges possible: ?";
-        }
+    const logicVal = (window.possible_merges && window.possible_merges[unlocked_pieces.length] !== undefined)
+        ? window.possible_merges[unlocked_pieces.length] : "?";
+    const possibleVal = (window.actual_possible_merges && window.actual_possible_merges[unlocked_pieces.length] !== undefined)
+        ? window.actual_possible_merges[unlocked_pieces.length] : "?";
+    try {
+        document.getElementById("m9").innerText = "Merges in logic: " + logicVal;
+    } catch (e) {
+        document.getElementById("m9").innerText = "Merges in logic: ?";
+    }
+    try {
+        document.getElementById("m10").innerText = "Merges possible: " + possibleVal;
+    } catch (e) {
+        document.getElementById("m10").innerText = "Merges possible: ?";
     }
 }
 
