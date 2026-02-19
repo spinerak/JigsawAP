@@ -238,6 +238,15 @@ function getBaseScaleMultiplier() {
     return 1 / activeBase;
 }
 
+function getEffectivePuzzleAreaAspectRatio(srcImage) {
+    const mode = window.puzzleAreaScale;
+    if (mode === "Landscape") return 16 / 9;
+    if (mode === "Portrait") return 9 / 16;
+    if (mode === "Square") return 1;
+    if (mode === "Picture" && srcImage) return srcImage.naturalWidth / srcImage.naturalHeight;
+    return 16 / 9;
+}
+
 function getZoomedViewScaleMultiplier() {
     return getBaseScaleMultiplier() * viewState.zoom;
 }
@@ -1389,6 +1398,32 @@ class Puzzle {
     }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    sizeContainerByAspectRatio(aspectRatio) {
+        const puzzleDIV = this.container.parentElement;
+        const baseScale = getActiveBaseScale();
+        let maxContentW, maxContentH;
+        if (puzzleDIV && baseScale > 0) {
+            maxContentW = puzzleDIV.clientWidth / baseScale;
+            maxContentH = puzzleDIV.clientHeight / baseScale;
+        } else {
+            this.getContainerSize();
+            maxContentW = this.contWidth || 800;
+            maxContentH = this.contHeight || 600;
+        }
+        let contWidth, contHeight;
+        if (maxContentW / maxContentH > aspectRatio) {
+            contHeight = maxContentH;
+            contWidth = maxContentH * aspectRatio;
+        } else {
+            contWidth = maxContentW;
+            contHeight = maxContentW / aspectRatio;
+        }
+        this.container.style.width = contWidth + 'px';
+        this.container.style.height = contHeight + 'px';
+        this.getContainerSize();
+    }
+
+    //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     puzzle_create(coordinates, groups, hasmoved, unlocked) {
         console.log(coordinates, groups, hasmoved, unlocked)
 
@@ -1757,34 +1792,21 @@ class Puzzle {
 
     puzzle_scale() {
 
-        const aspectRatio = this.srcImage ? (this.srcImage.naturalWidth / this.srcImage.naturalHeight) : (16 / 9);
+        const aspectRatio = getEffectivePuzzleAreaAspectRatio(this.srcImage);
 
         if (this.srcImage) {
-            const puzzleDIV = this.container.parentElement;
-            const baseScale = getActiveBaseScale();
-            let maxContentW, maxContentH;
-            if (puzzleDIV && baseScale > 0) {
-                maxContentW = puzzleDIV.clientWidth / baseScale;
-                maxContentH = puzzleDIV.clientHeight / baseScale;
-            } else {
-                this.getContainerSize();
-                maxContentW = this.contWidth || 800;
-                maxContentH = this.contHeight || 600;
-            }
-            let contWidth, contHeight;
-            if (maxContentW / maxContentH > aspectRatio) {
-                contHeight = maxContentH;
-                contWidth = maxContentH * aspectRatio;
-            } else {
-                contWidth = maxContentW;
-                contHeight = maxContentW / aspectRatio;
-            }
-            this.container.style.width = contWidth + 'px';
-            this.container.style.height = contHeight + 'px';
-            this.getContainerSize();
+            this.sizeContainerByAspectRatio(aspectRatio);
             const sqrtMultiplier = Math.sqrt(window.PUZZLE_AREA_SURFACE_MULTIPLIER || 1.25);
-            this.gameWidth = this.contWidth / sqrtMultiplier;
-            this.gameHeight = this.contHeight / sqrtMultiplier;
+            const availableW = this.contWidth / sqrtMultiplier;
+            const availableH = this.contHeight / sqrtMultiplier;
+            const imageAspect = this.srcImage.naturalWidth / this.srcImage.naturalHeight;
+            if (availableW / availableH > imageAspect) {
+                this.gameHeight = availableH;
+                this.gameWidth = availableH * imageAspect;
+            } else {
+                this.gameWidth = availableW;
+                this.gameHeight = availableW / imageAspect;
+            }
         } else {
             this.getContainerSize();
             if (this.contWidth / this.contHeight > aspectRatio) {
@@ -2016,7 +2038,12 @@ function loadImageFunction(){
     tmpImage = document.createElement("img");
     tmpImage.src = puzzle.srcImage.src;
     // console.log(puzzle.srcImage.src)
-    puzzle.getContainerSize();
+    if (window.puzzleAreaScale && typeof puzzle.sizeContainerByAspectRatio === "function") {
+        const ar = getEffectivePuzzleAreaAspectRatio(puzzle.srcImage);
+        puzzle.sizeContainerByAspectRatio(ar);
+    } else {
+        puzzle.getContainerSize();
+    }
     fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
     
     tmpImage.style.boxShadow = `${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px rgba(0, 0, 0, 0.5)`;
@@ -2038,6 +2065,19 @@ let moving; // for information about moved piece
         let event;
         
         if (events.length) event = events.shift(); // read event from queue
+
+        if (event && event.event === "puzzleAreaScaleChanged" && puzzle) {
+            const srcImg = puzzle.srcImage || null;
+            const ar = getEffectivePuzzleAreaAspectRatio(srcImg);
+            if (state === 15 && tmpImage) {
+                puzzle.sizeContainerByAspectRatio(ar);
+                fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+            } else if (state >= 25) {
+                puzzle.puzzle_scale();
+            }
+            applyViewTransform();
+            return;
+        }
         
         // resize event
         if (event && event.event == "resize") {
@@ -2642,9 +2682,14 @@ let menu = (function () {
         if (window.play_solo) {
             document.getElementById("m3a").style.display = "block"
             document.getElementById("m3b").style.display = "block"
+            document.getElementById("m3c").style.display = "block"
+            if (!window.puzzleAreaScale) window.puzzleAreaScale = "Landscape";
+            const scaleSelect = document.getElementById("puzzleAreaScale");
+            if (scaleSelect) scaleSelect.value = window.puzzleAreaScale;
         } else {
             document.getElementById("m3a").style.display = "none"
             document.getElementById("m3b").style.display = "none"
+            document.getElementById("m3c").style.display = "none"
         }
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
@@ -2683,6 +2728,14 @@ let menu = (function () {
 document.getElementById("m1").addEventListener("click", loadInitialFile);
 document.getElementById("m2").addEventListener("click", loadFile);
 document.getElementById("m3").addEventListener("click", () => { });
+const puzzleAreaScaleEl = document.getElementById("puzzleAreaScale");
+if (puzzleAreaScaleEl) {
+    puzzleAreaScaleEl.value = "Landscape";
+    puzzleAreaScaleEl.addEventListener("change", function () {
+        window.puzzleAreaScale = this.value;
+        events.push({ event: "puzzleAreaScaleChanged" });
+    });
+}
 document.getElementById("m4").addEventListener("click", () => {
     if (window.play_solo) {
         const soloSeedEl = document.getElementById("soloSeed");

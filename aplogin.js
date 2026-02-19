@@ -81,7 +81,8 @@ function pressed_login(){
 window.play_solo = false;
 function pressed_solo(){
     window.play_solo = true;
-    
+    window.puzzleAreaScale = "Landscape";
+
     window.possible_merges = [];
     window.actual_possible_merges = [];
 
@@ -92,8 +93,10 @@ function pressed_solo(){
     window.slot = window.slot ?? 0;
     const m3a = document.getElementById("m3a");
     const m3b = document.getElementById("m3b");
+    const m3c = document.getElementById("m3c");
     if (m3a) m3a.style.display = "block";
     if (m3b) m3b.style.display = "block";
+    if (m3c) m3c.style.display = "block";
     const soloPieceCount = document.getElementById("soloPieceCount");
     const soloSeed = document.getElementById("soloSeed");
     if (soloPieceCount) soloPieceCount.value = "24";
@@ -369,6 +372,11 @@ const connectedListener = (packet) => {
 
     if (packet.slot_data.uniform_piece_size !== undefined){
         window.make_pieces_square = packet.slot_data.uniform_piece_size === 1;
+    }
+
+    const validPuzzleAreaScales = ["Landscape", "Portrait", "Square", "Picture"];
+    if (packet.slot_data.puzzle_area_scale != null && validPuzzleAreaScales.includes(packet.slot_data.puzzle_area_scale)) {
+        window.puzzleAreaScale = packet.slot_data.puzzle_area_scale;
     }
 
     const shapeParam2 = getUrlParameter("shape");
