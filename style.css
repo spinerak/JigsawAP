@@ -232,6 +232,16 @@
       background: rgba(255, 255, 255, 0.5);
     }
 
+    #bgcolorR {
+      background: rgba(255, 220, 220, 0.85);
+    }
+    #bgcolorG {
+      background: rgba(220, 255, 220, 0.85);
+    }
+    #bgcolorB {
+      background: rgba(220, 220, 255, 0.85);
+    }
+
     .display-options-slider {
       display: grid;
       grid-template-columns: 180px 1fr 48px;
