@@ -52,6 +52,11 @@ function restoreDiv1() {
 
 const draggable2 = document.getElementById('draggable2');
 const taskbar2 = document.getElementById('taskbar2');
+document.getElementById('previm').addEventListener('load', () => {
+    if (draggable2.style.display === 'none' || draggable2.style.display === '') return;
+    const sizeKey = window.is_connected ? `draggable2Size_${window.apseed}_${window.slot}` : 'draggable2Size';
+    if (!localStorage.getItem(sizeKey)) sizePreviewToImageAspectRatio();
+});
 const draggable3 = document.getElementById('draggable3');
 const taskbar3 = document.getElementById('taskbar3');
 let offsetX2, offsetY2, isDragging2 = false;
@@ -96,10 +101,29 @@ document.addEventListener('mouseup', () => { isDragging3 = false; });
 document.addEventListener('touchend', () => { isDragging3 = false; });
 
 
+function sizePreviewToImageAspectRatio() {
+    const img = document.getElementById('previm');
+    if (!img || !img.naturalWidth || !img.naturalHeight) return;
+    const ratio = img.naturalWidth / img.naturalHeight;
+    const maxW = window.innerWidth * 0.8;
+    const maxH = window.innerHeight * 0.8;
+    let w = maxW;
+    let h = w / ratio;
+    if (h > maxH) {
+        h = maxH;
+        w = h * ratio;
+    }
+    draggable2.style.width = `${(w / window.innerWidth) * 100}vw`;
+    draggable2.style.height = `${(h / window.innerHeight) * 100}vh`;
+    adjustedSize(draggable2);
+}
+
 function restoreDiv2() {
     draggable2.style.display = (draggable2.style.display === 'none') ? 'block' : 'none';
     if (draggable2.style.display === 'block' || draggable2.style.display === '') {
         taskbar2.style.backgroundColor = '#909090'; // lighter color
+        const sizeKey = window.is_connected ? `draggable2Size_${window.apseed}_${window.slot}` : 'draggable2Size';
+        if (!localStorage.getItem(sizeKey)) sizePreviewToImageAspectRatio();
     } else {
         taskbar2.style.backgroundColor = ''; // reset to default
     }
@@ -214,7 +238,25 @@ function enableResizing1(resizer, horizontal, vertical) {
 function enableResizing2(resizer, horizontal, vertical) {
     let resizing = false;
     let startX, startY, startWidth, startHeight;
-    
+
+    function getPreviewAspectRatio() {
+        const img = document.getElementById('previm');
+        if (img && img.naturalWidth && img.naturalHeight) return img.naturalWidth / img.naturalHeight;
+        return startWidth && startHeight ? startWidth / startHeight : 16 / 10;
+    }
+
+    function applyResize2(clientX, clientY) {
+        const ratio = getPreviewAspectRatio();
+        const maxW = window.innerWidth - draggable2.offsetLeft - 5;
+        const maxH = window.innerHeight - draggable2.offsetTop - 5;
+        let newWidth = Math.max(0, startWidth + (clientX - startX));
+        newWidth = Math.min(newWidth, maxW, maxH * ratio);
+        const newHeight = newWidth / ratio;
+        draggable2.style.width = `${(newWidth / window.innerWidth) * 100}vw`;
+        draggable2.style.height = `${(newHeight / window.innerHeight) * 100}vh`;
+        adjustedSize(draggable2);
+    }
+
     resizer.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         resizing = true;
@@ -236,34 +278,42 @@ function enableResizing2(resizer, horizontal, vertical) {
 
     document.addEventListener('mousemove', (e) => {
         if (!resizing) return;
-        if (horizontal) {
-            const newWidth = startWidth + (e.clientX - startX);
-            const maxWidth = window.innerWidth - draggable2.offsetLeft - 5;
-            draggable2.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
-            adjustedSize(draggable2);
-        }
-        if (vertical) {
-            const newHeight = startHeight + (e.clientY - startY);
-            const maxHeight = window.innerHeight - draggable2.offsetTop - 5;
-            draggable2.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
-            adjustedSize(draggable2);
+        if (horizontal && vertical) {
+            applyResize2(e.clientX, e.clientY);
+        } else {
+            if (horizontal) {
+                const newWidth = startWidth + (e.clientX - startX);
+                const maxWidth = window.innerWidth - draggable2.offsetLeft - 5;
+                draggable2.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+                adjustedSize(draggable2);
+            }
+            if (vertical) {
+                const newHeight = startHeight + (e.clientY - startY);
+                const maxHeight = window.innerHeight - draggable2.offsetTop - 5;
+                draggable2.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+                adjustedSize(draggable2);
+            }
         }
     });
 
     document.addEventListener('touchmove', (e) => {
         if (!resizing) return;
         const touch = e.touches[0];
-        if (horizontal) {
-            const newWidth = startWidth + (touch.clientX - startX);
-            const maxWidth = window.innerWidth - draggable2.offsetLeft - 5;
-            draggable2.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
-            adjustedSize(draggable2);
-        }
-        if (vertical) {
-            const newHeight = startHeight + (touch.clientY - startY);
-            const maxHeight = window.innerHeight - draggable2.offsetTop - 5;
-            draggable2.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
-            adjustedSize(draggable2);
+        if (horizontal && vertical) {
+            applyResize2(touch.clientX, touch.clientY);
+        } else {
+            if (horizontal) {
+                const newWidth = startWidth + (touch.clientX - startX);
+                const maxWidth = window.innerWidth - draggable2.offsetLeft - 5;
+                draggable2.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+                adjustedSize(draggable2);
+            }
+            if (vertical) {
+                const newHeight = startHeight + (touch.clientY - startY);
+                const maxHeight = window.innerHeight - draggable2.offsetTop - 5;
+                draggable2.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+                adjustedSize(draggable2);
+            }
         }
     });
 
