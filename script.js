@@ -15,30 +15,140 @@ var process_pending_actions = false;
 var bevel_size = localStorage.getItem("option_bevel_2");
 if (bevel_size === null) bevel_size = 0.1;
 
-var shadow_size = localStorage.getItem("option_shadow_2");
-if (shadow_size === null) shadow_size = 0;
-
 // Set starting values from localStorage or defaults
 document.addEventListener('DOMContentLoaded', function() {
-    const borderSelect = document.getElementById('options_bt');
-    const shadowSelect = document.getElementById('options_st');
-
-    // Load from localStorage or use default
-    function formatValue(val, def) {
-        val = parseFloat(localStorage.getItem(val));
-        if (isNaN(val)) val = def;
-        return (val % 1 === 0) ? val.toString() : val.toFixed(1);
+    function redrawAllPiecesForDisplayOptions() {
+        if (typeof puzzle !== "undefined" && puzzle && puzzle.polyPieces && puzzle.polyPieces.length) {
+            puzzle.polyPieces.forEach(function(pp) {
+                pp.polypiece_drawImage(false);
+            });
+        }
     }
-    borderSelect.value = formatValue('option_bevel_2', 0.1);
-    shadowSelect.value = formatValue('option_shadow_2', 0);
 
-    // Save to localStorage on change
-    borderSelect.addEventListener('change', function() {
-        localStorage.setItem('option_bevel_2', borderSelect.value);
+    // Held Piece Shadow Darkness slider
+    const forPuzzleEl = document.getElementById("forPuzzle");
+    const heldShadowInput = document.getElementById("displayHeldPieceShadowDarkness");
+    const heldShadowValueSpan = document.getElementById("displayHeldPieceShadowDarknessValue");
+
+    // Cosmetic options panel: collapse/expand and sliders (only apply slider value while dragging, like view controls)
+    const displayOptionsHeader = document.getElementById("displayOptionsHeader");
+    const displayOptionsPanel = document.getElementById("display-options-panel");
+    const displayOptionsInteraction = { bevel: false, felt: false, radius: false, heldShadow: false };
+    document.addEventListener("pointerup", function() {
+        displayOptionsInteraction.bevel = false;
+        displayOptionsInteraction.felt = false;
+        displayOptionsInteraction.radius = false;
+        displayOptionsInteraction.heldShadow = false;
     });
-    shadowSelect.addEventListener('change', function() {
-        localStorage.setItem('option_shadow_2', shadowSelect.value);
+    document.addEventListener("pointercancel", function() {
+        displayOptionsInteraction.bevel = false;
+        displayOptionsInteraction.felt = false;
+        displayOptionsInteraction.radius = false;
+        displayOptionsInteraction.heldShadow = false;
     });
+
+    if (displayOptionsHeader && displayOptionsPanel) {
+        displayOptionsHeader.addEventListener("click", function(e) {
+            e.stopPropagation();
+            displayOptionsPanel.classList.toggle("display-options-collapsed");
+        });
+    }
+    const feltOpacityInput = document.getElementById("displayFeltOpacity");
+    const feltOpacityValueSpan = document.getElementById("displayFeltOpacityValue");
+    const playAreaRadiusInput = document.getElementById("displayPlayAreaRadius");
+    const playAreaRadiusValueSpan = document.getElementById("displayPlayAreaRadiusValue");
+    const pieceBevelInput = document.getElementById("displayPieceBevel");
+    const pieceBevelValueSpan = document.getElementById("displayPieceBevelValue");
+
+    // Piece bevel: update value/global on input (while dragging), save and redraw only on change (when released)
+    if (pieceBevelInput) {
+        const savedBevel = localStorage.getItem("option_bevel_2");
+        const defaultBevel = 0.1;
+        const initialBevel = savedBevel !== null ? parseFloat(savedBevel) : defaultBevel;
+        pieceBevelInput.value = initialBevel;
+        if (pieceBevelValueSpan) pieceBevelValueSpan.textContent = String(initialBevel);
+        pieceBevelInput.addEventListener("pointerdown", function() { displayOptionsInteraction.bevel = true; });
+        pieceBevelInput.addEventListener("input", function() {
+            if (displayOptionsInteraction.bevel) {
+                const val = parseFloat(pieceBevelInput.value);
+                bevel_size = val;
+                if (pieceBevelValueSpan) pieceBevelValueSpan.textContent = (val % 1 === 0) ? String(val) : val.toFixed(1);
+            } else {
+                // Re-sync from current effective value (bevel_size), not localStorage, so hover doesn't reset the slider
+                const val = typeof bevel_size === "number" ? bevel_size : parseFloat(bevel_size);
+                const num = (typeof val === "number" && !isNaN(val)) ? val : defaultBevel;
+                pieceBevelInput.value = num;
+                if (pieceBevelValueSpan) pieceBevelValueSpan.textContent = (num % 1 === 0) ? String(num) : num.toFixed(1);
+            }
+        });
+        pieceBevelInput.addEventListener("change", function() {
+            const val = parseFloat(pieceBevelInput.value);
+            localStorage.setItem("option_bevel_2", String(val));
+            bevel_size = val;
+            redrawAllPiecesForDisplayOptions();
+        });
+        // Also save and redraw on pointerup (release) — change can be unreliable on range inputs in some browsers
+        pieceBevelInput.addEventListener("pointerup", function() {
+            if (displayOptionsInteraction.bevel) {
+                const val = parseFloat(pieceBevelInput.value);
+                localStorage.setItem("option_bevel_2", String(val));
+                bevel_size = val;
+                redrawAllPiecesForDisplayOptions();
+            }
+        });
+    }
+
+    if (heldShadowInput && forPuzzleEl) {
+        heldShadowInput.addEventListener("pointerdown", function() { displayOptionsInteraction.heldShadow = true; });
+        heldShadowInput.addEventListener("input", function() {
+            if (displayOptionsInteraction.heldShadow) {
+                const val = parseFloat(heldShadowInput.value);
+                localStorage.setItem("heldPieceShadowDarkness", String(val));
+                forPuzzleEl.style.setProperty("--held-piece-shadow-darkness", String(val));
+                if (heldShadowValueSpan) heldShadowValueSpan.textContent = val.toFixed(2);
+            } else {
+                const saved = localStorage.getItem("heldPieceShadowDarkness");
+                const val = saved !== null ? parseFloat(saved) : 0.35;
+                heldShadowInput.value = val;
+                if (heldShadowValueSpan) heldShadowValueSpan.textContent = val.toFixed(2);
+                forPuzzleEl.style.setProperty("--held-piece-shadow-darkness", String(val));
+            }
+        });
+    }
+    if (feltOpacityInput && forPuzzleEl) {
+        feltOpacityInput.addEventListener("pointerdown", function() { displayOptionsInteraction.felt = true; });
+        feltOpacityInput.addEventListener("input", function() {
+            if (displayOptionsInteraction.felt) {
+                const val = parseFloat(feltOpacityInput.value);
+                localStorage.setItem("feltOpacity", String(val));
+                forPuzzleEl.style.setProperty("--felt-opacity", String(val));
+                if (feltOpacityValueSpan) feltOpacityValueSpan.textContent = val.toFixed(2);
+            } else {
+                const saved = localStorage.getItem("feltOpacity");
+                const val = saved !== null ? parseFloat(saved) : 0.5;
+                feltOpacityInput.value = val;
+                if (feltOpacityValueSpan) feltOpacityValueSpan.textContent = val.toFixed(2);
+                forPuzzleEl.style.setProperty("--felt-opacity", String(val));
+            }
+        });
+    }
+    if (playAreaRadiusInput && forPuzzleEl) {
+        playAreaRadiusInput.addEventListener("pointerdown", function() { displayOptionsInteraction.radius = true; });
+        playAreaRadiusInput.addEventListener("input", function() {
+            if (displayOptionsInteraction.radius) {
+                const val = parseInt(playAreaRadiusInput.value, 10);
+                localStorage.setItem("playAreaRadius", String(val));
+                forPuzzleEl.style.setProperty("--play-area-radius", val + "px");
+                if (playAreaRadiusValueSpan) playAreaRadiusValueSpan.textContent = val + "px";
+            } else {
+                const saved = localStorage.getItem("playAreaRadius");
+                const val = saved !== null ? parseInt(saved, 10) : 64;
+                playAreaRadiusInput.value = val;
+                if (playAreaRadiusValueSpan) playAreaRadiusValueSpan.textContent = val + "px";
+                forPuzzleEl.style.setProperty("--play-area-radius", val + "px");
+            }
+        });
+    }
 });
 
 const viewState = {
@@ -1005,7 +1115,7 @@ class PolyPiece {
         this.polypiece_ctx.drawImage(this.maskCanvas, destx, desty);
 
 
-        let borders = apnx * apny < 150 && (bevel_size > 0 || shadow_size > 0);
+        let borders = apnx * apny < 150 && bevel_size > 0;
 
         if(borders){
         
@@ -2013,9 +2123,6 @@ let moving; // for information about moved piece
                     bevel_size = localStorage.getItem("option_bevel_2");
                     if (bevel_size === null) bevel_size = 0.1;
 
-                    shadow_size = localStorage.getItem("option_shadow_2");
-                    if (shadow_size === null) shadow_size = 0;
-
                     state = 17;
                     if(window.is_connected){
                         if(window.apworld == "0.2.0" || window.apworld == "0.3.0"){
@@ -2247,9 +2354,6 @@ let moving; // for information about moved piece
                 document.getElementById("m3b").style.display = "none";
                 document.getElementById("m4").style.display = "none";
                 document.getElementById("m5").style.display = "none";
-                document.getElementById("m10b").style.display = "none";
-                document.getElementById("o1a").style.display = "none";
-                document.getElementById("o1b").style.display = "none";
 
                 /* prepare puzzle */
                 puzzle.puzzle_create(coordinates, groups, hasmoved, unlocked); // create shape of pieces, independant of size
@@ -2544,9 +2648,6 @@ let menu = (function () {
         }
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
-        document.getElementById("m10b").style.display = "block"
-        document.getElementById("o1a").style.display = "block";
-        document.getElementById("o1b").style.display = "block";
     }
     document.getElementById("m6").style.display = "block"
     document.getElementById("m11").style.display = "none"
@@ -2645,17 +2746,17 @@ document.getElementById("m13c").addEventListener("click", () => {
 });
 
 
-document.getElementById("m10b").addEventListener("click", () => {   
-    const forPuzzleElement = document.getElementById("forPuzzle");     
+function applyBackgroundColor() {
+    const forPuzzleElement = document.getElementById("forPuzzle");
     const red = document.getElementById("bgcolorR").value;
     const green = document.getElementById("bgcolorG").value;
     const blue = document.getElementById("bgcolorB").value;
     const newColor = `#${red}${green}${blue}`;
     forPuzzleElement.style.backgroundColor = newColor;
     localStorage.setItem("backgroundColor", newColor);
-
-    // const jsonList = [{ type: "text", text: "Example text with new background" }];
-    // window.jsonListener("", jsonList);
+}
+["bgcolorR", "bgcolorG", "bgcolorB"].forEach(id => {
+    document.getElementById(id).addEventListener("change", applyBackgroundColor);
 });
 
 // Set the initial background color from localStorage if available
@@ -2664,11 +2765,43 @@ window.addEventListener("load", () => {
     if (color === null) {
         color = "#DD9";
     }
-    
     document.getElementById("forPuzzle").style.backgroundColor = color;
     document.getElementById("bgcolorR").value = color.slice(1, 2);
     document.getElementById("bgcolorG").value = color.slice(2, 3);
     document.getElementById("bgcolorB").value = color.slice(3, 4);
+
+    // Cosmetic options: felt opacity, rounded corners, held piece shadow from localStorage
+    const forPuzzle = document.getElementById("forPuzzle");
+    const feltOpacity = document.getElementById("displayFeltOpacity");
+    const feltOpacityValue = document.getElementById("displayFeltOpacityValue");
+    const playAreaRadius = document.getElementById("displayPlayAreaRadius");
+    const playAreaRadiusValue = document.getElementById("displayPlayAreaRadiusValue");
+    if (forPuzzle && feltOpacity && playAreaRadius) {
+        const savedFelt = localStorage.getItem("feltOpacity");
+        const defaultFelt = 0.5;
+        const felt = savedFelt !== null ? parseFloat(savedFelt) : defaultFelt;
+        feltOpacity.value = felt;
+        if (feltOpacityValue) feltOpacityValue.textContent = felt.toFixed(2);
+        forPuzzle.style.setProperty("--felt-opacity", String(felt));
+
+        const savedRadius = localStorage.getItem("playAreaRadius");
+        const defaultRadius = 64;
+        const radius = savedRadius !== null ? parseInt(savedRadius, 10) : defaultRadius;
+        playAreaRadius.value = radius;
+        if (playAreaRadiusValue) playAreaRadiusValue.textContent = radius + "px";
+        forPuzzle.style.setProperty("--play-area-radius", radius + "px");
+    }
+    // Held Piece Shadow Darkness: default 0.35 (match .polypiece.moving)
+    const heldShadowSlider = document.getElementById("displayHeldPieceShadowDarkness");
+    const heldShadowValue = document.getElementById("displayHeldPieceShadowDarknessValue");
+    const savedHeldShadow = localStorage.getItem("heldPieceShadowDarkness");
+    const defaultHeldShadow = 0.35;
+    const heldShadow = savedHeldShadow !== null ? parseFloat(savedHeldShadow) : defaultHeldShadow;
+    if (forPuzzle && heldShadowSlider) {
+        heldShadowSlider.value = heldShadow;
+        if (heldShadowValue) heldShadowValue.textContent = heldShadow.toFixed(2);
+        forPuzzle.style.setProperty("--held-piece-shadow-darkness", String(heldShadow));
+    }
 });
 
 
@@ -2806,6 +2939,7 @@ function updateViewControlLabels() {
 function setScalingEnabled(enabled) {
     if (viewState.enableScaling === enabled) return;
     viewState.enableScaling = enabled;
+    localStorage.setItem("viewEnableScaling", String(enabled));
     if (enabled) {
         unlockScalingLayout();
         events.push({ event: "resize" });
@@ -2843,6 +2977,29 @@ function initViewControls() {
         });
     }
 
+    // Load view options from localStorage
+    const savedZoom = localStorage.getItem("viewEnableZoom");
+    if (savedZoom !== null) viewState.enableZoom = savedZoom === "true";
+    const savedPan = localStorage.getItem("viewEnablePan");
+    if (savedPan !== null) viewState.enablePan = savedPan === "true";
+    const savedScaling = localStorage.getItem("viewEnableScaling");
+    if (savedScaling !== null) viewState.enableScaling = savedScaling === "true";
+    const savedPanBtn = localStorage.getItem("viewPanButton");
+    if (savedPanBtn !== null) {
+        const pb = parseInt(savedPanBtn, 10);
+        if (!isNaN(pb) && pb >= 0 && pb <= 2) viewState.panButton = pb;
+    }
+    const savedZoomSen = localStorage.getItem("viewZoomSensitivity");
+    if (savedZoomSen !== null) {
+        const zs = parseFloat(savedZoomSen);
+        if (!isNaN(zs)) viewState.zoomSensitivity = clamp(zs, 0.2, 3);
+    }
+    const savedPanSen = localStorage.getItem("viewPanSensitivity");
+    if (savedPanSen !== null) {
+        const ps = parseFloat(savedPanSen);
+        if (!isNaN(ps)) viewState.panSensitivity = clamp(ps, 0.2, 3);
+    }
+
     viewControls = {
         zoom: zoomToggle,
         pan: panToggle,
@@ -2859,16 +3016,19 @@ function initViewControls() {
     if (panButtonToggle) {
         panButtonToggle.addEventListener("click", () => {
             viewState.panButton = (viewState.panButton + 1) % 3;
+            localStorage.setItem("viewPanButton", String(viewState.panButton));
             updateViewControlLabels();
         });
     }
 
     zoomToggle.addEventListener("click", () => {
         viewState.enableZoom = !viewState.enableZoom;
+        localStorage.setItem("viewEnableZoom", String(viewState.enableZoom));
         updateViewControlLabels();
     });
     panToggle.addEventListener("click", () => {
         viewState.enablePan = !viewState.enablePan;
+        localStorage.setItem("viewEnablePan", String(viewState.enablePan));
         updateViewControlLabels();
     });
     scalingToggle.addEventListener("click", () => {
@@ -2890,6 +3050,7 @@ function initViewControls() {
     zoomSensitivity.addEventListener("input", () => {
         if (sensitivityInteraction.zoom) {
             viewState.zoomSensitivity = clamp(parseFloat(zoomSensitivity.value), 0.2, 3);
+            localStorage.setItem("viewZoomSensitivity", String(viewState.zoomSensitivity));
             updateViewControlLabels();
         } else {
             zoomSensitivity.value = viewState.zoomSensitivity.toFixed(1);
@@ -2899,6 +3060,7 @@ function initViewControls() {
     panSensitivity.addEventListener("input", () => {
         if (sensitivityInteraction.pan) {
             viewState.panSensitivity = clamp(parseFloat(panSensitivity.value), 0.2, 3);
+            localStorage.setItem("viewPanSensitivity", String(viewState.panSensitivity));
             updateViewControlLabels();
         } else {
             panSensitivity.value = viewState.panSensitivity.toFixed(1);
@@ -2919,6 +3081,7 @@ function initViewControls() {
     });
     zoomSensitivity.value = viewState.zoomSensitivity.toFixed(1);
     panSensitivity.value = viewState.panSensitivity.toFixed(1);
+    setScalingEnabled(viewState.enableScaling);
     updateViewControlLabels();
 }
 

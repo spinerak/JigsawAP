@@ -213,123 +213,54 @@
     <li id="m13b" style="background-color: #ff0000; " title="Change color of clue">🎨</li>
     <li id="m13c" style="background-color: #888888; " title="Remove all clues">🗑️</li>
     
-    <li id="m10b" style="background-color: #45aabe;">BG color: #
-      <select id="bgcolorR">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-        <option value="D">D</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-      </select>
-      <select id="bgcolorG">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-        <option value="D">D</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-      </select>
-      <select id="bgcolorB">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-        <option value="D">D</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-      </select>
-    </li>
-
-    <li id="o1a" style="background-color: #45aabe;">Border thickness
-      <select id="options_bt">
-        <option value="0">0</option>
-        <option value="0.1">0.1</option>
-        <option value="0.2">0.2</option>
-        <option value="0.3">0.3</option>
-        <option value="0.4">0.4</option>
-        <option value="0.5">0.5</option>
-        <option value="0.6">0.6</option>
-        <option value="0.7">0.7</option>
-        <option value="0.8">0.8</option>
-        <option value="0.9">0.9</option>
-        <option value="1">1</option>
-        <option value="1.1">1.1</option>
-        <option value="1.2">1.2</option>
-        <option value="1.3">1.3</option>
-        <option value="1.4">1.4</option>
-        <option value="1.5">1.5</option>
-        <option value="1.6">1.6</option>
-        <option value="1.7">1.7</option>
-        <option value="1.8">1.8</option>
-        <option value="1.9">1.9</option>
-        <option value="2">2</option>
-      </select>
-    </li>
-    <li id="o1b" style="background-color: #45aabe;">Shadow thickness
-      <select id="options_st">
-        <option value="0">0</option>
-        <option value="0.1">0.1</option>
-        <option value="0.2">0.2</option>
-        <option value="0.3">0.3</option>
-        <option value="0.4">0.4</option>
-        <option value="0.5">0.5</option>
-        <option value="0.6">0.6</option>
-        <option value="0.7">0.7</option>
-        <option value="0.8">0.8</option>
-        <option value="0.9">0.9</option>
-        <option value="1">1</option>
-        <option value="1.1">1.1</option>
-        <option value="1.2">1.2</option>
-        <option value="1.3">1.3</option>
-        <option value="1.4">1.4</option>
-        <option value="1.5">1.5</option>
-        <option value="1.6">1.6</option>
-        <option value="1.7">1.7</option>
-        <option value="1.8">1.8</option>
-        <option value="1.9">1.9</option>
-        <option value="2">2</option>
-      </select>
-    </li>
-
     <br>
     <li id="m11" style="background-color: #c58e3c;">Full screen 🖥️</li>
     <li id="m11a" style="background-color: #c58e3c; cursor: pointer;" title="Enable/disable zooming">🔍✅</li> 
     <li id="m6" style="background-color: #555;">AP: not connected</li>
   </ul>
 
+  <div id="display-options-wrap">
+    <div id="display-options-panel" class="display-options-panel display-options-collapsed" style="background-color: #45aabe;" title="Cosmetic options">
+      <div class="display-options-header" id="displayOptionsHeader" title="Background, bevel, shadow, felt, and corner options. Click to collapse."><span class="display-options-icon" aria-hidden="true">🎨</span><span class="display-options-label">Cosmetic options <span class="display-options-collapse-icon" aria-hidden="true">▼</span></span></div>
+      <div class="display-options-body">
+        <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
+          <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
+          <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+          <select id="bgcolorG" class="display-options-select" aria-label="Background color green">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+          <select id="bgcolorB" class="display-options-select" aria-label="Background color blue">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+        </div>
+        <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
+          <label for="displayPieceBevel">Piece bevel</label>
+          <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
+          <span id="displayPieceBevelValue">0.1</span>
+        </div>
+        <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
+          <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
+          <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
+          <span id="displayHeldPieceShadowDarknessValue">0.35</span>
+        </div>
+        <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
+          <label for="displayFeltOpacity">Felt opacity</label>
+          <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
+          <span id="displayFeltOpacityValue">0.5</span>
+        </div>
+        <div class="display-options-slider" title="Rounded corners of the play area (px).">
+          <label for="displayPlayAreaRadius">Rounded corners</label>
+          <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
+          <span id="displayPlayAreaRadiusValue">64px</span>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="view-controls-wrap">
     <div id="m11b" class="view-controls-panel view-controls-collapsed" style="background-color: #c58e3c;" title="View controls">
-      <div class="view-controls-header" id="viewControlsHeader" title="Zoom, pan, and scaling options for the puzzle view. Click to collapse."><span class="view-controls-icon" aria-hidden="true">📷</span><span class="view-controls-label">View Controls <span class="view-controls-collapse-icon" aria-hidden="true">▼</span></span></div>
+      <div class="view-controls-header" id="viewControlsHeader" title="Zoom, pan, and scaling options for the puzzle view. Click to collapse."><span class="view-controls-icon" aria-hidden="true">📷</span><span class="view-controls-label">View controls <span class="view-controls-collapse-icon" aria-hidden="true">▼</span></span></div>
       <div class="view-controls-body">
       <div class="view-controls-row">
         <button id="viewZoomToggle" class="view-toggle-btn" type="button" title="Turn zoom on or off. When on, use scroll/pinch to zoom in and out on the puzzle.">Zoom: On</button>
