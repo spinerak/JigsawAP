@@ -2384,6 +2384,7 @@ let moving; // for information about moved piece
                 document.getElementById("m3").style.display = "none";
                 document.getElementById("m3a").style.display = "none";
                 document.getElementById("m3b").style.display = "none";
+                document.getElementById("m3c").style.display = "none";
                 document.getElementById("m4").style.display = "none";
                 document.getElementById("m5").style.display = "none";
 

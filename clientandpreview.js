@@ -94,13 +94,18 @@ draggable3.addEventListener('touchstart', (e) => {
     offsetY3 = touch.clientY - draggable3.offsetTop;
 });
 
+function isInteractiveControl(el) {
+    return el && el.closest('input, button, select, textarea, label');
+}
 if (draggable4) {
     draggable4.addEventListener('mousedown', (e) => {
+        if (isInteractiveControl(e.target)) return;
         isDragging4 = true;
         offsetX4 = e.clientX - draggable4.offsetLeft;
         offsetY4 = e.clientY - draggable4.offsetTop;
     });
     draggable4.addEventListener('touchstart', (e) => {
+        if (isInteractiveControl(e.target)) return;
         isDragging4 = true;
         const touch = e.touches[0];
         offsetX4 = touch.clientX - draggable4.offsetLeft;
@@ -109,11 +114,13 @@ if (draggable4) {
 }
 if (draggable5) {
     draggable5.addEventListener('mousedown', (e) => {
+        if (isInteractiveControl(e.target)) return;
         isDragging5 = true;
         offsetX5 = e.clientX - draggable5.offsetLeft;
         offsetY5 = e.clientY - draggable5.offsetTop;
     });
     draggable5.addEventListener('touchstart', (e) => {
+        if (isInteractiveControl(e.target)) return;
         isDragging5 = true;
         const touch = e.touches[0];
         offsetX5 = touch.clientX - draggable5.offsetLeft;
