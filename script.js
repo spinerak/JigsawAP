@@ -63,6 +63,15 @@ let viewControls = null;
 const VIEW_DEBUG = false;
 const sensitivityInteraction = { zoom: false, pan: false };
 
+/** Two-finger pinch zoom: active only while 2 touches. Tap (no move) = rotate piece. */
+const pinchState = { active: false, startDistance: 0, startZoom: 1, didMove: false };
+function touchDistance(touches) {
+    return Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+}
+function touchMidpoint(touches) {
+    return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
+}
+
 
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
@@ -2918,6 +2927,19 @@ let startDragClientY = 0;
 initViewControls();
 applyViewTransform();
 
+forPuzzle.addEventListener('touchstart', (event) => {
+    if (event.touches.length === 2 && viewState.enableZoom) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const dist = touchDistance(event.touches);
+        const mid = touchMidpoint(event.touches);
+        pinchState.active = true;
+        pinchState.startDistance = dist || 1;
+        pinchState.startZoom = viewState.zoom;
+        pinchState.didMove = false;
+    }
+}, { passive: false });
+
 forPuzzle.addEventListener('wheel', (event) => {
     if(moving){
         rotateCurrentPiece(event.deltaY < 0);
@@ -2935,6 +2957,17 @@ forPuzzle.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 forPuzzle.addEventListener("touchmove", (event) => {
+    if (event.touches.length !== 2) {
+        pinchState.active = false;
+    } else if (pinchState.active && viewState.enableZoom) {
+        event.preventDefault();
+        const dist = touchDistance(event.touches);
+        const mid = touchMidpoint(event.touches);
+        const targetZoom = pinchState.startZoom * (dist / pinchState.startDistance);
+        zoomAroundPoint(mid.x, mid.y, targetZoom);
+        pinchState.didMove = true;
+        return;
+    }
     if (viewState.enablePan || viewState.enableZoom) {
         event.preventDefault();
     }
@@ -2942,10 +2975,17 @@ forPuzzle.addEventListener("touchmove", (event) => {
 
 let lastTap = 0;
 forPuzzle.addEventListener('touchend', (event) => {
+    if (event.touches.length < 2) {
+        if (pinchState.active && !pinchState.didMove) {
+            event.preventDefault();
+            rotateCurrentPiece();
+        }
+        pinchState.active = false;
+    }
     if (event.touches.length != 0) return;
     const currentTime = new Date().getTime();
     const tapLength = currentTime - lastTap;
-    if (tapLength < 300 && tapLength > 0) {
+    if (event.changedTouches.length === 1 && tapLength < 300 && tapLength > 0) {
         event.preventDefault();
         if(!viewState.enableZoom){
             return;
