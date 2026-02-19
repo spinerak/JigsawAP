@@ -220,54 +220,18 @@
     <li id="m13c" style="background-color: #888888; " title="Remove all clues">🗑️</li>
     
     <br>
-    <li id="m11" style="background-color: #c58e3c;">Full screen 🖥️</li>
     <li id="m11a" style="background-color: #c58e3c; cursor: pointer;" title="Enable/disable zooming">🔍✅</li> 
     <li id="m6" style="background-color: #555;">AP: not connected</li>
   </ul>
+</div>
 
-  <div id="display-options-wrap">
-    <div id="display-options-panel" class="display-options-panel display-options-collapsed" style="background-color: #45aabe;" title="Cosmetic options">
-      <div class="display-options-header" id="displayOptionsHeader" title="Background, bevel, shadow, felt, and corner options. Click to collapse."><span class="display-options-icon" aria-hidden="true">🎨</span><span class="display-options-label">Cosmetic options <span class="display-options-collapse-icon" aria-hidden="true">▼</span></span></div>
-      <div class="display-options-body">
-        <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
-          <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
-          <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
-            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-          </select>
-          <select id="bgcolorG" class="display-options-select" aria-label="Background color green">
-            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-          </select>
-          <select id="bgcolorB" class="display-options-select" aria-label="Background color blue">
-            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-          </select>
-        </div>
-        <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
-          <label for="displayPieceBevel">Piece bevel</label>
-          <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
-          <span id="displayPieceBevelValue">0.1</span>
-        </div>
-        <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
-          <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
-          <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
-          <span id="displayHeldPieceShadowDarknessValue">0.35</span>
-        </div>
-        <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
-          <label for="displayFeltOpacity">Felt opacity</label>
-          <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
-          <span id="displayFeltOpacityValue">0.5</span>
-        </div>
-        <div class="display-options-slider" title="Rounded corners of the play area (px).">
-          <label for="displayPlayAreaRadius">Rounded corners</label>
-          <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
-          <span id="displayPlayAreaRadiusValue">64px</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="view-controls-wrap">
-    <div id="m11b" class="view-controls-panel view-controls-collapsed" style="background-color: #c58e3c;" title="View controls">
-      <div class="view-controls-header" id="viewControlsHeader" title="Zoom, pan, and scaling options for the puzzle view. Click to collapse."><span class="view-controls-icon" aria-hidden="true">📷</span><span class="view-controls-label">View controls <span class="view-controls-collapse-icon" aria-hidden="true">▼</span></span></div>
-      <div class="view-controls-body">
+<div class="draggable drawer-window" id="draggable4" style="display: none;">
+  <div class="view-controls-window-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">View controls</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn4" title="Minimize">−</button>
+    </header>
+    <div class="view-controls-body view-controls-window-body">
       <div class="view-controls-row">
         <button id="viewZoomToggle" class="view-toggle-btn" type="button" title="Turn zoom on or off. When on, use scroll/pinch to zoom in and out on the puzzle.">Zoom: On</button>
         <button id="viewPanToggle" class="view-toggle-btn" type="button" title="Turn panning on or off. When on, drag the puzzle background to move the view.">Pan: On</button>
@@ -289,11 +253,56 @@
         <input id="viewPanSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
         <span id="viewPanSensitivityValue">1.0x</span>
       </div>
+    </div>
+  </div>
+  <div class="resizer corner" id="resizerCorner4"></div>
+</div>
+<div class="draggable drawer-window" id="draggable5" style="display: none;">
+  <div class="drawer-panel cosmetic-window-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">Cosmetic options</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn5" title="Minimize">−</button>
+    </header>
+    <div class="display-options-body cosmetic-window-body">
+      <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
+        <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
+        <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="bgcolorG" class="display-options-select" aria-label="Background color green">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="bgcolorB" class="display-options-select" aria-label="Background color blue">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+      </div>
+      <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
+        <label for="displayPieceBevel">Piece bevel</label>
+        <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
+        <span id="displayPieceBevelValue">0.1</span>
+      </div>
+      <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
+        <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
+        <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
+        <span id="displayHeldPieceShadowDarknessValue">0.35</span>
+      </div>
+      <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
+        <label for="displayFeltOpacity">Felt opacity</label>
+        <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
+        <span id="displayFeltOpacityValue">0.5</span>
+      </div>
+      <div class="display-options-slider" title="Rounded corners of the play area (px).">
+        <label for="displayPlayAreaRadius">Rounded corners</label>
+        <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
+        <span id="displayPlayAreaRadiusValue">64px</span>
       </div>
     </div>
-    <button id="viewFullscreenButton" class="view-fullscreen-btn" type="button" title="Switch the puzzle area to full screen (or exit full screen)." aria-label="Full screen">🖥️</button>
   </div>
+  <div class="resizer corner" id="resizerCorner5"></div>
 </div>
+<div class="taskbar" id="taskbarFullscreen" style="display: none;" title="Full screen">🖥️</div>
+<div class="taskbar taskbar-view-controls" id="taskbarViewControls" style="display: none;" title="View controls"><span class="taskbar-view-controls-icon">📷</span></div>
+<div class="taskbar" id="taskbarCosmeticControls" style="display: none;" title="Cosmetic options">✨</div>
 
 <div class="draggable drawer-window chat-window" id="draggable1" style="display: none;">
   <div class="chat-panel">

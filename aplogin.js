@@ -61,15 +61,16 @@ window.toggleFullscreen = toggleFullscreen;
 // Show the fullscreen button only on mobile devices
 window.addEventListener('load', () => {
     if (isMobile()) {
-        document.getElementById('m11').style.display = 'none';
         document.getElementById('m11a').style.display = 'none';
-        document.getElementById('m11b').style.display = 'inline-block';
+        const tbFs = document.getElementById('taskbarFullscreen');
+        const tbV = document.getElementById('taskbarViewControls');
+        const tbC = document.getElementById('taskbarCosmeticControls');
+        if (tbFs) tbFs.style.display = 'flex';
+        if (tbV) tbV.style.display = 'flex';
+        if (tbC) tbC.style.display = 'flex';
         setTimeout(() => window.scrollTo(0, 1), 100); // URL bar hiding trick
     }
 });
-
-document.getElementById("m11").addEventListener("click", toggleFullscreen);
-
 
 function pressed_login(){
     localStorage.setItem("hostport", document.getElementById("hostport").value);
@@ -141,6 +142,12 @@ function pressed_solo(){
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
+    const tbf = document.getElementById('taskbarFullscreen');
+    const tbv = document.getElementById('taskbarViewControls');
+    const tbc = document.getElementById('taskbarCosmeticControls');
+    if (tbf) tbf.style.display = "flex";
+    if (tbv) tbv.style.display = "flex";
+    if (tbc) tbc.style.display = "flex";
 
     
     const messages = [
@@ -493,6 +500,12 @@ const connectedListener = (packet) => {
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
+    const tf = document.getElementById('taskbarFullscreen');
+    const tv = document.getElementById('taskbarViewControls');
+    const tc = document.getElementById('taskbarCosmeticControls');
+    if (tf) tf.style.display = "flex";
+    if (tv) tv.style.display = "flex";
+    if (tc) tc.style.display = "flex";
 
 
     

@@ -30,9 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const heldShadowInput = document.getElementById("displayHeldPieceShadowDarkness");
     const heldShadowValueSpan = document.getElementById("displayHeldPieceShadowDarknessValue");
 
-    // Cosmetic options panel: collapse/expand and sliders (only apply slider value while dragging, like view controls)
-    const displayOptionsHeader = document.getElementById("displayOptionsHeader");
-    const displayOptionsPanel = document.getElementById("display-options-panel");
+    // Cosmetic options: sliders (only apply slider value while dragging, like view controls)
     const displayOptionsInteraction = { bevel: false, felt: false, radius: false, heldShadow: false };
     document.addEventListener("pointerup", function() {
         displayOptionsInteraction.bevel = false;
@@ -47,12 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
         displayOptionsInteraction.heldShadow = false;
     });
 
-    if (displayOptionsHeader && displayOptionsPanel) {
-        displayOptionsHeader.addEventListener("click", function(e) {
-            e.stopPropagation();
-            displayOptionsPanel.classList.toggle("display-options-collapsed");
-        });
-    }
     const feltOpacityInput = document.getElementById("displayFeltOpacity");
     const feltOpacityValueSpan = document.getElementById("displayFeltOpacityValue");
     const playAreaRadiusInput = document.getElementById("displayPlayAreaRadius");
@@ -2695,9 +2687,13 @@ let menu = (function () {
         document.getElementById("m5").style.display = "block"
     }
     document.getElementById("m6").style.display = "block"
-    document.getElementById("m11").style.display = "none"
     document.getElementById("m11a").style.display = "none"
-    document.getElementById("m11b").style.display = "inline-block"
+    const tbFullscreen = document.getElementById("taskbarFullscreen");
+    const tbView = document.getElementById("taskbarViewControls");
+    const tbCosmetic = document.getElementById("taskbarCosmeticControls");
+    if (tbFullscreen) tbFullscreen.style.display = "flex";
+    if (tbView) tbView.style.display = "flex";
+    if (tbCosmetic) tbCosmetic.style.display = "flex";
     if(gameStarted){
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
@@ -3017,18 +3013,9 @@ function initViewControls() {
     const panSensitivity = document.getElementById("viewPanSensitivity");
     const zoomSensitivityValue = document.getElementById("viewZoomSensitivityValue");
     const panSensitivityValue = document.getElementById("viewPanSensitivityValue");
-    const fullscreenButton = document.getElementById("viewFullscreenButton");
+    const fullscreenButton = document.getElementById("taskbarFullscreen");
     const panButtonToggle = document.getElementById("viewPanButtonToggle");
-    const viewControlsHeader = document.getElementById("viewControlsHeader");
-    const viewControlsPanel = document.getElementById("m11b");
     if (!zoomToggle || !panToggle || !scalingToggle || !resetButton || !zoomSensitivity || !panSensitivity || !zoomSensitivityValue || !panSensitivityValue || !fullscreenButton) return;
-
-    if (viewControlsHeader && viewControlsPanel) {
-        viewControlsHeader.addEventListener("click", (e) => {
-            e.stopPropagation();
-            viewControlsPanel.classList.toggle("view-controls-collapsed");
-        });
-    }
 
     // Load view options from localStorage
     const savedZoom = localStorage.getItem("viewEnableZoom");
@@ -3121,7 +3108,8 @@ function initViewControls() {
         }
     });
 
-    fullscreenButton.addEventListener("click", () => {
+    fullscreenButton.addEventListener("click", (e) => {
+        e.stopPropagation();
         if (typeof window.toggleFullscreen === "function") {
             window.toggleFullscreen();
             return;

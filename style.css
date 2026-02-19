@@ -50,7 +50,7 @@
       height: auto;
     }
 
-    #m7, #m8, #m9, #m9a, #m10, #m11, #m11a, #m11b, #m13, #m13b, #m13c, #o1a, #o1b {
+    #m7, #m8, #m9, #m9a, #m10, #m11a, #m13, #m13b, #m13c, #o1a, #o1b {
       display: none;
     }
 
@@ -58,7 +58,7 @@
       display: none;
     }
 
-    #m11, #m11a, #m11b, #m13, #m13b, #m13c {
+    #m11a, #m13, #m13b, #m13c {
       margin: 0;
       padding: 0;
     }
@@ -123,89 +123,9 @@
       }
     }
 
-    #display-options-wrap {
-      position: absolute;
-      right: 12px;
-      bottom: 380px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column-reverse;
-      align-items: flex-end;
-      gap: 12px;
-    }
-
-    #display-options-panel.display-options-panel {
-      min-width: 240px;
-      border-radius: 10px;
-      box-sizing: border-box;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-      overflow: hidden;
-    }
-
-    #display-options-panel.display-options-panel.display-options-collapsed {
-      min-width: 0;
-      width: 44px;
-      height: 44px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-
-    .display-options-header {
-      color: #111;
-      font-weight: 600;
-      font-size: 13px;
-      letter-spacing: 0.02em;
-      text-align: center;
-      cursor: pointer;
-      user-select: none;
-      padding: 10px 14px;
-      transition: background-color 0.15s ease;
-    }
-
-    #display-options-panel:not(.display-options-collapsed) .display-options-header:hover {
-      background-color: rgba(0, 0, 0, 0.08);
-    }
-
-    .display-options-icon {
-      display: none;
-    }
-
-    .display-options-collapse-icon {
-      margin-left: 6px;
-      font-size: 0.8em;
-      opacity: 0.9;
-    }
-
-    #display-options-panel.display-options-collapsed .display-options-icon {
-      display: inline;
-    }
-
-    #display-options-panel.display-options-collapsed .display-options-label,
-    #display-options-panel.display-options-collapsed .display-options-collapse-icon {
-      display: none;
-    }
-
-    #display-options-panel.display-options-collapsed .display-options-header {
-      margin-bottom: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      font-size: 1.25em;
-    }
-
     .display-options-body {
       display: block;
       padding: 8px 14px 14px;
-    }
-
-    #display-options-panel.display-options-collapsed .display-options-body {
-      display: none;
     }
 
     .display-options-row {
@@ -271,114 +191,13 @@
       text-align: right;
     }
 
-    #view-controls-wrap {
-      position: absolute;
-      right: 12px;
-      bottom: 180px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column-reverse;
-      align-items: flex-end;
-      gap: 12px;
-    }
-
-    #viewFullscreenButton.view-fullscreen-btn {
-      width: 44px;
-      height: 44px;
-      padding: 0;
-      border: none;
-      border-radius: 10px;
-      background-color: #c58e3c;
-      font-size: 1.2em;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-      transition: filter 0.15s ease;
-    }
-
-    #viewFullscreenButton.view-fullscreen-btn:hover {
-      filter: brightness(1.1);
-    }
-
-    #m11b.view-controls-panel {
-      min-width: 240px;
-      border-radius: 10px;
-      box-sizing: border-box;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-      overflow: hidden;
-    }
-
-    #m11b.view-controls-panel.view-controls-collapsed {
-      min-width: 0;
-      width: 44px;
-      height: 44px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-
-    .view-controls-header {
-      color: #111;
-      font-weight: 600;
-      font-size: 13px;
-      letter-spacing: 0.02em;
-      text-align: center;
-      cursor: pointer;
-      user-select: none;
-      padding: 10px 14px;
-      transition: background-color 0.15s ease;
-    }
-
-    #m11b.view-controls-panel:not(.view-controls-collapsed) .view-controls-header:hover {
-      background-color: rgba(0, 0, 0, 0.08);
-    }
-
-    .view-controls-icon {
-      display: none;
-    }
-
-    .view-controls-collapse-icon {
-      margin-left: 6px;
-      font-size: 0.8em;
-      opacity: 0.9;
-    }
-
-    #m11b.view-controls-collapsed .view-controls-icon {
-      display: inline;
-    }
-
-    #m11b.view-controls-collapsed .view-controls-label,
-    #m11b.view-controls-collapsed .view-controls-collapse-icon {
-      display: none;
-    }
-
-    #m11b.view-controls-collapsed .view-controls-header {
-      margin-bottom: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      font-size: 1.25em;
-    }
-
-    #m11b.view-controls-collapsed .view-controls-icon {
-      transform: translateY(-2px);
-    }
-
     .view-controls-body {
       display: block;
       padding: 8px 14px 14px;
     }
 
-    #m11b.view-controls-collapsed .view-controls-body {
-      display: none;
+    .view-controls-window-body {
+      margin-top: -6px;
     }
 
     .view-controls-row {
@@ -441,6 +260,35 @@
     .view-controls-slider span {
       font-variant-numeric: tabular-nums;
       text-align: right;
+    }
+
+    .view-controls-window-panel .view-toggle-btn,
+    .view-controls-window-panel .view-controls-slider {
+      color: #e2e8f0;
+    }
+    .view-controls-window-panel .view-toggle-btn {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: #e2e8f0;
+    }
+    .view-controls-window-panel .view-toggle-btn:hover {
+      background-color: rgba(255, 255, 255, 0.18);
+    }
+    .view-controls-window-panel .view-toggle-btn.is-off {
+      background-color: rgba(0, 0, 0, 0.35);
+      color: #94a3b8;
+    }
+    .cosmetic-window-body .display-options-label-inline,
+    .cosmetic-window-body .display-options-slider label {
+      color: #a0aec0;
+    }
+    .cosmetic-window-body .display-options-slider span {
+      color: #e2e8f0;
+    }
+    .cosmetic-window-body .display-options-select {
+      background: #1e293b;
+      border-color: #475569;
+      color: #f1f5f9;
     }
     
     
@@ -590,6 +438,42 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
+    #draggable4 {
+      display: inline-block;
+      width: 300px;
+      min-width: 280px;
+      height: auto;
+      min-height: 120px;
+      background: #2d3748;
+      position: absolute;
+      top: 80px;
+      left: 80px;
+      border-radius: 10px;
+      padding: 0;
+      cursor: grab;
+      user-select: none;
+      z-index: 99;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    #draggable5 {
+      display: inline-block;
+      width: 640px;
+      min-width: 600px;
+      height: auto;
+      min-height: 120px;
+      background: #2d3748;
+      position: absolute;
+      top: 120px;
+      left: 120px;
+      border-radius: 10px;
+      padding: 0;
+      cursor: grab;
+      user-select: none;
+      z-index: 99;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
 
     /* Drawer panel layout and styling */
     .drawer-panel {
@@ -597,6 +481,15 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+    }
+    .view-controls-window-panel {
+      padding: 0 14px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cosmetic-window-panel.drawer-panel {
+      gap: 10px;
     }
     .drawer-header {
       display: flex;
@@ -773,6 +666,30 @@
 
 
 
+    #taskbarFullscreen {
+        width: 50px; height: 30px; background: #444; color: #fff;
+        position: absolute; bottom: 210px; right: 10px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        z-index: 1;
+    }
+    #taskbarViewControls {
+        width: 50px; height: 30px; background: #444; color: #fff;
+        position: absolute; bottom: 170px; right: 10px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        z-index: 1;
+    }
+    #taskbarViewControls .taskbar-view-controls-icon {
+        transform: translateY(-3px);
+    }
+    #taskbarCosmeticControls {
+        width: 50px; height: 30px; background: #444; color: #fff;
+        position: absolute; bottom: 130px; right: 10px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        z-index: 1;
+    }
     #taskbar1 { 
         width: 50px; height: 30px; background: #444; color: #fff;
         position: absolute; bottom: 90px; right: 10px; border-radius: 8px;
@@ -780,8 +697,6 @@
         cursor: pointer;
         z-index: 1;
     }
-
-
 
     #taskbar2 { 
         width: 50px; height: 30px; background: #444; color: #fff;

@@ -59,8 +59,14 @@ document.getElementById('previm').addEventListener('load', () => {
 });
 const draggable3 = document.getElementById('draggable3');
 const taskbar3 = document.getElementById('taskbar3');
+const draggable4 = document.getElementById('draggable4');
+const taskbarViewControls = document.getElementById('taskbarViewControls');
+const draggable5 = document.getElementById('draggable5');
+const taskbarCosmeticControls = document.getElementById('taskbarCosmeticControls');
 let offsetX2, offsetY2, isDragging2 = false;
 let offsetX3, offsetY3, isDragging3 = false;
+let offsetX4, offsetY4, isDragging4 = false;
+let offsetX5, offsetY5, isDragging5 = false;
 
 draggable2.addEventListener('mousedown', (e) => {
     isDragging2 = true;
@@ -88,11 +94,46 @@ draggable3.addEventListener('touchstart', (e) => {
     offsetY3 = touch.clientY - draggable3.offsetTop;
 });
 
-document.addEventListener('mousemove', (e) => handleDrag(draggable2, isDragging2, offsetX2, offsetY2, e));
-document.addEventListener('touchmove', (e) => handleDrag(draggable2, isDragging2, offsetX2, offsetY2, e));
+if (draggable4) {
+    draggable4.addEventListener('mousedown', (e) => {
+        isDragging4 = true;
+        offsetX4 = e.clientX - draggable4.offsetLeft;
+        offsetY4 = e.clientY - draggable4.offsetTop;
+    });
+    draggable4.addEventListener('touchstart', (e) => {
+        isDragging4 = true;
+        const touch = e.touches[0];
+        offsetX4 = touch.clientX - draggable4.offsetLeft;
+        offsetY4 = touch.clientY - draggable4.offsetTop;
+    });
+}
+if (draggable5) {
+    draggable5.addEventListener('mousedown', (e) => {
+        isDragging5 = true;
+        offsetX5 = e.clientX - draggable5.offsetLeft;
+        offsetY5 = e.clientY - draggable5.offsetTop;
+    });
+    draggable5.addEventListener('touchstart', (e) => {
+        isDragging5 = true;
+        const touch = e.touches[0];
+        offsetX5 = touch.clientX - draggable5.offsetLeft;
+        offsetY5 = touch.clientY - draggable5.offsetTop;
+    });
+}
 
-document.addEventListener('mouseup', () => { isDragging2 = false; });
-document.addEventListener('touchend', () => { isDragging2 = false; });
+document.addEventListener('mousemove', (e) => {
+    handleDrag(draggable2, isDragging2, offsetX2, offsetY2, e);
+    if (draggable4) handleDrag(draggable4, isDragging4, offsetX4, offsetY4, e);
+    if (draggable5) handleDrag(draggable5, isDragging5, offsetX5, offsetY5, e);
+});
+document.addEventListener('touchmove', (e) => {
+    handleDrag(draggable2, isDragging2, offsetX2, offsetY2, e);
+    if (draggable4) handleDrag(draggable4, isDragging4, offsetX4, offsetY4, e);
+    if (draggable5) handleDrag(draggable5, isDragging5, offsetX5, offsetY5, e);
+});
+
+document.addEventListener('mouseup', () => { isDragging2 = false; isDragging4 = false; isDragging5 = false; });
+document.addEventListener('touchend', () => { isDragging2 = false; isDragging4 = false; isDragging5 = false; });
 
 document.addEventListener('mousemove', (e) => handleDrag(draggable3, isDragging3, offsetX3, offsetY3, e));
 document.addEventListener('touchmove', (e) => handleDrag(draggable3, isDragging3, offsetX3, offsetY3, e));
@@ -141,6 +182,38 @@ function restoreDiv3() {
     }
 }
 
+function setMinHeightToContent(draggable) {
+    if (!draggable) return;
+    requestAnimationFrame(() => {
+        const panel = draggable.querySelector('.view-controls-window-panel, .cosmetic-window-panel');
+        const resizer = draggable.querySelector('.resizer.corner');
+        const panelH = panel ? panel.offsetHeight : 0;
+        const resizerH = resizer ? resizer.offsetHeight : 0;
+        draggable.style.minHeight = (panelH + resizerH) + 'px';
+    });
+}
+
+function restoreDiv4() {
+    if (!draggable4 || !taskbarViewControls) return;
+    draggable4.style.display = (draggable4.style.display === 'none') ? 'block' : 'none';
+    if (draggable4.style.display === 'block' || draggable4.style.display === '') {
+        taskbarViewControls.style.backgroundColor = '#909090';
+        setMinHeightToContent(draggable4);
+    } else {
+        taskbarViewControls.style.backgroundColor = '';
+    }
+}
+
+function restoreDiv5() {
+    if (!draggable5 || !taskbarCosmeticControls) return;
+    draggable5.style.display = (draggable5.style.display === 'none') ? 'block' : 'none';
+    if (draggable5.style.display === 'block' || draggable5.style.display === '') {
+        taskbarCosmeticControls.style.backgroundColor = '#909090';
+        setMinHeightToContent(draggable5);
+    } else {
+        taskbarCosmeticControls.style.backgroundColor = '';
+    }
+}
 
 document.getElementById('control-btn1').addEventListener('click', restoreDiv1);
 document.getElementById('taskbar1').addEventListener('click', restoreDiv1);
@@ -148,6 +221,18 @@ document.getElementById('control-btn2a').addEventListener('click', restoreDiv2);
 document.getElementById('taskbar2').addEventListener('click', restoreDiv2);
 document.getElementById('control-btn3a').addEventListener('click', restoreDiv3);
 document.getElementById('taskbar3').addEventListener('click', restoreDiv3);
+const controlBtn4 = document.getElementById('control-btn4');
+const controlBtn5 = document.getElementById('control-btn5');
+if (controlBtn4) {
+    controlBtn4.addEventListener('click', restoreDiv4);
+    controlBtn4.addEventListener('mousedown', (e) => e.stopPropagation());
+}
+if (taskbarViewControls) taskbarViewControls.addEventListener('click', restoreDiv4);
+if (controlBtn5) {
+    controlBtn5.addEventListener('click', restoreDiv5);
+    controlBtn5.addEventListener('mousedown', (e) => e.stopPropagation());
+}
+if (taskbarCosmeticControls) taskbarCosmeticControls.addEventListener('click', restoreDiv5);
 
 // Call restore functions when pressing number keys 1, 2, 3 (ignore when typing in inputs)
 document.addEventListener('keydown', (e) => {
@@ -168,6 +253,8 @@ const resizerCorner1 = document.getElementById('resizerCorner1');
 // const resizerRight2 = document.getElementById('resizerRight2');
 // const resizerBottom2 = document.getElementById('resizerBottom2');
 const resizerCorner2 = document.getElementById('resizerCorner2');
+const resizerCorner4 = document.getElementById('resizerCorner4');
+const resizerCorner5 = document.getElementById('resizerCorner5');
 
 // enableResizing1(resizerRight1, true, false);
 // enableResizing1(resizerBottom1, false, true);
@@ -175,8 +262,11 @@ enableResizing1(resizerCorner1, true, true);
 // enableResizing2(resizerRight2, true, false);
 // enableResizing2(resizerBottom2, false, true);
 enableResizing2(resizerCorner2, true, true);
+if (resizerCorner4 && draggable4) enableResizing1(resizerCorner4, true, true, draggable4);
+if (resizerCorner5 && draggable5) enableResizing1(resizerCorner5, true, true, draggable5);
 
-function enableResizing1(resizer, horizontal, vertical) {
+function enableResizing1(resizer, horizontal, vertical, target) {
+    const el = target || draggable1;
     let resizing = false;
     let startX, startY, startWidth, startHeight;
     resizer.addEventListener('mousedown', (e) => {
@@ -184,8 +274,8 @@ function enableResizing1(resizer, horizontal, vertical) {
         resizing = true;
         startX = e.clientX;
         startY = e.clientY;
-        startWidth = draggable1.offsetWidth;
-        startHeight = draggable1.offsetHeight;
+        startWidth = el.offsetWidth;
+        startHeight = el.offsetHeight;
     });
 
     resizer.addEventListener('touchstart', (e) => {
@@ -194,23 +284,23 @@ function enableResizing1(resizer, horizontal, vertical) {
         const touch = e.touches[0];
         startX = touch.clientX;
         startY = touch.clientY;
-        startWidth = draggable1.offsetWidth;
-        startHeight = draggable1.offsetHeight;
+        startWidth = el.offsetWidth;
+        startHeight = el.offsetHeight;
     });
 
     document.addEventListener('mousemove', (e) => {
         if (!resizing) return;
         if (horizontal) {
             const newWidth = startWidth + (e.clientX - startX);
-            const maxWidth = window.innerWidth - draggable1.offsetLeft - 5;
-            draggable1.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
-            adjustedSize(draggable1);
+            const maxWidth = window.innerWidth - el.offsetLeft - 5;
+            el.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+            adjustedSize(el);
         }
         if (vertical) {
             const newHeight = startHeight + (e.clientY - startY);
-            const maxHeight = window.innerHeight - draggable1.offsetTop - 5;
-            draggable1.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
-            adjustedSize(draggable1);
+            const maxHeight = window.innerHeight - el.offsetTop - 5;
+            el.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+            adjustedSize(el);
         }
     });
 
@@ -219,15 +309,15 @@ function enableResizing1(resizer, horizontal, vertical) {
         const touch = e.touches[0];
         if (horizontal) {
             const newWidth = startWidth + (touch.clientX - startX);
-            const maxWidth = window.innerWidth - draggable1.offsetLeft - 5;
-            draggable1.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
-            adjustedSize(draggable1);
+            const maxWidth = window.innerWidth - el.offsetLeft - 5;
+            el.style.width = `${(Math.min(newWidth, maxWidth) / window.innerWidth) * 100}vw`;
+            adjustedSize(el);
         }
         if (vertical) {
             const newHeight = startHeight + (touch.clientY - startY);
-            const maxHeight = window.innerHeight - draggable1.offsetTop - 5;
-            draggable1.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
-            adjustedSize(draggable1);
+            const maxHeight = window.innerHeight - el.offsetTop - 5;
+            el.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
+            adjustedSize(el);
         }
     });
 
@@ -334,12 +424,21 @@ function adjustedSize(draggable) {
     if (draggable === draggable2) {
         const widthVW = parseFloat(draggable.style.width);
         const heightVH = parseFloat(draggable.style.height);
-        // console.log(`Draggable2 Size: ${widthVW}vw, ${heightVH}vh`);
         localStorage.setItem('draggable2Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
         if(window.is_connected){
             const suffix = `_${window.apseed}_${window.slot}`;
             localStorage.setItem('draggable2Size' + suffix, JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
         }
+    }
+    if (draggable === draggable4) {
+        const widthVW = parseFloat(draggable.style.width);
+        const heightVH = parseFloat(draggable.style.height);
+        localStorage.setItem('draggable4Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
+    }
+    if (draggable === draggable5) {
+        const widthVW = parseFloat(draggable.style.width);
+        const heightVH = parseFloat(draggable.style.height);
+        localStorage.setItem('draggable5Size', JSON.stringify({ width: `${widthVW}vw`, height: `${heightVH}vh` }));
     }
 }
 
@@ -367,12 +466,21 @@ function adjustedPosition(draggable) {
     if (draggable === draggable3) {
         const leftVW = parseFloat(draggable.style.left);
         const topVH = parseFloat(draggable.style.top);
-        // console.log(`Draggable3 Position: ${leftVW}vw, ${topVH}vh`);
         localStorage.setItem('draggable3Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
         if(window.is_connected){
             const suffix = `_${window.apseed}_${window.slot}`;
             localStorage.setItem('draggable3Position' + suffix, JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
         }
+    }
+    if (draggable === draggable4) {
+        const leftVW = parseFloat(draggable.style.left);
+        const topVH = parseFloat(draggable.style.top);
+        localStorage.setItem('draggable4Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
+    }
+    if (draggable === draggable5) {
+        const leftVW = parseFloat(draggable.style.left);
+        const topVH = parseFloat(draggable.style.top);
+        localStorage.setItem('draggable5Position', JSON.stringify({ width: `${leftVW}vw`, height: `${topVH}vh` }));
     }
 }
 
@@ -414,6 +522,26 @@ function getPreviousSizeAndPosition() {
         const draggable3Position = JSON.parse(localStorage.getItem(ids[4]));
         draggable3.style.left = `${draggable3Position.width}`;
         draggable3.style.top = `${draggable3Position.height}`;
+    }
+    if (draggable4 && localStorage.getItem('draggable4Position')) {
+        const pos = JSON.parse(localStorage.getItem('draggable4Position'));
+        draggable4.style.left = pos.width;
+        draggable4.style.top = pos.height;
+    }
+    if (draggable4 && localStorage.getItem('draggable4Size')) {
+        const sz = JSON.parse(localStorage.getItem('draggable4Size'));
+        draggable4.style.width = sz.width;
+        draggable4.style.height = sz.height;
+    }
+    if (draggable5 && localStorage.getItem('draggable5Position')) {
+        const pos = JSON.parse(localStorage.getItem('draggable5Position'));
+        draggable5.style.left = pos.width;
+        draggable5.style.top = pos.height;
+    }
+    if (draggable5 && localStorage.getItem('draggable5Size')) {
+        const sz = JSON.parse(localStorage.getItem('draggable5Size'));
+        draggable5.style.width = sz.width;
+        draggable5.style.height = sz.height;
     }
 }
 window.getPreviousSizeAndPosition = getPreviousSizeAndPosition;
