@@ -454,14 +454,20 @@
 
             let lastTap = 0;
             forPuzzle.addEventListener("touchstart", (event) => {
-                if (event.touches.length === 2 && viewState.enableZoom) {
-                    event.preventDefault();
-                    event.stopImmediatePropagation();
-                    const dist = touchDistance(event.touches);
-                    pinchState.active = true;
-                    pinchState.startDistance = dist || 1;
-                    pinchState.startZoom = viewState.zoom;
-                    pinchState.didMove = false;
+                if (event.touches.length === 2) {
+                    if (globalScope.moving && globalScope.moving.pp) {
+                        event.preventDefault();
+                        return;
+                    }
+                    if (viewState.enableZoom) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        const dist = touchDistance(event.touches);
+                        pinchState.active = true;
+                        pinchState.startDistance = dist || 1;
+                        pinchState.startZoom = viewState.zoom;
+                        pinchState.didMove = false;
+                    }
                 }
             }, { passive: false });
 
@@ -480,6 +486,9 @@
 
             forPuzzle.addEventListener("touchmove", (event) => {
                 if (event.touches.length !== 2) {
+                    pinchState.active = false;
+                } else if (globalScope.moving && globalScope.moving.pp) {
+                    event.preventDefault();
                     pinchState.active = false;
                 } else if (pinchState.active && viewState.enableZoom) {
                     event.preventDefault();

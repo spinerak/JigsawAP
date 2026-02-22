@@ -2124,6 +2124,13 @@ function setMovingState(nextMoving) {
     window.moving = nextMoving || null;
 }
 setMovingState(null);
+
+function preventZoomWhileHoldingPiece(e) {
+    if (moving && moving.pp) e.preventDefault();
+}
+document.addEventListener("gesturestart", preventZoomWhileHoldingPiece, { passive: false, capture: true });
+document.addEventListener("gesturechange", preventZoomWhileHoldingPiece, { passive: false, capture: true });
+document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive: false, capture: true });
 { // scope for animate
     let state = 0;
     let stateAfterPan = 50;

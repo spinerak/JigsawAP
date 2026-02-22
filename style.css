@@ -921,6 +921,13 @@
         min-width: 0;
         width: 100%;
       }
+      /* Keep Load custom media image preset dropdown compact on mobile (avoid huge native picker trigger) */
+      #defaultImageIndex {
+        max-height: 44px;
+        font-size: 16px;
+        padding: 8px 10px;
+        box-sizing: border-box;
+      }
     }
     .chat-header {
       display: flex;

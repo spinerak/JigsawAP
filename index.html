@@ -129,8 +129,10 @@
 <div id=forPuzzle></div>
   <ul id="menu">
     <li id="m0">&#x2630;</li>
-    <li id="m2">Load custom image</li>
-    <li id="m3">Shape: 
+    <li id="m2">Select image</li>
+    <li id="m3a">Seed: <input type="text" id="soloSeed" placeholder="optional"></li>
+    <li id="m3b">Pieces: <input type="text" id="soloPieceCount" placeholder="4-500" value="24"></li>
+    <li id="m3">Piece shape:
       <select id="shape">
         <option value="1" selected>classic</option>
         <option value="2">triangle</option>
@@ -140,8 +142,6 @@
         <option value="6">chaos</option>
       </select>
     </li>
-    <li id="m3a">Seed: <input type="text" id="soloSeed" placeholder="optional"></li>
-    <li id="m3b">Pieces: <input type="text" id="soloPieceCount" placeholder="4-500" value="24"></li>
     <li id="m3c" style="display: none;">Puzzle area: <select id="puzzleAreaScale" aria-label="Puzzle area scaling" autocomplete="off">
         <option value="Landscape" selected>Landscape</option>
         <option value="Portrait">Portrait</option>
