@@ -153,6 +153,15 @@
                     if (typeof globalScope.updateGrayscaleReferenceCanvas === "function") globalScope.updateGrayscaleReferenceCanvas();
                 });
             }
+            const customDropCheckbox = document.getElementById("useCustomDropLocation");
+            if (customDropCheckbox) {
+                customDropCheckbox.checked = !!viewState.useCustomDropLocation;
+                customDropCheckbox.addEventListener("change", function () {
+                    viewState.useCustomDropLocation = customDropCheckbox.checked;
+                    try { localStorage.setItem("useCustomDropLocation", String(customDropCheckbox.checked)); } catch (_e) {}
+                    if (typeof globalScope.updateDropLocationTarget === "function") globalScope.updateDropLocationTarget();
+                });
+            }
         }
 
         function applyBackgroundColor() {
@@ -176,6 +185,26 @@
             document.getElementById("bgcolorR").value = color.slice(1, 2);
             document.getElementById("bgcolorG").value = color.slice(2, 3);
             document.getElementById("bgcolorB").value = color.slice(3, 4);
+
+            function applyDropLocationColor() {
+                const r = document.getElementById("dropLocationR").value;
+                const g = document.getElementById("dropLocationG").value;
+                const b = document.getElementById("dropLocationB").value;
+                const newColor = "#" + r + g + b;
+                viewState.dropLocationColor = newColor;
+                try { localStorage.setItem("dropLocationColor", newColor); } catch (_e) {}
+                if (typeof globalScope.updateDropLocationTarget === "function") globalScope.updateDropLocationTarget();
+            }
+            ["dropLocationR", "dropLocationG", "dropLocationB"].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener("change", applyDropLocationColor);
+            });
+            let dropColor = viewState.dropLocationColor || "#FC8";
+            if (dropColor.length === 4) {
+                document.getElementById("dropLocationR").value = dropColor.slice(1, 2);
+                document.getElementById("dropLocationG").value = dropColor.slice(2, 3);
+                document.getElementById("dropLocationB").value = dropColor.slice(3, 4);
+            }
 
             const feltOpacity = document.getElementById("displayFeltOpacity");
             const feltOpacityValue = document.getElementById("displayFeltOpacityValue");

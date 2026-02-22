@@ -48,8 +48,16 @@ const viewState = {
     fitScaleLocked: null,
     isScalingLocked: false,
     puzzleResolution: "native",
-    showGrayscaleReference: false
+    showGrayscaleReference: false,
+    useCustomDropLocation: false,
+    customDropNormX: 0.1,
+    customDropNormY: 0.1,
+    dropLocationColor: "#FC8"
 };
+try {
+    const storedDrop = localStorage.getItem("useCustomDropLocation");
+    if (storedDrop === "true") viewState.useCustomDropLocation = true;
+} catch (_e) {}
 try {
     const storedRef = localStorage.getItem("showGrayscaleReference");
     if (storedRef === "true") viewState.showGrayscaleReference = true;
@@ -60,10 +68,30 @@ try {
         viewState.puzzleResolution = stored;
     }
 } catch (_e) {}
+try {
+    const storedColor = localStorage.getItem("dropLocationColor");
+    if (storedColor && /^#[0-9A-Fa-f]{3}$/.test(storedColor)) viewState.dropLocationColor = storedColor;
+} catch (_e) {}
 window.viewState = viewState;
 
 function getPuzzleResolution() {
     return viewState.puzzleResolution || "native";
+}
+
+function getDropPositionPixels(puz, scatterFraction) {
+    if (!puz) return { x: 0, y: 0 };
+    const w = puz.contWidth || 1;
+    const h = puz.contHeight || 1;
+    const nx = viewState.customDropNormX != null ? viewState.customDropNormX : 0.1;
+    const ny = viewState.customDropNormY != null ? viewState.customDropNormY : 0.1;
+    let cx = nx * w;
+    let cy = ny * h;
+    if (scatterFraction && scatterFraction > 0) {
+        const s = Math.min(scatterFraction * w, scatterFraction * h, w * 0.1, h * 0.1);
+        cx += (Math.random() * 2 - 1) * s;
+        cy += (Math.random() * 2 - 1) * s;
+    }
+    return { x: cx, y: cy };
 }
 
 const VIEW_DEBUG = false;
@@ -2077,6 +2105,91 @@ function updateGrayscaleReferenceCanvas() {
 }
 window.updateGrayscaleReferenceCanvas = updateGrayscaleReferenceCanvas;
 
+let dropLocationTarget = null;
+let dropTargetDragState = null;
+
+function applyDropLocationTargetColor(el) {
+    if (!el || !viewState.dropLocationColor) return;
+    const hex = viewState.dropLocationColor.replace(/^#/, "");
+    const r = hex.length === 3 ? (parseInt(hex[0] + hex[0], 16)) : parseInt(hex.slice(0, 2), 16);
+    const g = hex.length === 3 ? (parseInt(hex[1] + hex[1], 16)) : parseInt(hex.slice(2, 4), 16);
+    const b = hex.length === 3 ? (parseInt(hex[2] + hex[2], 16)) : parseInt(hex.slice(4, 6), 16);
+    el.style.borderColor = viewState.dropLocationColor;
+    el.style.background = "rgba(" + r + "," + g + "," + b + ",0.2)";
+}
+
+function createDropLocationTarget() {
+    if (dropLocationTarget) return dropLocationTarget;
+    const el = document.createElement("div");
+    el.id = "dropLocationTarget";
+    el.className = "drop-location-target";
+    el.setAttribute("aria-label", "Drop location for new pieces (drag to move)");
+    el.title = "Drag to set where new pieces appear";
+    el.style.cssText = "position:absolute;width:48px;height:48px;border-radius:50%;border:3px solid;transform:translate(-50%,-50%);pointer-events:auto;z-index:2147483646;box-sizing:border-box;";
+    applyDropLocationTargetColor(el);
+    function clampNorm(v) { return Math.max(0.02, Math.min(0.98, v)); }
+    function updatePositionFromClient(clientX, clientY) {
+        if (!puzzle || !puzzle.container) return;
+        const br = puzzle.container.getBoundingClientRect();
+        if (br.width <= 0 || br.height <= 0) return;
+        const normX = clampNorm((clientX - br.left) / br.width);
+        const normY = clampNorm((clientY - br.top) / br.height);
+        viewState.customDropNormX = normX;
+        viewState.customDropNormY = normY;
+        el.style.left = (normX * 100) + "%";
+        el.style.top = (normY * 100) + "%";
+    }
+    function onPointerMove(e) {
+        if (!dropTargetDragState || !dropTargetDragState.active) return;
+        e.preventDefault();
+        const clientX = e.clientX != null ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientY = e.clientY != null ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        updatePositionFromClient(clientX, clientY);
+    }
+    function onPointerUp() {
+        if (!dropTargetDragState) return;
+        dropTargetDragState.active = false;
+        document.removeEventListener("pointermove", onPointerMove, true);
+        document.removeEventListener("pointerup", onPointerUp, true);
+        document.removeEventListener("pointercancel", onPointerUp, true);
+    }
+    el.addEventListener("pointerdown", function (e) {
+        if (!viewState.useCustomDropLocation || !puzzle || !puzzle.container) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dropTargetDragState = { active: true };
+        updatePositionFromClient(e.clientX, e.clientY);
+        document.addEventListener("pointermove", onPointerMove, true);
+        document.addEventListener("pointerup", onPointerUp, true);
+        document.addEventListener("pointercancel", onPointerUp, true);
+    });
+    dropLocationTarget = el;
+    return el;
+}
+
+function updateDropLocationTarget() {
+    if (!viewState.useCustomDropLocation) {
+        if (dropLocationTarget) {
+            dropLocationTarget.style.display = "none";
+            dropLocationTarget.style.pointerEvents = "none";
+        }
+        return;
+    }
+    if (!puzzle || !puzzle.container) return;
+    const el = createDropLocationTarget();
+    const nx = viewState.customDropNormX != null ? viewState.customDropNormX : 0.1;
+    const ny = viewState.customDropNormY != null ? viewState.customDropNormY : 0.1;
+    el.style.left = (nx * 100) + "%";
+    el.style.top = (ny * 100) + "%";
+    el.style.display = "block";
+    el.style.pointerEvents = "auto";
+    applyDropLocationTargetColor(el);
+    if (el.parentNode !== puzzle.container) {
+        puzzle.container.appendChild(el);
+    }
+}
+window.updateDropLocationTarget = updateDropLocationTarget;
+
 function getPreviewSourceDimensions(source) {
     if (!source) return { w: 0, h: 0 };
     const w = source.videoWidth || source.naturalWidth || source.width || 0;
@@ -2210,6 +2323,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         if (rendererFacade) rendererFacade.renderFrame(nowMs);
         drawSyncedPreviewWindowFrame();
         if (state === 15) drawPrestartPreviewFrame();
+        if (state >= 50 && puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
 
         let event;
         
@@ -2555,6 +2669,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 if (mediaWindow) mediaWindow.style.display = "none";
 
                 /* prepare puzzle */
+                viewState.customDropNormX = 0.1;
+                viewState.customDropNormY = 0.1;
                 puzzle.puzzle_create(coordinates, groups, hasmoved, unlocked); // create shape of pieces, independant of size
 
 
@@ -3306,10 +3422,8 @@ function unlockPiece(index) {
             console.log("PolyPiece not found for index", index);
             return;
         }
-        pp.moveTo(
-            ((index+10)*43.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
-            ((index+10)*73.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
-        );
+        const drop = getDropPositionPixels(puzzle, 0.03);
+        pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
         if (window.rotations > 0) {
             let num_rots = Math.round(360 / window.rotations);
             let random_rotation = 0;
@@ -3340,10 +3454,8 @@ function unlockFakePiece() {
     if(process_pending_actions){
         let pp = findPolyPieceUsingPuzzlePiece(index);
         console.log(pp)
-        pp.moveTo(
-            ((index+10)*429.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
-            ((index+10)*723.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
-        );
+        const drop = getDropPositionPixels(puzzle, 0.03);
+        pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
         if (window.rotations > 0) {
             let num_rots = Math.round(360 / window.rotations);
             let random_rotation = 0;
@@ -3719,6 +3831,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     x = 0.3;
                     y = 0.7;
                     break;
+                case "8": // Drop location (custom or default) - handled in forEach below
+                    x = 0;
+                    y = 0;
+                    break;
                 case "7": // Anywhere
                 default:
                     x = 0.7;
@@ -3736,7 +3852,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             piecesToDeposit.forEach(pp => {
-                pp.moveTo(Math.random() * x * puzzle.contWidth, Math.random() * y * puzzle.contHeight);
+                if (value === "8") {
+                    const d = getDropPositionPixels(puzzle, 0.05);
+                    pp.moveTo(d.x - puzzle.scalex * 0.5, d.y - puzzle.scaley * 0.5);
+                } else {
+                    pp.moveTo(Math.random() * x * puzzle.contWidth, Math.random() * y * puzzle.contHeight);
+                }
                 pp.withdrawn = false;
             });
 

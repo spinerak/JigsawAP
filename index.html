@@ -258,6 +258,22 @@
         <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
         <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">
       </div>
+      <div class="display-options-row display-options-row--label-wide" title="Show a draggable handle for where new pieces will appear; drag to move it. The drop location is reset when you start a new puzzle.">
+        <label for="useCustomDropLocation" class="display-options-label-inline">Show drop location handle</label>
+        <input type="checkbox" id="useCustomDropLocation" class="display-options-checkbox" aria-label="Show drop location handle">
+      </div>
+      <div class="display-options-row" title="Color of the drop location target (hex R, G, B).">
+        <label for="dropLocationR" class="display-options-label-inline">Drop location color #</label>
+        <select id="dropLocationR" class="display-options-select" aria-label="Drop location color red">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="dropLocationG" class="display-options-select" aria-label="Drop location color green">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="dropLocationB" class="display-options-select" aria-label="Drop location color blue">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+      </div>
       <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
         <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
         <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>
@@ -443,6 +459,7 @@
           <option value="5">Left edge</option>
           <option value="6">Left area</option>
           <option value="7">Anywhere</option>
+          <option value="8">Drop location</option>
         </select>
       </div>
       <div class="drawer-actions">
