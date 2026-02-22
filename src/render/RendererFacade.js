@@ -5,7 +5,7 @@
         constructor({ container, config, getPuzzleResolution }) {
             this.container = container;
             this.config = config || {};
-            this.getPuzzleResolution = typeof getPuzzleResolution === "function" ? getPuzzleResolution : () => "native";
+            this.getPuzzleResolution = typeof getPuzzleResolution === "function" ? getPuzzleResolution : () => "1080p";
             this.canvasRenderer = null;
             this.webglRenderer = null;
             this.activeRenderer = null;
