@@ -165,10 +165,15 @@ function getEffectivePuzzleAreaAspectRatio(srcImage) {
     if (mode === "Landscape") return 16 / 9;
     if (mode === "Portrait") return 9 / 16;
     if (mode === "Square") return 1;
-    if (mode === "Picture" && srcImage) {
-        const nw = srcImage.naturalWidth | 0;
-        const nh = srcImage.naturalHeight | 0;
-        if (nw > 0 && nh > 0) return nw / nh;
+    if (mode === "Picture") {
+        if (window.useCanonicalAspectForLayout && window.canonicalPictureAspectRatio != null && Number.isFinite(window.canonicalPictureAspectRatio)) {
+            return window.canonicalPictureAspectRatio;
+        }
+        if (srcImage) {
+            const nw = srcImage.naturalWidth | 0;
+            const nh = srcImage.naturalHeight | 0;
+            if (nw > 0 && nh > 0) return nw / nh;
+        }
     }
     return 16 / 9;
 }
@@ -2247,6 +2252,23 @@ function drawPrestartPreviewFrame() {
 }
 
 function loadImageFunction(){
+    if (!window.play_solo && window.is_connected && window.puzzleAreaScale === "Picture" && !window.canonicalOAspectFetched) {
+        window.canonicalOAspectFetched = true;
+        const keyO = `JIG_PROG_${window.slot}_O`;
+        const client = window.getAPClient && window.getAPClient();
+        if (client && client.storage && typeof client.storage.fetch === "function") {
+            client.storage.fetch([keyO]).then(function (results) {
+                const val = results && results[keyO];
+                if (val != null && val !== "" && Number.isFinite(parseFloat(val))) {
+                    window.canonicalPictureAspectRatio = parseFloat(val);
+                } else {
+                    window.canonicalPictureAspectRatio = null;
+                }
+            }).catch(function () {
+                window.canonicalPictureAspectRatio = null;
+            });
+        }
+    }
     puzzle.container.innerHTML = ""; // forget contents
     tmpImage = document.createElement("canvas");
     tmpPreviewCtx = tmpImage.getContext("2d");
@@ -2525,16 +2547,12 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                         for (let [key, value] of Object.entries(results)) {
                             let spl = key.split("_")[3];
                             if (spl === "O"){
-                                if(!window.ignoreAspectRatio){
-                                    console.log("value is", value)
-                                    if(value){
-                                        if(Math.abs(parseFloat(value) - puzzle.srcImage.width / puzzle.srcImage.height) > 0.05){
-                                            alert("Warning, you are not using the same aspect ratio as before. Pieces might not be in the correct relative position. You can refresh now to discard this login (if you do ignore this error next time).")
-                                        }
-                                    }
-                                    console.log("put to ", puzzle.srcImage.width / puzzle.srcImage.height)
-                                    change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
+                                if (value != null && value !== "" && Number.isFinite(parseFloat(value))) {
+                                    window.canonicalPictureAspectRatio = parseFloat(value);
+                                } else {
+                                    window.canonicalPictureAspectRatio = null;
                                 }
+                                change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                             }else{
                                 if(value){
                                     if (spl === "M") {
@@ -2608,6 +2626,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
 
 
             case 19:  // process save file and start game
+                window.useCanonicalAspectForLayout = true;
                 let coordinates = {}
                 let groups = {}
                 let hasmoved = {}
@@ -2994,8 +3013,8 @@ let menu = (function () {
     menu.open = function () {
     if(!gameStarted){
         document.getElementById("m2").style.display = "block"
-        document.getElementById("m3").style.display = "block"
         if (window.play_solo) {
+            document.getElementById("m3").style.display = "block"
             document.getElementById("m3a").style.display = "block"
             document.getElementById("m3b").style.display = "block"
             document.getElementById("m3c").style.display = "block"
@@ -3003,6 +3022,7 @@ let menu = (function () {
             const scaleSelect = document.getElementById("puzzleAreaScale");
             if (scaleSelect) scaleSelect.value = window.puzzleAreaScale;
         } else {
+            document.getElementById("m3").style.display = "none"
             document.getElementById("m3a").style.display = "none"
             document.getElementById("m3b").style.display = "none"
             document.getElementById("m3c").style.display = "none"

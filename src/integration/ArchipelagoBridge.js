@@ -6,7 +6,12 @@
             if (globalScope.play_solo) return;
             const keyName = `JIG_PROG_${globalScope.slot}_${key}`;
 
-            if (key === "M" || key === "O") {
+            if (key === "O") {
+                const client = globalScope.getAPClient();
+                client.storage.prepare(keyName, value).default().commit();
+                return;
+            }
+            if (key === "M") {
                 const client = globalScope.getAPClient();
                 client.storage.prepare(keyName, 0).replace(value).commit();
                 return;

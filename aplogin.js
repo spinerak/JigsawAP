@@ -92,9 +92,11 @@ function pressed_solo(){
     closeMenus();
 
     window.slot = window.slot ?? 0;
+    const m3 = document.getElementById("m3");
     const m3a = document.getElementById("m3a");
     const m3b = document.getElementById("m3b");
     const m3c = document.getElementById("m3c");
+    if (m3) m3.style.display = "block";
     if (m3a) m3a.style.display = "block";
     if (m3b) m3b.style.display = "block";
     if (m3c) m3c.style.display = "block";
