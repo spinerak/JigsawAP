@@ -263,6 +263,19 @@
             return source;
         }
 
+        async setDisplayStream(stream) {
+            if (!this.media || !this.media.setDisplayStream) return null;
+            await this.media.setDisplayStream(stream);
+            const source = this.media.getFrameSource();
+            if (this.canvasRenderer && this.canvasRenderer.setMediaSource) {
+                this.canvasRenderer.setMediaSource(source);
+            }
+            if (this.webglRenderer && this.webglRenderer.setMediaSource) {
+                this.webglRenderer.setMediaSource(source);
+            }
+            return source;
+        }
+
         _computeCappedResolution(width, height, preset) {
             if (!preset || preset === "native" || width <= 0 || height <= 0) {
                 return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Puzzle source</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #1a1a1a; }
+    .container { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 8px; }
+    .embed-wrap { position: relative; width: 100%; max-width: 100%; height: 100%; max-height: 100%; }
+    .embed-wrap iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+    .play-overlay {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.7); color: #fff; cursor: pointer;
+      font-family: system-ui, sans-serif; font-size: 18px; text-align: center; padding: 24px;
+    }
+    .play-overlay.hidden { display: none; }
+    .error { color: #f88; font-family: system-ui, sans-serif; padding: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="embed-wrap">
+      <div id="error" class="error" style="display: none;"></div>
+      <div id="playOverlay" class="play-overlay hidden">Click to play</div>
+      <iframe id="embed" title="Video source" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </div>
+  <script>
+    (function() {
+      function getUrlParam(name) {
+        var params = new URLSearchParams(window.location.search);
+        return params.get(name) || "";
+      }
+
+      function parseInputUrl(raw) {
+        var url = (raw || "").trim();
+        if (!url) return null;
+        try {
+          if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+          return new URL(url);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function buildYouTubeEmbedUrl(videoId) {
+        return "https://www.youtube.com/embed/" + encodeURIComponent(videoId) + "?autoplay=1&rel=0";
+      }
+
+      function buildTwitchEmbedUrl(host, channel, videoId, clipSlug) {
+        var base = "https://player.twitch.tv/";
+        var params = new URLSearchParams();
+        params.set("parent", host);
+        if (clipSlug) {
+          params.set("clip", clipSlug);
+        } else if (videoId) {
+          params.set("video", videoId);
+        } else if (channel) {
+          params.set("channel", channel);
+        } else {
+          return null;
+        }
+        return base + "?" + params.toString();
+      }
+
+      function getEmbedUrl(inputUrl) {
+        var u = parseInputUrl(inputUrl);
+        if (!u) return null;
+        var host = u.hostname.toLowerCase();
+        var path = u.pathname || "/";
+
+        if (host === "www.youtube.com" || host === "youtube.com" || host === "m.youtube.com") {
+          var v = u.searchParams.get("v");
+          if (v) return { url: buildYouTubeEmbedUrl(v), type: "youtube" };
+        }
+        if (host === "youtu.be") {
+          var id = path.replace(/^\//, "").split("/")[0];
+          if (id) return { url: buildYouTubeEmbedUrl(id), type: "youtube" };
+        }
+
+        if (host === "www.twitch.tv" || host === "twitch.tv") {
+          var parts = path.replace(/^\//, "").split("/").filter(Boolean);
+          var parentHost = window.location.hostname || "localhost";
+          if (parts[0] === "videos" && parts[1]) {
+            return { url: buildTwitchEmbedUrl(parentHost, null, parts[1], null), type: "twitch" };
+          }
+          var channel = parts[0];
+          var clipSlug = (parts[1] === "clip" && parts[2]) ? parts[2] : null;
+          if (channel) {
+            return { url: buildTwitchEmbedUrl(parentHost, channel, null, clipSlug), type: "twitch" };
+          }
+        }
+
+        return null;
+      }
+
+      var urlParam = getUrlParam("url");
+      var result = getEmbedUrl(urlParam);
+      var embedEl = document.getElementById("embed");
+      var errorEl = document.getElementById("error");
+      var playOverlay = document.getElementById("playOverlay");
+
+      if (!result || !result.url) {
+        errorEl.style.display = "block";
+        errorEl.textContent = "No valid YouTube or Twitch URL in query. Use ?url=...";
+        embedEl.style.display = "none";
+        return;
+      }
+
+      embedEl.src = result.url;
+      embedEl.style.display = "block";
+
+      embedEl.addEventListener("load", function onLoad() {
+        playOverlay.classList.add("hidden");
+      });
+
+      playOverlay.addEventListener("click", function() {
+        playOverlay.classList.add("hidden");
+      });
+
+      setTimeout(function() {
+        if (embedEl.readyState === 0) {
+          playOverlay.classList.remove("hidden");
+        }
+      }, 800);
+    })();
+  </script>
+</body>
+</html>

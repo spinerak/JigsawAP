@@ -2000,6 +2000,7 @@ class Puzzle {
 
 let loadFile;
 let startWebcamSource;
+let startLinkCaptureSource;
 let mediaBindings = null;
 
 var defaultImagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
@@ -2305,9 +2306,11 @@ if (window.JigsawMediaBindings && typeof window.JigsawMediaBindings.create === "
     });
     loadFile = mediaBindings.buildLoadFileHandler();
     startWebcamSource = function () { return mediaBindings.startWebcamSource(); };
+    startLinkCaptureSource = function (stream) { return mediaBindings.startLinkCaptureSource(stream); };
 }
 if (!loadFile) loadFile = function () {};
 if (!startWebcamSource) startWebcamSource = async function () {};
+if (!startLinkCaptureSource) startLinkCaptureSource = async function () {};
 
 let moving; // for information about moved piece
 function setMovingState(nextMoving) {
@@ -3042,6 +3045,7 @@ let menu = (function () {
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
         document.getElementById("m10").style.display = "block"
+        if (typeof updateDisplayCaptureMenuItemVisibility === "function") updateDisplayCaptureMenuItemVisibility();
 
         console.log(window.show_clue)
         if(window.show_clue){
@@ -3068,23 +3072,99 @@ let menu = (function () {
 document.getElementById("m2").addEventListener("click", () => {
     if (typeof window.restoreDiv6 === "function") window.restoreDiv6();
 });
+
+function openSourceWindow(url) {
+    const raw = (url || "").trim();
+    if (!raw) {
+        alert("Please enter a YouTube or Twitch URL.");
+        return null;
+    }
+    const lower = raw.toLowerCase();
+    const isYouTube = lower.includes("youtube.com") || lower.includes("youtu.be");
+    const isTwitch = lower.includes("twitch.tv");
+    if (!isYouTube && !isTwitch) {
+        alert("URL must be a YouTube or Twitch link.");
+        return null;
+    }
+    const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, "");
+    const target = base + "source.html?url=" + encodeURIComponent(raw);
+    const features = "popup,width=960,height=540,toolbar=no,location=no,status=no,menubar=no,scrollbars=no";
+    const w = window.open(target, "puzzleSource", features);
+    if (!w) alert("Popup blocked—please allow popups for this site.");
+    return w;
+}
+
 const mediaLoadFileBtn = document.getElementById("mediaLoadFileBtn");
 if (mediaLoadFileBtn) {
     mediaLoadFileBtn.addEventListener("click", () => {
         if (typeof loadFile === "function") loadFile();
     });
 }
+function updateDisplayCaptureMenuItemVisibility() {
+    const el = document.getElementById("mChangeCaptureSource");
+    if (!el) return;
+    const cfg = window.rendererConfig;
+    const isDisplay = cfg && cfg.media === "display";
+    el.style.display = isDisplay ? "block" : "none";
+}
+
 const mediaUseCameraBtn = document.getElementById("mediaUseCameraBtn");
 if (mediaUseCameraBtn) {
     mediaUseCameraBtn.addEventListener("click", async () => {
         try {
             await startWebcamSource();
+            updateDisplayCaptureMenuItemVisibility();
         } catch (err) {
             console.error("Webcam start failed", err);
             alert("Failed to start webcam.");
         }
     });
 }
+const mediaLinkUrlInput = document.getElementById("mediaLinkUrlInput");
+const mediaOpenSourceWindowBtn = document.getElementById("mediaOpenSourceWindowBtn");
+if (mediaOpenSourceWindowBtn && mediaLinkUrlInput) {
+    mediaOpenSourceWindowBtn.addEventListener("click", () => {
+        openSourceWindow(mediaLinkUrlInput.value);
+    });
+}
+function runDisplayCapture() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert("Capture not allowed or not supported.");
+        return Promise.resolve();
+    }
+    return navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+    }).then((stream) => {
+        if (startLinkCaptureSource) return startLinkCaptureSource(stream);
+    });
+}
+
+const mediaStartCaptureBtn = document.getElementById("mediaStartCaptureBtn");
+if (mediaStartCaptureBtn) {
+    mediaStartCaptureBtn.addEventListener("click", async () => {
+        try {
+            await runDisplayCapture();
+            updateDisplayCaptureMenuItemVisibility();
+        } catch (err) {
+            console.error("Display capture failed", err);
+            alert("Capture not allowed or not supported.");
+        }
+    });
+}
+const mChangeCaptureSource = document.getElementById("mChangeCaptureSource");
+if (mChangeCaptureSource) {
+    mChangeCaptureSource.addEventListener("click", async () => {
+        try {
+            await runDisplayCapture();
+            updateDisplayCaptureMenuItemVisibility();
+        } catch (err) {
+            console.error("Display capture failed", err);
+            alert("Capture not allowed or not supported.");
+        }
+    });
+}
+updateDisplayCaptureMenuItemVisibility();
 document.getElementById("m3").addEventListener("click", () => { });
 const puzzleAreaScaleEl = document.getElementById("puzzleAreaScale");
 if (puzzleAreaScaleEl) {
@@ -3602,6 +3682,7 @@ var numberOfMergesAtStart = 0;
 
 function setImagePath(l, options = {}) {
     if (mediaBindings && mediaBindings.setImagePath) mediaBindings.setImagePath(l, options);
+    updateDisplayCaptureMenuItemVisibility();
 }
 window.setImagePath = setImagePath;
 

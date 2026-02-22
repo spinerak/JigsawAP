@@ -32,7 +32,7 @@
 
         setVideoElement(videoEl, kind = "video") {
             this._stopGifPlayback();
-            this.mode = kind === "camera" ? "camera" : "video";
+            this.mode = (kind === "camera" || kind === "display") ? kind : "video";
             this.video = videoEl || null;
             this.ready = !!(videoEl && videoEl.readyState >= 2);
             this.failureReason = this.ready ? "" : "not-ready";
@@ -48,6 +48,28 @@
                 throw new Error("Camera API not available");
             }
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!this.video) {
+                this.video = document.createElement("video");
+                this.video.muted = true;
+                this.video.playsInline = true;
+                this.video.autoplay = true;
+            }
+            this.video.srcObject = this.stream;
+            await this.video.play();
+            this.ready = true;
+            this.failureReason = "";
+            this.lastVideoTime = this.video.currentTime;
+            this.lastFrameAt = 0;
+        }
+
+        async setDisplayStream(stream) {
+            this._stopGifPlayback();
+            this.mode = "display";
+            if (!stream || !stream.getTracks) {
+                this.failureReason = "display-stream-invalid";
+                throw new Error("Invalid display stream");
+            }
+            this.stream = stream;
             if (!this.video) {
                 this.video = document.createElement("video");
                 this.video.muted = true;
@@ -142,7 +164,7 @@
             if (!this.ready) return null;
             if (this.mode === "gif-decoded") return this.gifFrameCanvas;
             if (this.mode === "image" || this.mode === "gif") return this.image;
-            if (this.mode === "video" || this.mode === "camera") return this.video;
+            if (this.mode === "video" || this.mode === "camera" || this.mode === "display") return this.video;
             return this.image || this.video;
         }
 
@@ -176,7 +198,7 @@
                 return false;
             }
 
-            if (this.mode === "video" || this.mode === "camera") {
+            if (this.mode === "video" || this.mode === "camera" || this.mode === "display") {
                 const v = this.video;
                 if (!v || v.readyState < 2) {
                     this.failureReason = "not-ready";

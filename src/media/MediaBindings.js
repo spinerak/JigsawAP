@@ -169,6 +169,22 @@
             rendererFacade.setVideoSource(cameraVideo, "camera");
         }
 
+        async function startLinkCaptureSource(stream) {
+            const rendererFacade = getRendererFacade();
+            if (!rendererFacade || !rendererFacade.setDisplayStream) {
+                throw new Error("Display capture is not available in current renderer setup.");
+            }
+            teardownActiveVideoSource();
+            if (rendererFacade.media && rendererFacade.media.stop) rendererFacade.media.stop();
+            const displayVideo = await rendererFacade.setDisplayStream(stream);
+            if (!displayVideo) throw new Error("Failed to attach display stream.");
+            const posterDataUrl = await captureVideoPosterDataUrl(displayVideo);
+            setImagePath(posterDataUrl, { preserveVideo: true, skipRendererMediaBind: true });
+            const cfg = deps.getRendererConfig();
+            if (cfg) cfg.media = "display";
+            rendererFacade.setVideoSource(displayVideo, "display");
+        }
+
         function loadInitialFile() {
             setImagePath(globalScope.defaultImagePath);
         }
@@ -207,6 +223,7 @@
             setImagePath: setImagePath,
             loadVideoFile: loadVideoFile,
             startWebcamSource: startWebcamSource,
+            startLinkCaptureSource: startLinkCaptureSource,
             loadInitialFile: loadInitialFile,
             buildLoadFileHandler: buildLoadFileHandler,
             teardownActiveVideoSource: teardownActiveVideoSource

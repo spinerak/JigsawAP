@@ -152,7 +152,7 @@
     <li id="m4" style="background-color: green;">Start!</li>
     
     <li id="m5">Credits</li>
-     
+    <li id="mChangeCaptureSource" style="display: none;" title="Video or stream ended? Choose the capture source again.">Change capture source</li>
     <li id="m9a"></li> <!-- number of merges -->
     <li id="m9"></li> <!-- logic1 -->
     <li id="m10"></li> <!-- logic2 -->
@@ -356,6 +356,18 @@
         <h4 class="media-window-title">Use media</h4>
         <p class="media-window-text">Pick an image, GIF, or video from your device. Animated sources work best with WebGL for smoother playback and lower CPU usage on larger puzzles.</p>
         <button id="mediaLoadFileBtn" type="button" class="drawer-btn drawer-btn--primary">Use media</button>
+      </section>
+      <section class="media-window-card">
+        <h4 class="media-window-title">Capture from link (YouTube / Twitch)</h4>
+        <p class="media-window-text">Open a source window with the link, then click Start capture in this tab and select that window or tab in the chooser. Some DRM content may capture as black.</p>
+        <p class="media-window-text">The source window cannot be minimized during play, or capture may stop. Use the menu during play to change the capture source if needed.</p>
+        <div class="media-window-row">
+          <input type="text" id="mediaLinkUrlInput" class="drawer-input" placeholder="Paste YouTube or Twitch URL" aria-label="YouTube or Twitch URL">
+        </div>
+        <div class="media-window-row">
+          <button id="mediaOpenSourceWindowBtn" type="button" class="drawer-btn">Open source window</button>
+          <button id="mediaStartCaptureBtn" type="button" class="drawer-btn">Start capture</button>
+        </div>
       </section>
       <section class="media-window-card">
         <h4 class="media-window-title">Use camera</h4>

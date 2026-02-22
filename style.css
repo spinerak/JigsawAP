@@ -550,8 +550,8 @@
       display: inline-block;
       width: min(560px, 94vw);
       min-width: 340px;
-      height: auto;
-      min-height: 260px;
+      height: fit-content;
+      min-height: 0;
       max-height: calc(100vh - 120px);
       background: #2d3748;
       position: absolute;
@@ -590,11 +590,13 @@
       gap: 10px;
       max-height: calc(100vh - 150px);
       overflow: auto;
+      flex: 0 1 auto;
     }
     .media-window-body {
       display: flex;
       flex-direction: column;
       gap: 10px;
+      flex: 0 0 auto;
     }
     .media-window-card {
       display: flex;
@@ -632,6 +634,19 @@
     .media-window-row .drawer-select {
       flex: 1 1 180px;
       min-width: 120px;
+    }
+    .drawer-input {
+      flex: 1 1 200px;
+      min-width: 120px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #e2e8f0;
+      font: inherit;
+    }
+    .drawer-input::placeholder {
+      color: #718096;
     }
     .drawer-header {
       display: flex;
