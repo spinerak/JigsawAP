@@ -317,6 +317,7 @@
                 return;
             }
             if (this.sceneState && this.sceneState.consumeDirtyPieces) this.sceneState.consumeDirtyPieces();
+            if (this.sceneState) this.sceneState.mediaContentDirty = mediaAdvanced;
             const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
             this.activeRenderer.renderFrame(nowMs, this.sceneState);
 

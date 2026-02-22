@@ -38,6 +38,8 @@
             this._sortedPiecesVersion = -1;
             this.lastDrawCount = 0;
             this.lastMediaUploads = 0;
+            this._batchedVertices = null;
+            this._batchedVertexCapacity = 0;
         }
 
         init(puzzle) {
@@ -90,7 +92,7 @@
             if (this.gl) this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         }
 
-        renderFrame() {
+        renderFrame(nowMs, sceneState) {
             if (!this.enabled || !this.gl) return;
             try {
                 const gl = this.gl;
@@ -100,13 +102,17 @@
                 if (!this.puzzle || !this._mediaProgram || !this._overlayProgram || !this._shadowProgram) return;
 
                 const sourceCanvas = this.puzzle.gameCanvas || null;
-                if (!sourceCanvas || !this._updateMediaTexture(sourceCanvas)) return;
+                const forceUpload = sceneState == null || !!(sceneState && sceneState.mediaContentDirty);
+                if (!sourceCanvas || !this._updateMediaTexture(sourceCanvas, forceUpload)) return;
 
                 const pieces = this._getSortedPieces();
+                const sourceW = sourceCanvas.width || 1;
+                const sourceH = sourceCanvas.height || 1;
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+                const heldShadowAlpha = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35") * 0.95));
                 const activePieces = new Set();
                 const drawItems = [];
+                let numHeld = 0;
                 for (const pp of pieces) {
                     const pieceCanvas = pp.polypiece_canvas;
                     if (!pieceCanvas) continue;
@@ -119,24 +125,52 @@
 
                     const cache = this._ensurePieceTextures(pp);
                     if (!cache || !cache.maskTexture || !cache.overlayTexture) continue;
-                    const vertices = this._buildPieceVertices(pp, w, h, sourceCanvas.width || 1, sourceCanvas.height || 1);
                     const held = !!pp._isHeld;
+                    if (held) numHeld++;
                     drawItems.push({
-                        vertices: vertices,
-                        shadowVertices: held ? this._buildShadowVertices(vertices, Math.max(6, w * 0.05), Math.max(6, h * 0.06)) : null,
+                        pp,
+                        w,
+                        h,
                         maskTexture: cache.maskTexture,
                         overlayTexture: cache.overlayTexture,
                         maskW: cache.maskW || w,
                         maskH: cache.maskH || h,
-                        held: held,
-                        heldShadowAlpha: Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35") * 0.95))
+                        held,
+                        heldShadowAlpha
                     });
                 }
 
-                if (drawItems.length) {
+                const requiredFloats = (numHeld + drawItems.length) * 36;
+                if (requiredFloats > 0 && (!this._batchedVertices || this._batchedVertexCapacity < requiredFloats)) {
+                    this._batchedVertexCapacity = requiredFloats;
+                    this._batchedVertices = new Float32Array(this._batchedVertexCapacity);
+                }
+
+                if (drawItems.length && this._batchedVertices) {
+                    let shadowIdx = 0;
+                    let pieceIdx = 0;
                     for (const item of drawItems) {
-                        if (item.held && item.shadowVertices) {
-                            this._bindProgram(this._shadowProgram);
+                        const pieceOffsetFloats = (numHeld + pieceIdx) * 36;
+                        this._writePieceVerticesTo(item.pp, item.w, item.h, sourceW, sourceH, this._batchedVertices, pieceOffsetFloats);
+                        if (item.held) {
+                            const shadowDx = Math.max(6, item.w * 0.05);
+                            const shadowDy = Math.max(6, item.h * 0.06);
+                            this._writeShadowVerticesTo(this._batchedVertices, pieceOffsetFloats, shadowDx, shadowDy, shadowIdx * 36);
+                            item.shadowVertexOffsetFloats = shadowIdx * 36;
+                            shadowIdx++;
+                        } else {
+                            item.shadowVertexOffsetFloats = -1;
+                        }
+                        item.pieceVertexOffsetFloats = pieceOffsetFloats;
+                        pieceIdx++;
+                    }
+
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, this._batchedVertices.subarray(0, requiredFloats), gl.STREAM_DRAW);
+
+                    for (const item of drawItems) {
+                        if (item.held && item.shadowVertexOffsetFloats >= 0) {
+                            this._bindProgram(this._shadowProgram, item.shadowVertexOffsetFloats * 4);
                             this._bindTextureUnit(0, item.maskTexture);
                             gl.uniform1i(this._shadowProgram.uMask, 0);
                             gl.uniform1f(this._shadowProgram.uAlpha, item.heldShadowAlpha);
@@ -146,28 +180,25 @@
                                 1 / Math.max(1, item.maskH)
                             );
                             gl.uniform1f(this._shadowProgram.uSoftness, 3.0);
-                            gl.bufferData(gl.ARRAY_BUFFER, item.shadowVertices, gl.STREAM_DRAW);
                             gl.drawArrays(gl.TRIANGLES, 0, 6);
                         }
 
-                        this._bindProgram(this._mediaProgram);
+                        this._bindProgram(this._mediaProgram, item.pieceVertexOffsetFloats * 4);
                         this._bindTextureUnit(0, this._mediaTexture);
                         gl.uniform1i(this._mediaProgram.uMedia, 0);
                         this._bindTextureUnit(1, item.maskTexture);
                         gl.uniform1i(this._mediaProgram.uMask, 1);
-                        gl.bufferData(gl.ARRAY_BUFFER, item.vertices, gl.STREAM_DRAW);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-                        this._bindProgram(this._overlayProgram);
+                        this._bindProgram(this._overlayProgram, item.pieceVertexOffsetFloats * 4);
                         this._bindTextureUnit(0, item.overlayTexture);
                         gl.uniform1i(this._overlayProgram.uOverlay, 0);
-                        gl.bufferData(gl.ARRAY_BUFFER, item.vertices, gl.STREAM_DRAW);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
                     }
                 }
                 this._frameCounter++;
                 if ((this._frameCounter % 30) === 0) this._pruneTextureCache(activePieces);
-                this.lastDrawCount = drawItems.length * 2 + drawItems.reduce((acc, item) => acc + (item.held ? 1 : 0), 0);
+                this.lastDrawCount = drawItems.length * 2 + numHeld;
                 this.lastMediaUploads = this._mediaUploadsThisFrame || 0;
             } catch (e) {
                 this._handleRuntimeFailure(e);
@@ -298,13 +329,22 @@
             return true;
         }
 
-        _updateMediaTexture(sourceCanvas) {
+        _updateMediaTexture(sourceCanvas, forceUpload) {
             const gl = this.gl;
             this._mediaUploadsThisFrame = 0;
             if (!this._mediaTexture) {
                 this._mediaTexture = gl.createTexture();
                 if (!this._mediaTexture) return false;
                 this._mediaTextureConfigured = false;
+            }
+            const sw = sourceCanvas.width | 0;
+            const sh = sourceCanvas.height | 0;
+            if (sw <= 0 || sh <= 0) return false;
+            const dimensionsMatch = this._mediaTextureW === sw && this._mediaTextureH === sh;
+            const skipUpload = forceUpload === false && dimensionsMatch && this._mediaTextureW > 0;
+            if (skipUpload) {
+                this._bindTextureUnit(0, this._mediaTexture);
+                return true;
             }
             this._bindTextureUnit(0, this._mediaTexture);
             if (!this._mediaTextureConfigured) {
@@ -313,9 +353,6 @@
             }
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
             try {
-                const sw = sourceCanvas.width | 0;
-                const sh = sourceCanvas.height | 0;
-                if (sw <= 0 || sh <= 0) return false;
                 if (this._mediaTextureW !== sw || this._mediaTextureH !== sh) {
                     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
                     this._mediaTextureW = sw;
@@ -344,6 +381,12 @@
         }
 
         _buildPieceVertices(pp, w, h, sourceW, sourceH) {
+            const out = new Float32Array(36);
+            this._writePieceVerticesTo(pp, w, h, sourceW, sourceH, out, 0);
+            return out;
+        }
+
+        _writePieceVerticesTo(pp, w, h, sourceW, sourceH, out, offsetFloats) {
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             const deg = (globalScope.rotations === 180 ? 90 : globalScope.rotations) || 0;
@@ -361,14 +404,26 @@
             const tr = this._rotateAndTranslate(hw, -hh, c, s, cx, cy);
             const bl = this._rotateAndTranslate(-hw, hh, c, s, cx, cy);
             const br = this._rotateAndTranslate(hw, hh, c, s, cx, cy);
-            return new Float32Array([
-                tl.x, tl.y, 0, 0, u0, v0,
-                tr.x, tr.y, 1, 0, u1, v0,
-                bl.x, bl.y, 0, 1, u0, v1,
-                bl.x, bl.y, 0, 1, u0, v1,
-                tr.x, tr.y, 1, 0, u1, v0,
-                br.x, br.y, 1, 1, u1, v1
-            ]);
+            const o = offsetFloats;
+            out[o] = tl.x; out[o + 1] = tl.y; out[o + 2] = 0; out[o + 3] = 0; out[o + 4] = u0; out[o + 5] = v0;
+            out[o + 6] = tr.x; out[o + 7] = tr.y; out[o + 8] = 1; out[o + 9] = 0; out[o + 10] = u1; out[o + 11] = v0;
+            out[o + 12] = bl.x; out[o + 13] = bl.y; out[o + 14] = 0; out[o + 15] = 1; out[o + 16] = u0; out[o + 17] = v1;
+            out[o + 18] = bl.x; out[o + 19] = bl.y; out[o + 20] = 0; out[o + 21] = 1; out[o + 22] = u0; out[o + 23] = v1;
+            out[o + 24] = tr.x; out[o + 25] = tr.y; out[o + 26] = 1; out[o + 27] = 0; out[o + 28] = u1; out[o + 29] = v0;
+            out[o + 30] = br.x; out[o + 31] = br.y; out[o + 32] = 1; out[o + 33] = 1; out[o + 34] = u1; out[o + 35] = v1;
+        }
+
+        _writeShadowVerticesTo(out, pieceOffsetFloats, shadowDx, shadowDy, shadowOffsetFloats) {
+            for (let i = 0; i < 6; i++) {
+                const src = pieceOffsetFloats + i * 6;
+                const dst = shadowOffsetFloats + i * 6;
+                out[dst] = out[src] + shadowDx;
+                out[dst + 1] = out[src + 1] + shadowDy;
+                out[dst + 2] = out[src + 2];
+                out[dst + 3] = out[src + 3];
+                out[dst + 4] = out[src + 4];
+                out[dst + 5] = out[src + 5];
+            }
         }
 
         _buildShadowVertices(vertices, shadowDx, shadowDy) {
@@ -466,19 +521,20 @@
             return entry;
         }
 
-        _bindProgram(programInfo) {
+        _bindProgram(programInfo, byteOffset) {
             const gl = this.gl;
+            const offset = byteOffset || 0;
             if (this._boundProgram !== programInfo.program) {
                 gl.useProgram(programInfo.program);
                 this._boundProgram = programInfo.program;
             }
             gl.enableVertexAttribArray(programInfo.aPosition);
-            gl.vertexAttribPointer(programInfo.aPosition, 2, gl.FLOAT, false, 24, 0);
+            gl.vertexAttribPointer(programInfo.aPosition, 2, gl.FLOAT, false, 24, offset);
             gl.enableVertexAttribArray(programInfo.aTexCoord);
-            gl.vertexAttribPointer(programInfo.aTexCoord, 2, gl.FLOAT, false, 24, 8);
+            gl.vertexAttribPointer(programInfo.aTexCoord, 2, gl.FLOAT, false, 24, offset + 8);
             if (programInfo.aMediaUv >= 0) {
                 gl.enableVertexAttribArray(programInfo.aMediaUv);
-                gl.vertexAttribPointer(programInfo.aMediaUv, 2, gl.FLOAT, false, 24, 16);
+                gl.vertexAttribPointer(programInfo.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
             }
             gl.uniform2f(programInfo.uResolution, this.canvas.width, this.canvas.height);
         }

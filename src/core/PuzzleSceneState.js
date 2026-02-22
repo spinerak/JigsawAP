@@ -7,6 +7,7 @@
             this.dirtyPieces = new Set();
             this.dirtyRects = [];
             this.version = 0;
+            this.mediaContentDirty = true;
         }
 
         bindPuzzle(puzzle) {
