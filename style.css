@@ -154,12 +154,15 @@
 
     #bgcolorR {
       background: rgba(255, 220, 220, 0.85);
+      color: #3f1212;
     }
     #bgcolorG {
       background: rgba(220, 255, 220, 0.85);
+      color: #0f3b10;
     }
     #bgcolorB {
       background: rgba(220, 220, 255, 0.85);
+      color: #101c4a;
     }
 
     .display-options-slider {
@@ -282,6 +285,23 @@
     .cosmetic-window-body .display-options-slider label {
       color: #a0aec0;
     }
+    .cosmetic-window-body .display-options-label-inline {
+      flex: 0 1 64px;
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
+    }
+    .cosmetic-window-body .display-options-slider {
+      grid-template-columns: minmax(84px, 1fr) minmax(96px, 1.4fr) minmax(40px, auto);
+      gap: 8px 10px;
+    }
+    .cosmetic-window-body .display-options-slider label {
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
+    }
     .cosmetic-window-body .display-options-slider span {
       color: #e2e8f0;
     }
@@ -290,6 +310,34 @@
       border-color: #475569;
       color: #f1f5f9;
     }
+    .renderer-mode-status {
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      opacity: 0.95;
+      font-family: Consolas, Monaco, monospace;
+      line-height: 1.35;
+      word-break: break-word;
+      text-align: left;
+      max-width: 100%;
+    }
+    .renderer-mode-slider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .renderer-fallback-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    #rendererModeRetry {
+      padding: 5px 9px;
+      font-size: 0.74rem;
+      line-height: 1.1;
+    }
     
     
     .polypiece {
@@ -297,16 +345,6 @@
       overflow: hidden;
       position: absolute;
     }
-
-    .polypiece.moving {
-      filter: drop-shadow(12px 12px 12px rgba(0, 0, 0, var(--held-piece-shadow-darkness, 0.35)));
-    }
-
-    /* .moving {
-      transition-property: top, left;
-      transition-duration: 1s;
-      transition-timing-function: linear;
-    } */
 
     .gameCanvas {
       display: none;
@@ -378,7 +416,7 @@
     }
 
 
-    #previm {
+    #prevsync {
       width: auto;
       height: auto;
       max-width: 100%;
@@ -386,6 +424,14 @@
       object-fit: contain; /* Maintain natural aspect ratio */
       user-select: none; /* Make it unselectable */
       pointer-events: none; /* Ignore mouse events */
+    }
+    #prevsync {
+      display: block;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 0;
     }
 
     #draggable1 {
@@ -440,10 +486,11 @@
     }
     #draggable4 {
       display: inline-block;
-      width: 300px;
+      width: min(360px, 92vw);
       min-width: 280px;
       height: auto;
       min-height: 120px;
+      max-height: calc(100vh - 120px);
       background: #2d3748;
       position: absolute;
       top: 80px;
@@ -458,14 +505,34 @@
     }
     #draggable5 {
       display: inline-block;
-      width: 640px;
-      min-width: 600px;
+      width: min(760px, 94vw);
+      min-width: 240px;
       height: auto;
       min-height: 120px;
+      max-height: calc(100vh - 120px);
       background: #2d3748;
       position: absolute;
       top: 120px;
       left: 120px;
+      border-radius: 10px;
+      padding: 0;
+      cursor: grab;
+      user-select: none;
+      z-index: 99;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    #draggable6 {
+      display: inline-block;
+      width: min(560px, 94vw);
+      min-width: 340px;
+      height: auto;
+      min-height: 260px;
+      max-height: calc(100vh - 120px);
+      background: #2d3748;
+      position: absolute;
+      top: 140px;
+      left: 140px;
       border-radius: 10px;
       padding: 0;
       cursor: grab;
@@ -487,9 +554,60 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      max-height: calc(100vh - 150px);
+      overflow: auto;
     }
     .cosmetic-window-panel.drawer-panel {
       gap: 10px;
+      max-height: calc(100vh - 150px);
+      overflow: auto;
+    }
+    .media-window-panel.drawer-panel {
+      gap: 10px;
+      max-height: calc(100vh - 150px);
+      overflow: auto;
+    }
+    .media-window-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .media-window-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .media-window-title {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .media-window-text {
+      margin: 0;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      color: #a0aec0;
+    }
+    .media-window-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .media-window-row .drawer-label {
+      min-width: 0;
+      white-space: normal;
+      line-height: 1.2;
+      color: #a0aec0;
+    }
+    .media-window-row .drawer-select {
+      flex: 1 1 180px;
+      min-width: 120px;
     }
     .drawer-header {
       display: flex;
@@ -719,6 +837,12 @@
         position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; 
         align-items: center; /* Vertically center buttons */
     }
+    #draggable2 .controls {
+      z-index: 3;
+    }
+    #draggable2 .resizer.corner {
+      z-index: 4;
+    }
     .control-btn { 
         width: 24px; height: 24px; border-radius: 50%; border: none; 
         background: #1e1e1e; color: #fff; display: flex; 
@@ -747,6 +871,56 @@
       height: 100%;
       min-height: 0;
       box-sizing: border-box;
+    }
+
+    @media (max-width: 820px) {
+      #draggable4, #draggable5, #draggable6 {
+        left: 4vw !important;
+        top: 72px !important;
+        min-width: 0;
+        width: 92vw;
+        min-height: 0;
+        height: auto;
+        max-height: calc(100vh - 110px);
+      }
+      #draggable4 .resizer.corner,
+      #draggable5 .resizer.corner,
+      #draggable6 .resizer.corner {
+        width: 18px;
+        height: 18px;
+      }
+      .view-controls-window-panel,
+      .cosmetic-window-panel.drawer-panel,
+      .media-window-panel.drawer-panel {
+        padding: 0 10px 10px;
+      }
+      .view-controls-row {
+        flex-direction: column;
+      }
+      .view-controls-window-panel .view-toggle-btn {
+        width: 100%;
+      }
+      .display-options-slider input[type="range"],
+      .view-controls-slider input[type="range"] {
+        min-height: 32px;
+      }
+      .renderer-mode-status {
+        width: 100%;
+      }
+      #rendererModeRetry {
+        margin-left: 0;
+      }
+      .media-window-card .drawer-btn {
+        width: 100%;
+      }
+      .media-window-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .media-window-row .drawer-select {
+        min-width: 0;
+        width: 100%;
+      }
     }
     .chat-header {
       display: flex;

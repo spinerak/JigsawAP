@@ -129,65 +129,6 @@
 <div id=forPuzzle></div>
   <ul id="menu">
     <li id="m0">&#x2630;</li>
-    <li id="m1">Default image | #:
-      <select id="defaultImageIndex">
-        <option value="1" selected>1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-        <option value="11">11</option>
-        <option value="12">12</option>
-        <option value="13">13</option>
-        <option value="14">14</option>
-        <option value="15">15</option>
-        <option value="16">16</option>
-        <option value="17">17</option>
-        <option value="18">18</option>
-        <option value="19">19</option>
-        <option value="20">20</option>
-        <option value="21">21</option>
-        <option value="22">22</option>
-        <option value="23">23</option>
-        <option value="24">24</option>
-        <option value="25">25</option>
-        <option value="26">26</option>
-        <option value="27">27</option>
-        <option value="28">28</option>
-        <option value="29">29</option>
-        <option value="30">30</option>
-        <option value="31">31</option>
-        <option value="32">32</option>
-        <option value="33">33</option>
-        <option value="34">34</option>
-        <option value="35">35</option>
-        <option value="36">36</option>
-        <option value="37">37</option>
-        <option value="38">38</option>
-        <option value="39">39</option>
-        <option value="40">40</option>
-        <option value="41">41</option>
-        <option value="42">42</option>
-        <option value="43">43</option>
-        <option value="44">44</option>
-        <option value="45">45</option>
-        <option value="46">46</option>
-        <option value="47">47</option>
-        <option value="48">48</option>
-        <option value="49">49</option>
-        <option value="50">50</option>
-        <option value="51">51</option>
-        <option value="52">52</option>
-        <option value="53">53</option>
-        <option value="54">54</option>
-        <option value="55">55</option>
-      </select>
-    </li>
     <li id="m2">Load custom image</li>
     <li id="m3">Shape: 
       <select id="shape">
@@ -296,9 +237,106 @@
         <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
         <span id="displayPlayAreaRadiusValue">64px</span>
       </div>
+      <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources). Canvas2D is the compatibility path and is used when WebGL is unavailable, blocked, or downgraded for this session.">
+        <label for="rendererModeSelect" title="Auto: preferred default. It attempts WebGL and falls back to Canvas2D when needed. WebGL: GPU path for best performance with large piece counts/animated media. Canvas2D: CPU single-canvas compatibility path.">Renderer backend</label>
+        <select id="rendererModeSelect" class="display-options-select" title="Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available. Canvas2D: compatibility path used when WebGL is unavailable/blocked.">
+          <option value="auto">auto</option>
+          <option value="webgl">webgl</option>
+          <option value="canvas2d">canvas2d</option>
+        </select>
+      </div>
+      <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
+        <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
+        <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>
+      </div>
     </div>
   </div>
   <div class="resizer corner" id="resizerCorner5"></div>
+</div>
+<div class="draggable drawer-window" id="draggable6" style="display: none;">
+  <div class="drawer-panel media-window-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">Load custom media</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn6" title="Minimize">−</button>
+    </header>
+    <div class="media-window-body">
+      <section class="media-window-card">
+        <h4 class="media-window-title">Use media</h4>
+        <p class="media-window-text">Pick an image, GIF, or video from your device. Animated sources work best with WebGL for smoother playback and lower CPU usage on larger puzzles.</p>
+        <button id="mediaLoadFileBtn" type="button" class="drawer-btn drawer-btn--primary">Use media</button>
+      </section>
+      <section class="media-window-card">
+        <h4 class="media-window-title">Use camera</h4>
+        <p class="media-window-text">Use a webcam or a virtual camera (for example, an OBS virtual camera) as the puzzle source so you can puzzle over live video.</p>
+        <button id="mediaUseCameraBtn" type="button" class="drawer-btn">Use camera</button>
+      </section>
+      <section class="media-window-card">
+        <h4 class="media-window-title">Preset images</h4>
+        <p class="media-window-text">These are built-in image links. Some hosts block CORS, which can cause WebGL upload restrictions and force Canvas2D fallback.</p>
+        <div class="media-window-row">
+          <label for="defaultImageIndex" class="drawer-label">Default image #</label>
+          <select id="defaultImageIndex" class="drawer-select" aria-label="Default image preset">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+            <option value="13">13</option>
+            <option value="14">14</option>
+            <option value="15">15</option>
+            <option value="16">16</option>
+            <option value="17">17</option>
+            <option value="18">18</option>
+            <option value="19">19</option>
+            <option value="20">20</option>
+            <option value="21">21</option>
+            <option value="22">22</option>
+            <option value="23">23</option>
+            <option value="24">24</option>
+            <option value="25">25</option>
+            <option value="26">26</option>
+            <option value="27">27</option>
+            <option value="28">28</option>
+            <option value="29">29</option>
+            <option value="30">30</option>
+            <option value="31">31</option>
+            <option value="32">32</option>
+            <option value="33">33</option>
+            <option value="34">34</option>
+            <option value="35">35</option>
+            <option value="36">36</option>
+            <option value="37">37</option>
+            <option value="38">38</option>
+            <option value="39">39</option>
+            <option value="40">40</option>
+            <option value="41">41</option>
+            <option value="42">42</option>
+            <option value="43">43</option>
+            <option value="44">44</option>
+            <option value="45">45</option>
+            <option value="46">46</option>
+            <option value="47">47</option>
+            <option value="48">48</option>
+            <option value="49">49</option>
+            <option value="50">50</option>
+            <option value="51">51</option>
+            <option value="52">52</option>
+            <option value="53">53</option>
+            <option value="54">54</option>
+            <option value="55">55</option>
+          </select>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="resizer corner" id="resizerCorner6"></div>
 </div>
 <div class="taskbar" id="taskbarFullscreen" style="display: none;" title="Full screen">🖥️</div>
 <div class="taskbar taskbar-view-controls" id="taskbarViewControls" style="display: none;" title="View controls"><span class="taskbar-view-controls-icon">📷</span></div>
@@ -325,7 +363,7 @@
   <div class="controls">
       <button class="control-btn" id="control-btn2a">-</button>
   </div>
-  <img id="previm" src="portrait2.png" alt="Image">
+  <canvas id="prevsync" aria-label="Synchronized media preview"></canvas>
   <!-- <div class="resizer right" id="resizerRight2"></div>
   <div class="resizer bottom" id="resizerBottom2"></div> -->
   <div class="resizer corner" id="resizerCorner2"></div>
@@ -411,6 +449,18 @@
   <script type="module" src="./clientandpreview.js"></script>
   <script type="module" src="./loadimages.js"></script>
   <script type="module" src="./aplogin.js"></script>
+  <script src="./src/core/PuzzleSceneState.js"></script>
+  <script src="./src/core/PieceSetupQueue.js"></script>
+  <script src="./src/core/HitTestService.js"></script>
+  <script src="./src/render/RenderScheduler.js"></script>
+  <script src="./src/media/MediaSourceAdapter.js"></script>
+  <script src="./src/media/MediaBindings.js"></script>
+  <script src="./src/render/canvas2d/CanvasRenderer.js"></script>
+  <script src="./src/render/webgl/WebGLRenderer.js"></script>
+  <script src="./src/render/RendererFacade.js"></script>
+  <script src="./src/ui/ViewControls.js"></script>
+  <script src="./src/ui/RendererModeControl.js"></script>
+  <script src="./src/integration/ArchipelagoBridge.js"></script>
   <script  src="./script.js"></script>
   <!-- <script  src="./debug.js"></script> -->
 

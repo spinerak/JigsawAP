@@ -1,0 +1,164 @@
+"use strict";
+
+(function initCanvasRenderer(globalScope) {
+    class CanvasRenderer {
+        constructor({ container }) {
+            this.container = container;
+            this.canvas = document.createElement("canvas");
+            this.canvas.className = "jigsaw-single-canvas-renderer";
+            this.canvas.style.position = "absolute";
+            this.canvas.style.left = "0px";
+            this.canvas.style.top = "0px";
+            this.canvas.style.zIndex = "99999999";
+            this.ctx = this.canvas.getContext("2d");
+            this.puzzle = null;
+            this.enabled = false;
+            this.mediaSource = null;
+            this._sortedPieces = [];
+            this._sortedPiecesVersion = -1;
+            this.lastDrawCount = 0;
+            this.lastMediaUploads = 0;
+        }
+
+        init(puzzle) {
+            this.puzzle = puzzle || null;
+            if (!this.puzzle || !this.container) return;
+            this.canvas.width = this.container.clientWidth || this.puzzle.contWidth || 1;
+            this.canvas.height = this.container.clientHeight || this.puzzle.contHeight || 1;
+            if (!this.canvas.parentElement) this.container.appendChild(this.canvas);
+            this.enabled = true;
+        }
+
+        setVisible(visible) {
+            this.canvas.style.display = visible ? "block" : "none";
+        }
+
+        setMediaSource(source) {
+            this.mediaSource = source || null;
+        }
+
+        resize(width, height) {
+            if (!this.enabled) return;
+            this.canvas.width = Math.max(1, Math.round(width));
+            this.canvas.height = Math.max(1, Math.round(height));
+        }
+
+        clear() {
+            if (!this.enabled) return;
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        _getSortedPieces() {
+            const puzzle = this.puzzle;
+            if (!puzzle) return [];
+            const version = puzzle._zOrderVersion || 0;
+            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== (puzzle.polyPieces || []).length) {
+                this._sortedPieces = (puzzle.polyPieces || []).slice();
+                this._sortedPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+                this._sortedPiecesVersion = version;
+            }
+            return this._sortedPieces;
+        }
+
+        _isPieceVisible(pp, w, h) {
+            const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+            const angle = (pp.rot || 0) * deg * Math.PI / 180;
+            let hw = w / 2;
+            let hh = h / 2;
+            if (angle !== 0) {
+                const c = Math.abs(Math.cos(angle));
+                const s = Math.abs(Math.sin(angle));
+                const aw = hw * c + hh * s;
+                const ah = hw * s + hh * c;
+                hw = aw;
+                hh = ah;
+            }
+            const cx = pp.x + w / 2;
+            const cy = pp.y + h / 2;
+            if (cx + hw < 0 || cy + hh < 0) return false;
+            if (cx - hw > this.canvas.width || cy - hh > this.canvas.height) return false;
+            return true;
+        }
+
+        _worldToPieceLocal(pp, worldDx, worldDy) {
+            const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+            const angle = (pp.rot || 0) * deg * Math.PI / 180;
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            return {
+                x: worldDx * c + worldDy * s,
+                y: -worldDx * s + worldDy * c
+            };
+        }
+
+        _drawHeldShadow(pp, w, h) {
+            if (!pp.path) return;
+            const darkness = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
+            const localShadow = this._worldToPieceLocal(pp, Math.max(6, w * 0.05), Math.max(6, h * 0.06));
+            const blur = Math.max(18, Math.min(w, h) * 0.24);
+            this.ctx.save();
+            this.ctx.translate(localShadow.x, localShadow.y);
+            this.ctx.shadowColor = `rgba(0,0,0,${Math.min(1, darkness * 0.85)})`;
+            this.ctx.shadowBlur = blur;
+            this.ctx.shadowOffsetX = 0;
+            this.ctx.shadowOffsetY = 0;
+            // Keep the core very faint so most weight comes from the blurred edge.
+            this.ctx.fillStyle = `rgba(0,0,0,${Math.min(1, darkness * 0.12)})`;
+            this.ctx.fill(pp.path);
+            this.ctx.restore();
+        }
+
+        renderFrame() {
+            if (!this.enabled || !this.puzzle) return;
+            this.clear();
+            const pieces = this._getSortedPieces();
+            const sourceCanvas = this.puzzle.gameCanvas || null;
+            let drawn = 0;
+            for (const pp of pieces) {
+                if (!pp.polypiece_canvas) continue;
+                const w = pp.polypiece_canvas.width;
+                const h = pp.polypiece_canvas.height;
+                if (w <= 0 || h <= 0) continue;
+                if (!this._isPieceVisible(pp, w, h)) continue;
+                const cx = pp.x + w / 2;
+                const cy = pp.y + h / 2;
+                this.ctx.save();
+                this.ctx.translate(cx, cy);
+                const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+                this.ctx.rotate((pp.rot || 0) * deg * Math.PI / 180);
+                this.ctx.translate(-w / 2, -h / 2);
+                if (pp._isHeld) this._drawHeldShadow(pp, w, h);
+                if (sourceCanvas && pp.path && pp._mediaSample) {
+                    const ms = pp._mediaSample;
+                    this.ctx.save();
+                    this.ctx.clip(pp.path);
+                    this.ctx.drawImage(
+                        sourceCanvas,
+                        ms.sx, ms.sy, ms.w, ms.h,
+                        ms.destx, ms.desty, ms.w, ms.h
+                    );
+                    this.ctx.restore();
+                }
+                this.ctx.drawImage(pp.polypiece_canvas, 0, 0);
+                this.ctx.restore();
+                drawn++;
+            }
+            this.lastDrawCount = drawn;
+            this.lastMediaUploads = 0;
+        }
+
+        renderDirtyPieces(sceneState) {
+            if (sceneState && sceneState.hasDirtyPieces && !sceneState.hasDirtyPieces()) return;
+            if (sceneState && sceneState.consumeDirtyPieces) sceneState.consumeDirtyPieces();
+            this.renderFrame();
+        }
+
+        destroy() {
+            this.enabled = false;
+            if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
+        }
+    }
+
+    globalScope.JigsawCanvasRenderer = CanvasRenderer;
+})(window);
+
