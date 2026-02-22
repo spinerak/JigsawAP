@@ -47,8 +47,13 @@ const viewState = {
     panButton: 0,
     fitScaleLocked: null,
     isScalingLocked: false,
-    puzzleResolution: "native"
+    puzzleResolution: "native",
+    showGrayscaleReference: false
 };
+try {
+    const storedRef = localStorage.getItem("showGrayscaleReference");
+    if (storedRef === "true") viewState.showGrayscaleReference = true;
+} catch (_e) {}
 try {
     const stored = localStorage.getItem("puzzleResolution");
     if (stored === "1080p" || stored === "720p" || stored === "540p" || stored === "native") {
@@ -1946,6 +1951,7 @@ class Puzzle {
       applyMediaFrame(frameSource, nowMs) {
         if (!frameSource || !this.polyPieces || !this.polyPieces.length) return false;
         this.renderSourceToGameCanvas(frameSource);
+        if (viewState.showGrayscaleReference && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
         const activeRendererName = (rendererFacade && rendererFacade.activeRenderer && rendererFacade.activeRenderer.constructor)
             ? rendererFacade.activeRenderer.constructor.name
             : "";
@@ -2031,6 +2037,45 @@ let tmpImage;
 let tmpPreviewCtx = null;
 let syncedPreviewCanvas = null;
 let syncedPreviewCtx = null;
+let grayscaleReferenceCanvas = null;
+let grayscaleReferenceCtx = null;
+
+function updateGrayscaleReferenceCanvas() {
+    if (!puzzle || !puzzle.container) return;
+    if (!viewState.showGrayscaleReference) {
+        if (grayscaleReferenceCanvas && grayscaleReferenceCanvas.parentNode) {
+            grayscaleReferenceCanvas.parentNode.removeChild(grayscaleReferenceCanvas);
+        }
+        grayscaleReferenceCanvas = null;
+        grayscaleReferenceCtx = null;
+        return;
+    }
+    if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
+    const w = Math.max(1, Math.round(puzzle.gameWidth));
+    const h = Math.max(1, Math.round(puzzle.gameHeight));
+    if (!grayscaleReferenceCanvas) {
+        grayscaleReferenceCanvas = document.createElement("canvas");
+        grayscaleReferenceCtx = grayscaleReferenceCanvas.getContext("2d");
+        grayscaleReferenceCanvas.className = "grayscale-reference-canvas";
+        grayscaleReferenceCanvas.style.position = "absolute";
+        grayscaleReferenceCanvas.style.pointerEvents = "none";
+        grayscaleReferenceCanvas.style.zIndex = "99999997";
+    }
+    grayscaleReferenceCanvas.width = w;
+    grayscaleReferenceCanvas.height = h;
+    grayscaleReferenceCanvas.style.width = w + "px";
+    grayscaleReferenceCanvas.style.height = h + "px";
+    grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
+    grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
+    if (!grayscaleReferenceCtx) return;
+    grayscaleReferenceCtx.filter = "grayscale(1)";
+    grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, w, h);
+    grayscaleReferenceCtx.filter = "none";
+    if (!grayscaleReferenceCanvas.parentNode) {
+        puzzle.container.insertBefore(grayscaleReferenceCanvas, puzzle.container.firstChild);
+    }
+}
+window.updateGrayscaleReferenceCanvas = updateGrayscaleReferenceCanvas;
 
 function getPreviewSourceDimensions(source) {
     if (!source) return { w: 0, h: 0 };
@@ -2229,6 +2274,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
 
             applyViewTransform();
             if (rendererFacade && puzzle) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+            if (state >= 25 && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
 
             return;
         } // resize event
@@ -2565,6 +2611,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 puzzle.gameCanvas.style.left = puzzle.offsx + "px";
                 puzzle.gameCanvas.style.display = "block";
 
+                if (typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
                 applyViewTransform();
 
                 window.save_loaded = true;

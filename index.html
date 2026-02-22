@@ -254,6 +254,10 @@
           <option value="540p">540p</option>
         </select>
       </div>
+      <div class="display-options-row display-options-row--label-wide" title="Show the puzzle image in grayscale behind the pieces as a reference while solving.">
+        <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
+        <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">
+      </div>
       <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
         <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
         <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>

@@ -292,6 +292,13 @@
       overflow-wrap: anywhere;
       line-height: 1.2;
     }
+    .cosmetic-window-body .display-options-row--label-wide .display-options-label-inline {
+      flex: 1 1 160px;
+      min-width: 120px;
+    }
+    .cosmetic-window-body .display-options-row--label-wide .display-options-checkbox {
+      flex-shrink: 0;
+    }
     .cosmetic-window-body .display-options-slider {
       grid-template-columns: minmax(84px, 1fr) minmax(96px, 1.4fr) minmax(40px, auto);
       gap: 8px 10px;

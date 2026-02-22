@@ -144,6 +144,15 @@
                     }
                 });
             }
+            const grayscaleRefCheckbox = document.getElementById("showGrayscaleReference");
+            if (grayscaleRefCheckbox) {
+                grayscaleRefCheckbox.checked = !!viewState.showGrayscaleReference;
+                grayscaleRefCheckbox.addEventListener("change", function () {
+                    viewState.showGrayscaleReference = grayscaleRefCheckbox.checked;
+                    try { localStorage.setItem("showGrayscaleReference", String(grayscaleRefCheckbox.checked)); } catch (_e) {}
+                    if (typeof globalScope.updateGrayscaleReferenceCanvas === "function") globalScope.updateGrayscaleReferenceCanvas();
+                });
+            }
         }
 
         function applyBackgroundColor() {
