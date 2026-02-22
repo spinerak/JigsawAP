@@ -47,7 +47,7 @@ const viewState = {
     panButton: 0,
     fitScaleLocked: null,
     isScalingLocked: false,
-    puzzleResolution: "native",
+    puzzleResolution: "1080p",
     showGrayscaleReference: false,
     useCustomDropLocation: false,
     customDropNormX: 0.1,
@@ -64,7 +64,7 @@ try {
 } catch (_e) {}
 try {
     const stored = localStorage.getItem("puzzleResolution");
-    if (stored === "1080p" || stored === "720p" || stored === "540p" || stored === "native") {
+    if (stored === "1080p" || stored === "720p" || stored === "540p") {
         viewState.puzzleResolution = stored;
     }
 } catch (_e) {}
@@ -75,7 +75,7 @@ try {
 window.viewState = viewState;
 
 function getPuzzleResolution() {
-    return viewState.puzzleResolution || "native";
+    return viewState.puzzleResolution || "1080p";
 }
 
 function getDropPositionPixels(puz, scatterFraction) {
@@ -3199,7 +3199,7 @@ if (window.JigsawRendererModeControl && typeof window.JigsawRendererModeControl.
         queuePolyPieceSetup: (...args) => queuePolyPieceSetup(...args),
         getPuzzleResolution: getPuzzleResolution,
         setPuzzleResolution: (value) => {
-            if (value === "native" || value === "1080p" || value === "720p" || value === "540p") {
+            if (value === "1080p" || value === "720p" || value === "540p") {
                 viewState.puzzleResolution = value;
                 try { localStorage.setItem("puzzleResolution", value); } catch (_e) {}
             }
