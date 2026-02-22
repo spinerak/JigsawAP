@@ -2,9 +2,10 @@
 
 (function initRendererFacade(globalScope) {
     class RendererFacade {
-        constructor({ container, config }) {
+        constructor({ container, config, getPuzzleResolution }) {
             this.container = container;
             this.config = config || {};
+            this.getPuzzleResolution = typeof getPuzzleResolution === "function" ? getPuzzleResolution : () => "native";
             this.canvasRenderer = null;
             this.webglRenderer = null;
             this.activeRenderer = null;
@@ -262,9 +263,31 @@
             return source;
         }
 
+        _computeCappedResolution(width, height, preset) {
+            if (!preset || preset === "native" || width <= 0 || height <= 0) {
+                return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };
+            }
+            let maxW = 1920, maxH = 1080;
+            if (preset === "1080p") { maxW = 1920; maxH = 1080; }
+            else if (preset === "720p") { maxW = 1280; maxH = 720; }
+            else if (preset === "540p") { maxW = 960; maxH = 540; }
+            else {
+                return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };
+            }
+            const scale = Math.min(maxW / width, maxH / height, 1);
+            const cappedW = Math.max(1, Math.round(width * scale));
+            const cappedH = Math.max(1, Math.round(height * scale));
+            return { cappedW, cappedH };
+        }
+
         onResize(width, height) {
-            if (this.canvasRenderer) this.canvasRenderer.resize(width, height);
-            if (this.webglRenderer) this.webglRenderer.resize(width, height);
+            const preset = this.getPuzzleResolution();
+            const { cappedW, cappedH } = this._computeCappedResolution(width, height, preset);
+            const displayW = Math.max(1, Math.round(width));
+            const displayH = Math.max(1, Math.round(height));
+            if (this.canvasRenderer) this.canvasRenderer.resize(cappedW, cappedH, displayW, displayH);
+            if (this.webglRenderer) this.webglRenderer.resize(cappedW, cappedH, displayW, displayH);
+            if (this.sceneState && this.sceneState.markAllDirty) this.sceneState.markAllDirty();
         }
 
         _isWebGLRuntimeFailed() {

@@ -18,6 +18,8 @@
             this._sortedPiecesVersion = -1;
             this.lastDrawCount = 0;
             this.lastMediaUploads = 0;
+            this._displayWidth = 0;
+            this._displayHeight = 0;
         }
 
         init(puzzle) {
@@ -26,6 +28,8 @@
             this.canvas.width = this.container.clientWidth || this.puzzle.contWidth || 1;
             this.canvas.height = this.container.clientHeight || this.puzzle.contHeight || 1;
             if (!this.canvas.parentElement) this.container.appendChild(this.canvas);
+            this.canvas.style.width = "100%";
+            this.canvas.style.height = "100%";
             this.enabled = true;
         }
 
@@ -37,10 +41,12 @@
             this.mediaSource = source || null;
         }
 
-        resize(width, height) {
+        resize(bufferW, bufferH, displayW, displayH) {
             if (!this.enabled) return;
-            this.canvas.width = Math.max(1, Math.round(width));
-            this.canvas.height = Math.max(1, Math.round(height));
+            this.canvas.width = Math.max(1, Math.round(bufferW));
+            this.canvas.height = Math.max(1, Math.round(bufferH));
+            this._displayWidth = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayW)) : this.canvas.width;
+            this._displayHeight = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayH)) : this.canvas.height;
         }
 
         clear() {
@@ -76,7 +82,9 @@
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             if (cx + hw < 0 || cy + hh < 0) return false;
-            if (cx - hw > this.canvas.width || cy - hh > this.canvas.height) return false;
+            const dw = this._displayWidth || this.canvas.width;
+            const dh = this._displayHeight || this.canvas.height;
+            if (cx - hw > dw || cy - hh > dh) return false;
             return true;
         }
 
@@ -110,7 +118,13 @@
 
         renderFrame() {
             if (!this.enabled || !this.puzzle) return;
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
             this.clear();
+            const dw = this._displayWidth || this.canvas.width;
+            const dh = this._displayHeight || this.canvas.height;
+            const scaleX = this.canvas.width / dw;
+            const scaleY = this.canvas.height / dh;
+            this.ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
             const pieces = this._getSortedPieces();
             const sourceCanvas = this.puzzle.gameCanvas || null;
             let drawn = 0;

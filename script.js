@@ -46,9 +46,20 @@ const viewState = {
     panSensitivity: 1,
     panButton: 0,
     fitScaleLocked: null,
-    isScalingLocked: false
+    isScalingLocked: false,
+    puzzleResolution: "native"
 };
+try {
+    const stored = localStorage.getItem("puzzleResolution");
+    if (stored === "1080p" || stored === "720p" || stored === "540p" || stored === "native") {
+        viewState.puzzleResolution = stored;
+    }
+} catch (_e) {}
 window.viewState = viewState;
+
+function getPuzzleResolution() {
+    return viewState.puzzleResolution || "native";
+}
 
 const VIEW_DEBUG = false;
 function touchDistance(touches) {
@@ -3006,7 +3017,8 @@ puzzle = new Puzzle({ container: "forPuzzle" });
 if (window.JigsawRendererFacade) {
     rendererFacade = new window.JigsawRendererFacade({
         container: document.getElementById("forPuzzle"),
-        config: window.rendererConfig || { mode: "auto", media: "image" }
+        config: window.rendererConfig || { mode: "auto", media: "image" },
+        getPuzzleResolution: getPuzzleResolution
     });
     rendererFacade.init(puzzle);
     hitTestService = rendererFacade.hitTest || null;
@@ -3021,7 +3033,14 @@ if (window.JigsawRendererModeControl && typeof window.JigsawRendererModeControl.
         getPuzzle: () => puzzle,
         getRendererConfig: () => window.rendererConfig,
         setRendererConfig: (cfg) => { window.rendererConfig = cfg; },
-        queuePolyPieceSetup: (...args) => queuePolyPieceSetup(...args)
+        queuePolyPieceSetup: (...args) => queuePolyPieceSetup(...args),
+        getPuzzleResolution: getPuzzleResolution,
+        setPuzzleResolution: (value) => {
+            if (value === "native" || value === "1080p" || value === "720p" || value === "540p") {
+                viewState.puzzleResolution = value;
+                try { localStorage.setItem("puzzleResolution", value); } catch (_e) {}
+            }
+        }
     });
     rendererModeApi.initRendererModeControl();
 }

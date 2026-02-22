@@ -107,6 +107,24 @@
             rendererModeControl = { control: null, select: select, status: status, retryBtn: retryBtn || null, fallbackRow: fallbackRow || null };
             refreshRendererModeControl();
             globalScope.addEventListener("jigsaw-renderer-status-change", refreshRendererModeControl);
+
+            const resolutionSelect = document.getElementById("puzzleResolutionSelect");
+            if (resolutionSelect && typeof deps.getPuzzleResolution === "function" && typeof deps.setPuzzleResolution === "function") {
+                const current = deps.getPuzzleResolution();
+                if (current === "native" || current === "1080p" || current === "720p" || current === "540p") {
+                    resolutionSelect.value = current;
+                }
+                resolutionSelect.addEventListener("change", () => {
+                    const value = resolutionSelect.value;
+                    if (value !== "native" && value !== "1080p" && value !== "720p" && value !== "540p") return;
+                    deps.setPuzzleResolution(value);
+                    const facade = deps.getRendererFacade();
+                    const puzzle = deps.getPuzzle();
+                    if (facade && puzzle && typeof puzzle.contWidth === "number" && typeof puzzle.contHeight === "number") {
+                        facade.onResize(puzzle.contWidth, puzzle.contHeight);
+                    }
+                });
+            }
         }
 
         function runRendererPerfBench(durationMs = 5000) {

@@ -245,6 +245,15 @@
           <option value="canvas2d">canvas2d</option>
         </select>
       </div>
+      <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited.">
+        <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen.">Puzzle resolution</label>
+        <select id="puzzleResolutionSelect" class="display-options-select" aria-label="Puzzle render resolution cap">
+          <option value="native">Native</option>
+          <option value="1080p">1080p</option>
+          <option value="720p">720p</option>
+          <option value="540p">540p</option>
+        </select>
+      </div>
       <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
         <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
         <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>

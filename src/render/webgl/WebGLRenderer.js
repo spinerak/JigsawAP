@@ -40,6 +40,8 @@
             this.lastMediaUploads = 0;
             this._batchedVertices = null;
             this._batchedVertexCapacity = 0;
+            this._displayWidth = 0;
+            this._displayHeight = 0;
         }
 
         init(puzzle) {
@@ -48,6 +50,8 @@
             this.canvas.width = this.container.clientWidth || 1;
             this.canvas.height = this.container.clientHeight || 1;
             if (!this.canvas.parentElement) this.container.appendChild(this.canvas);
+            this.canvas.style.width = "100%";
+            this.canvas.style.height = "100%";
             this.gl = this.canvas.getContext("webgl2") || this.canvas.getContext("webgl");
             if (!this.gl) {
                 this.enabled = false;
@@ -86,9 +90,11 @@
             this.mediaSource = source || null;
         }
 
-        resize(width, height) {
-            this.canvas.width = Math.max(1, Math.round(width));
-            this.canvas.height = Math.max(1, Math.round(height));
+        resize(bufferW, bufferH, displayW, displayH) {
+            this.canvas.width = Math.max(1, Math.round(bufferW));
+            this.canvas.height = Math.max(1, Math.round(bufferH));
+            this._displayWidth = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayW)) : this.canvas.width;
+            this._displayHeight = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayH)) : this.canvas.height;
             if (this.gl) this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         }
 
@@ -536,7 +542,7 @@
                 gl.enableVertexAttribArray(programInfo.aMediaUv);
                 gl.vertexAttribPointer(programInfo.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
             }
-            gl.uniform2f(programInfo.uResolution, this.canvas.width, this.canvas.height);
+            gl.uniform2f(programInfo.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
         }
 
         _configureTextureDefaults(texture) {
@@ -593,7 +599,9 @@
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             if (cx + hw < 0 || cy + hh < 0) return false;
-            if (cx - hw > this.canvas.width || cy - hh > this.canvas.height) return false;
+            const dw = this._displayWidth || this.canvas.width;
+            const dh = this._displayHeight || this.canvas.height;
+            if (cx - hw > dw || cy - hh > dh) return false;
             return true;
         }
 
