@@ -7,6 +7,49 @@ function getUrlParameter(name) {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 };
 
+const CHANGELOG_STORAGE_KEY = "jigsawChangelogVersionSeen";
+const CHANGELOG_VERSION = "0.10.0";
+
+function showChangelogModal() {
+    const overlay = document.getElementById("changelogModal");
+    if (overlay) overlay.style.display = "flex";
+}
+window.showChangelogModal = showChangelogModal;
+
+function hideChangelogModal() {
+    const overlay = document.getElementById("changelogModal");
+    if (overlay) overlay.style.display = "none";
+}
+
+function initChangelog() {
+    const overlay = document.getElementById("changelogModal");
+    const closeBtn = document.getElementById("closeChangelogBtn");
+    const showBtn = document.getElementById("showChangelogBtn");
+    const versionSpans = document.querySelectorAll(".changelog-current-version");
+
+    versionSpans.forEach((el) => {
+        el.textContent = CHANGELOG_VERSION;
+    });
+
+    if (showBtn) showBtn.addEventListener("click", showChangelogModal);
+    if (closeBtn) closeBtn.addEventListener("click", hideChangelogModal);
+    if (overlay) {
+        overlay.addEventListener("click", (event) => {
+            if (event.target === overlay) hideChangelogModal();
+        });
+    }
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hideChangelogModal();
+    });
+
+    const savedVersion = localStorage.getItem(CHANGELOG_STORAGE_KEY);
+    if (savedVersion !== CHANGELOG_VERSION) {
+        localStorage.setItem(CHANGELOG_STORAGE_KEY, CHANGELOG_VERSION);
+        showChangelogModal();
+    }
+}
+initChangelog();
+
 
 document.getElementById('hostport').value = getUrlParameter('hostport') || localStorage.getItem("hostport") || "archipelago.gg:38281";
 
@@ -991,5 +1034,3 @@ if(getUrlParameter("go") == "SS"){
     window.start_solo_immediately = true;
     pressed_solo();
 }
-
-console.log("0.9.0")

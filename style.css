@@ -1089,3 +1089,86 @@
       filter: drop-shadow(0px 0px 5px red) drop-shadow(0px 0px 5px red) drop-shadow(0px 0px 5px red) drop-shadow(0px 0px 5px red);
         
     }
+
+    .changelog-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.62);
+      z-index: 2147483646;
+    }
+
+    .changelog-modal-card {
+      width: min(94vw, 900px);
+      max-height: 86vh;
+      background: rgba(16, 26, 39, 0.98);
+      border: 2px solid #4dabf74d;
+      border-radius: 12px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.52);
+      display: flex;
+      flex-direction: column;
+      color: white;
+      padding: 14px;
+      gap: 10px;
+    }
+
+    .changelog-modal-title {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .changelog-modal-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-top: -4px;
+    }
+
+    .changelog-modal-scroll {
+      overflow-y: auto;
+      padding: 10px 12px;
+      border: 1px solid #4dabf74d;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.18);
+      max-height: 58vh;
+      display: grid;
+      gap: 12px;
+    }
+
+    .changelog-modal-intro {
+      font-size: 13px;
+      opacity: 0.95;
+    }
+
+    .changelog-entry {
+      border: 1px solid rgba(77, 171, 247, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .changelog-entry-title {
+      font-weight: 700;
+      color: #d8ecff;
+      margin-bottom: 4px;
+    }
+
+    .changelog-entry-body {
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .changelog-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .changelog-close-btn {
+      background: #4caf50;
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+    }

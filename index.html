@@ -107,9 +107,15 @@
               <input type="submit" value="Hex" id="solobutton3" class="login-submit">
             </div>
           </div>
+          <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
+            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">What's new</div>
+            <hr style="border: 1px solid #4dabf74d; margin: 8px 0;">
+            <input type="button" value="Show changelog" id="showChangelogBtn" class="login-submit">
+          </div>
       </div>
 
       <div style="margin-top: 5px; font-size: 0.7em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
+        Made by Spineraks and fariel. <br>
         The images displayed on this website are loaded directly from external sources and are not hosted or distributed by this site. <br>
         Archipelago Logo © 2022 by Krista Corkos and Christopher Wilson is licensed under Attribution-NonCommercial 4.0 International. <br>
         Amazing artwork by le_becc.
@@ -117,6 +123,56 @@
         
   </div>
 
+</div>
+
+<div id="changelogModal" class="changelog-modal">
+  <div class="changelog-modal-card">
+    <div class="changelog-modal-title">Changelog</div>
+    <div class="changelog-modal-subtitle">
+      Current changelog version: <span class="changelog-current-version">0.10.0</span>
+    </div>
+    <div class="changelog-modal-scroll">
+      <div class="changelog-modal-intro">
+        This changelog appears automatically when a new changelog version is detected and can always be reopened from the login page.
+      </div>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Version 0.10.0</div>
+        <div class="changelog-entry-body">
+          <ul>
+            <li>Media source options expanded significantly: GIF support (usually best when uploaded locally), camera source support (including OBS Virtual Camera workflows so your game feed can become puzzle "screen space"), and capture-source support for YouTube/Twitch via a helper window + browser capture flow. It can capture anything your browser allows, but minimizing the captured source window may freeze playback in some browser setups.</li>
+            <li>The URL loader is smarter for extension-less links: you can force media interpretation with <code>imageType=image</code>, <code>imageType=gif</code>, or <code>imageType=video</code>.</li>
+            <li>Linked media now handles cross-origin (CORS) issues more gracefully. If an external host blocks secure media access, the game explains what happened and downgrades rendering when possible. The main hard limitation is animated GIFs from CORS-blocked URLs; for those, local upload is usually the best fix.</li>
+            <li>When a media compatibility issue happens, you now get an in-game popup with guidance instead of a silent failure. If you are sharing GIF puzzles, the most reliable workflow is usually to save the GIF locally and have both players load that file directly.</li>
+            <li>A built-in changelog was added. New versions now show an update modal once, and players can reopen it anytime from the login page with "Show changelog."</li>
+            <li>The renderer was rewritten to use WebGL/OpenGL-style acceleration when available, with automatic fallback to Canvas2D when not. Both paths are a major upgrade over the old renderer, and scale to much larger puzzles more reliably.</li>
+            <li>Overall puzzle performance was improved in general, especially in heavier scenarios where rendering and piece updates used to bottleneck sooner.</li>
+            <li>Local puzzle generation now supports up to 2500 client-generated pieces.</li>
+            <li>Performance was improved for piece placement when pieces are added onto the board (separate from local piece generation), so drops feel snappier under load.</li>
+            <li>The image preview now scales by image aspect ratio to remove the gray dead zone it used to make... except with GIFs, because browsers still hate GIFs.</li>
+            <li>A new puzzle-area scaling option based on image aspect ratio is available. It tends to feel best in local play, but can be used in AP too if you prefer unusual puzzle shapes.</li>
+            <li>A brand-new drop-location handle was added. It is a movable placement marker inside the play area, and you can use it to choose exactly where board-added pieces should land. It is hidden by default; enable it from Cosmetic Options.</li>
+            <li>Drawer-to-board dropping can now target the drop-location handle position as well, making drawer placement more predictable.</li>
+            <li>View/navigation controls were expanded: pan by click-drag, near-infinite zoom (within reason), zoom/pan toggles, scaling toggle, reset view, pan-button selection, and adjustable zoom/pan speeds from the View Controls window.</li>
+            <li>The play area got a visual upgrade: felt-like texture, rounded corners, and clearer "held piece" shadow feedback.</li>
+            <li>Cosmetic controls are now accessible from a dedicated bottom-right window, including: board background color, piece bevel depth, held-piece shadow darkness, corner radius, renderer selection, puzzle resolution/performance settings, grayscale reference background (Banjo-Kazooie style), and drop-handle visibility/color.</li>
+            <li>Several in-game windows were cleaned up and refactored for readability and easier navigation, including the main start-game menu flow.</li>
+            <li>Also included: a curated assortment of brand-new, artisanal bugs, handcrafted for your personal puzzling experience.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Before we recorded history.</div>
+        <div class="changelog-entry-body">
+          we don't know what happened. It's lost
+        </div>
+      </article>
+    </div>
+    <div class="changelog-modal-actions">
+      <button type="button" id="closeChangelogBtn" class="changelog-close-btn">Close</button>
+    </div>
+  </div>
 </div>
 
 <audio id="newItemSound">
