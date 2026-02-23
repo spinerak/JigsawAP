@@ -3156,6 +3156,11 @@ const mChangeCaptureSource = document.getElementById("mChangeCaptureSource");
 if (mChangeCaptureSource) {
     mChangeCaptureSource.addEventListener("click", async () => {
         try {
+            const url = prompt("Enter a new YouTube or Twitch URL to open and capture, or cancel to just pick a window/tab again.", mediaLinkUrlInput ? mediaLinkUrlInput.value.trim() || "" : "");
+            if (url !== null && url.trim() !== "") {
+                const opened = openSourceWindow(url);
+                if (opened && mediaLinkUrlInput) mediaLinkUrlInput.value = url.trim();
+            }
             await runDisplayCapture();
             updateDisplayCaptureMenuItemVisibility();
         } catch (err) {
