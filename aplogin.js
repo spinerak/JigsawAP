@@ -542,24 +542,69 @@ function setImage(url){
         }
     }
 
+    function detectMediaKind(src) {
+        if (typeof src !== "string") return "image";
+        const lowerSrc = src.toLowerCase();
+        if (lowerSrc.startsWith("data:video/")) return "video";
+        if (lowerSrc.startsWith("data:image/gif")) return "gif";
+        if (lowerSrc.startsWith("data:image/")) return "image";
+        if (/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(src)) return "video";
+        if (/\.gif(\?|#|$)/i.test(src)) return "gif";
+        if (/\.(png|jpe?g|webp|bmp|svg)(\?|#|$)/i.test(src)) return "image";
+        if (/(^|[?&])(format|fm|ext|type)=gif(&|$)/i.test(src)) return "gif";
+        if (/image\/gif/i.test(src)) return "gif";
+        return "unknown";
+    }
+
     function checkImage(url, callback) {
         let img = new Image();
         img.onload = () => callback(true);  // Image loaded successfully
         img.onerror = () => callback(false); // Image failed to load
         img.src = url;
     }
-            
+
+    const forcedMediaType = (getUrlParameter("imageType") || getUrlParameter("imagetype") || getUrlParameter("mediaType") || "").toLowerCase();
+    const mediaKind = (forcedMediaType === "gif" || forcedMediaType === "video" || forcedMediaType === "image")
+        ? forcedMediaType
+        : detectMediaKind(url);
+    if (mediaKind === "video" && typeof window.loadVideoUrl === "function") {
+        window.loadVideoUrl(url)
+            .then(() => {
+                imagePath = url;
+                window.choose_ap_image = true;
+                window.set_ap_image = true;
+                console.log("Set video!");
+            })
+            .catch((error) => {
+                console.error("Video is a dead link.", error);
+            });
+        return;
+    }
+
     checkImage(url, (isValid) => {
         if (isValid) {
             imagePath = url;
-            console.log("Set image!")
+            console.log("Set image!");
+            const options = mediaKind === "gif" ? { forceMediaKind: "gif" } : {};
+            window.setImagePath(imagePath, options);
+            window.choose_ap_image = true;
+            window.set_ap_image = true;
         } else {
             console.log("Image is a dead link.");
+            if (mediaKind !== "gif" && typeof window.loadVideoUrl === "function") {
+                window.loadVideoUrl(url)
+                    .then(() => {
+                        imagePath = url;
+                        window.choose_ap_image = true;
+                        window.set_ap_image = true;
+                        console.log("Set video!");
+                    })
+                    .catch((error) => {
+                        console.error("Image/video is a dead link.", error);
+                    });
+                return;
+            }
         }
-        window.setImagePath(imagePath);
-        
-        window.choose_ap_image = true;
-        window.set_ap_image = true;
     });
 }
 

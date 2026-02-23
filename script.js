@@ -3691,6 +3691,14 @@ function setImagePath(l, options = {}) {
 }
 window.setImagePath = setImagePath;
 
+async function loadVideoUrl(url) {
+    if (mediaBindings && mediaBindings.loadVideoUrl) {
+        return mediaBindings.loadVideoUrl(url);
+    }
+    throw new Error("Video URL loading is unavailable.");
+}
+window.loadVideoUrl = loadVideoUrl;
+
 function setRendererMode(mode) {
     if (rendererModeApi && rendererModeApi.setRendererMode) rendererModeApi.setRendererMode(mode);
 }

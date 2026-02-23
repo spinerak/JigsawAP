@@ -5,6 +5,20 @@
         let activeCustomVideoEl = null;
         let activeCustomVideoUrl = null;
         let mediaBindToken = 0;
+        const corsNoticeShown = new Set();
+        const corsSuppressStorageKey = "jigsawSuppressCorsNoticesSession";
+        let suppressCorsNoticesForSession = false;
+        let corsModalEl = null;
+        let corsModalTitleEl = null;
+        let corsModalBodyEl = null;
+        let corsModalSuppressCheckboxEl = null;
+
+        try {
+            suppressCorsNoticesForSession = globalScope.sessionStorage &&
+                globalScope.sessionStorage.getItem(corsSuppressStorageKey) === "1";
+        } catch (_e) {
+            suppressCorsNoticesForSession = false;
+        }
 
         function ensureSynchronizedPreviewSurface() {
             const sync = document.getElementById("prevsync");
@@ -22,6 +36,153 @@
         function isGifSource(src) {
             return typeof src === "string" && (
                 src.startsWith("data:image/gif") || /\.gif(\?|#|$)/i.test(src)
+            );
+        }
+
+        function isCrossOriginHttpUrl(src) {
+            try {
+                const u = new URL(src, globalScope.location.href);
+                const isHttp = u.protocol === "http:" || u.protocol === "https:";
+                return isHttp && u.origin !== globalScope.location.origin;
+            } catch (_e) {
+                return false;
+            }
+        }
+
+        function ensureCorsModal() {
+            if (corsModalEl) return;
+            const overlay = document.createElement("div");
+            overlay.style.position = "fixed";
+            overlay.style.inset = "0";
+            overlay.style.background = "rgba(0, 0, 0, 0.6)";
+            overlay.style.zIndex = "2147483647";
+            overlay.style.display = "none";
+            overlay.style.alignItems = "center";
+            overlay.style.justifyContent = "center";
+            overlay.setAttribute("role", "dialog");
+            overlay.setAttribute("aria-modal", "true");
+            overlay.setAttribute("aria-label", "CORS notice");
+
+            const card = document.createElement("div");
+            card.style.width = "min(92vw, 680px)";
+            card.style.maxHeight = "80vh";
+            card.style.overflow = "auto";
+            card.style.background = "#1f2430";
+            card.style.color = "#f5f7ff";
+            card.style.border = "1px solid rgba(255, 255, 255, 0.2)";
+            card.style.borderRadius = "10px";
+            card.style.boxShadow = "0 12px 32px rgba(0, 0, 0, 0.45)";
+            card.style.padding = "18px 18px 14px";
+            card.addEventListener("click", (evt) => evt.stopPropagation());
+
+            const title = document.createElement("div");
+            title.style.fontSize = "20px";
+            title.style.fontWeight = "700";
+            title.style.marginBottom = "10px";
+
+            const body = document.createElement("div");
+            body.style.whiteSpace = "pre-wrap";
+            body.style.lineHeight = "1.45";
+            body.style.fontSize = "14px";
+
+            const actions = document.createElement("div");
+            actions.style.display = "flex";
+            actions.style.justifyContent = "flex-end";
+            actions.style.marginTop = "14px";
+
+            const optionsRow = document.createElement("label");
+            optionsRow.style.display = "flex";
+            optionsRow.style.alignItems = "center";
+            optionsRow.style.gap = "8px";
+            optionsRow.style.marginTop = "12px";
+            optionsRow.style.userSelect = "none";
+            optionsRow.style.fontSize = "13px";
+            optionsRow.style.opacity = "0.95";
+
+            const suppressCheckbox = document.createElement("input");
+            suppressCheckbox.type = "checkbox";
+            suppressCheckbox.checked = suppressCorsNoticesForSession;
+            suppressCheckbox.addEventListener("change", () => {
+                suppressCorsNoticesForSession = !!suppressCheckbox.checked;
+                try {
+                    if (globalScope.sessionStorage) {
+                        if (suppressCorsNoticesForSession) {
+                            globalScope.sessionStorage.setItem(corsSuppressStorageKey, "1");
+                        } else {
+                            globalScope.sessionStorage.removeItem(corsSuppressStorageKey);
+                        }
+                    }
+                } catch (_e) {}
+            });
+
+            const suppressText = document.createElement("span");
+            suppressText.textContent = "Don't show this again this session";
+            optionsRow.appendChild(suppressCheckbox);
+            optionsRow.appendChild(suppressText);
+
+            const closeBtn = document.createElement("button");
+            closeBtn.type = "button";
+            closeBtn.textContent = "Close";
+            closeBtn.style.background = "#4caf50";
+            closeBtn.style.color = "#ffffff";
+            closeBtn.style.border = "none";
+            closeBtn.style.borderRadius = "6px";
+            closeBtn.style.padding = "8px 14px";
+            closeBtn.style.cursor = "pointer";
+            closeBtn.addEventListener("click", () => {
+                overlay.style.display = "none";
+            });
+
+            actions.appendChild(closeBtn);
+            card.appendChild(title);
+            card.appendChild(body);
+            card.appendChild(optionsRow);
+            card.appendChild(actions);
+            overlay.appendChild(card);
+            overlay.addEventListener("click", () => {
+                overlay.style.display = "none";
+            });
+
+            const parent = document.body || document.documentElement;
+            if (parent) parent.appendChild(overlay);
+
+            corsModalEl = overlay;
+            corsModalTitleEl = title;
+            corsModalBodyEl = body;
+            corsModalSuppressCheckboxEl = suppressCheckbox;
+        }
+
+        function showCorsNoticeOnce(key, title, message) {
+            if (suppressCorsNoticesForSession) return;
+            if (!key || corsNoticeShown.has(key)) return;
+            corsNoticeShown.add(key);
+            ensureCorsModal();
+            if (!corsModalEl || !corsModalTitleEl || !corsModalBodyEl) return;
+            if (corsModalSuppressCheckboxEl) corsModalSuppressCheckboxEl.checked = suppressCorsNoticesForSession;
+            corsModalTitleEl.textContent = title || "CORS notice";
+            corsModalBodyEl.textContent = message || "";
+            corsModalEl.style.display = "flex";
+        }
+
+        function showCorsDowngradeNotice(mediaKind, sourceUrl) {
+            const kindLabel = mediaKind === "video" ? "video" : "image";
+            const suffix = sourceUrl ? `\n\nSource: ${sourceUrl}` : "";
+            showCorsNoticeOnce(
+                `downgrade:${kindLabel}:${sourceUrl || ""}`,
+                "Cross-origin media: renderer downgraded",
+                `This ${kindLabel} URL is hosted on a different origin and blocks secure texture upload.\n\nThe puzzle should still work, but rendering has been downgraded from WebGL to Canvas2D for this media source.\n\nRamifications: lower performance, higher CPU use, and fewer renderer optimizations on larger puzzles.${suffix}`
+            );
+        }
+
+        function showGifAnimationUnavailableNotice(sourceUrl, reason = "") {
+            const isCors = reason === "cors";
+            const suffix = sourceUrl ? `\n\nSource: ${sourceUrl}` : "";
+            showCorsNoticeOnce(
+                `gif-unsupported:${reason}:${sourceUrl || ""}`,
+                "Animated GIF limitation",
+                isCors
+                    ? `This animated GIF URL blocks cross-origin frame access.\n\nResult: full animated GIF playback is not available for this source (you may only see a static frame).\n\nYou can try another image URL, or save the GIF to your computer and load it with "Select image".${suffix}`
+                    : `This animated GIF could not be decoded for frame-by-frame playback in the current browser setup.\n\nResult: full animated GIF playback is not available for this source (you may only see a static frame).\n\nYou can try another image URL, or save the GIF to your computer and load it with "Select image".${suffix}`
             );
         }
 
@@ -57,12 +218,103 @@
             return c.toDataURL("image/png");
         }
 
+        async function waitForVideoReady(video, timeoutMs = 10000) {
+            if (!video) throw new Error("No video element provided.");
+            if (video.readyState >= 2) return;
+            await new Promise((resolve, reject) => {
+                const onReady = () => {
+                    cleanup();
+                    resolve();
+                };
+                const onError = () => {
+                    cleanup();
+                    reject(new Error("Video failed to load."));
+                };
+                const onTimeout = () => {
+                    cleanup();
+                    reject(new Error("Video load timed out."));
+                };
+                const cleanup = () => {
+                    video.removeEventListener("loadeddata", onReady);
+                    video.removeEventListener("canplay", onReady);
+                    video.removeEventListener("error", onError);
+                    clearTimeout(timer);
+                };
+                video.addEventListener("loadeddata", onReady, { once: true });
+                video.addEventListener("canplay", onReady, { once: true });
+                video.addEventListener("error", onError, { once: true });
+                const timer = globalScope.setTimeout(onTimeout, Math.max(1000, timeoutMs | 0));
+            });
+        }
+
+        function buildFallbackPosterDataUrl(video) {
+            const w = Math.max(1, video && video.videoWidth ? video.videoWidth : 1);
+            const h = Math.max(1, video && video.videoHeight ? video.videoHeight : 1);
+            const c = document.createElement("canvas");
+            c.width = w;
+            c.height = h;
+            const ctx = c.getContext("2d");
+            if (ctx) {
+                ctx.fillStyle = "#111";
+                ctx.fillRect(0, 0, w, h);
+            }
+            return c.toDataURL("image/png");
+        }
+
+        function markWebGLBlockedIfVideoTainted(video) {
+            const puzzle = getPuzzle();
+            if (!puzzle || !video) return;
+            try {
+                const probe = document.createElement("canvas");
+                probe.width = 1;
+                probe.height = 1;
+                const ctx = probe.getContext("2d");
+                if (!ctx) return;
+                ctx.drawImage(video, 0, 0, 1, 1);
+                ctx.getImageData(0, 0, 1, 1);
+                if (!puzzle._webglStartBlockedReason) puzzle._webglStartBlockedReason = "";
+            } catch (_e) {
+                puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
+                showCorsDowngradeNotice("video", video && video.currentSrc ? video.currentSrc : video.src);
+            }
+        }
+
+        async function bindVideoElement(video, options = {}) {
+            const rendererFacade = getRendererFacade();
+            if (!options.preserveExistingMedia) {
+                teardownActiveVideoSource();
+                if (rendererFacade && rendererFacade.media && rendererFacade.media.stop) rendererFacade.media.stop();
+            }
+
+            await waitForVideoReady(video);
+
+            let posterDataUrl = null;
+            try {
+                posterDataUrl = await captureVideoPosterDataUrl(video);
+            } catch (_e) {
+                posterDataUrl = buildFallbackPosterDataUrl(video);
+            }
+
+            activeCustomVideoEl = video;
+            activeCustomVideoUrl = options.objectUrl || null;
+            setImagePath(posterDataUrl, { preserveVideo: true, skipRendererMediaBind: true });
+            markWebGLBlockedIfVideoTainted(video);
+
+            try { await video.play(); } catch (_e) {}
+            const cfg = deps.getRendererConfig();
+            if (cfg) cfg.media = options.kind || "video";
+            if (rendererFacade) rendererFacade.setVideoSource(video, options.kind || "video");
+        }
+
         function setImagePath(path, options = {}) {
             const puzzle = getPuzzle();
             if (!puzzle) return;
             mediaBindToken++;
             const bindToken = mediaBindToken;
             const rendererFacade = getRendererFacade();
+            const forcedKind = options && typeof options.forceMediaKind === "string"
+                ? options.forceMediaKind.toLowerCase()
+                : "";
 
             if (!options.preserveVideo) {
                 teardownActiveVideoSource();
@@ -72,11 +324,11 @@
             deps.setImagePath(path);
             const imagePath = deps.getImagePath();
             ensureSynchronizedPreviewSurface();
-            puzzle.isGif = isGifSource(imagePath);
+            puzzle.isGif = forcedKind === "gif" ? true : isGifSource(imagePath);
             puzzle.imageLoaded = false;
             puzzle._webglStartBlockedReason = "";
             const cfg = deps.getRendererConfig();
-            if (cfg) cfg.media = puzzle.isGif ? "gif" : "image";
+            if (cfg) cfg.media = (forcedKind === "image" || forcedKind === "gif") ? forcedKind : (puzzle.isGif ? "gif" : "image");
 
             let isCrossOriginHttp = false;
             try {
@@ -101,6 +353,11 @@
                     puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
                     puzzle.imageLoaded = false;
                     puzzle.srcImage.src = imagePath;
+                    if (puzzle.isGif) {
+                        showGifAnimationUnavailableNotice(imagePath, "cors");
+                    } else {
+                        showCorsDowngradeNotice("image", imagePath);
+                    }
                 };
                 puzzle.srcImage.addEventListener("error", fallbackOnError, { once: true });
             }
@@ -112,9 +369,21 @@
                     if (rendererFacade.setGifSource) {
                         rendererFacade.setGifSource(imagePath, puzzle.srcImage).then((ok) => {
                             if (bindToken !== mediaBindToken) return;
-                            if (!ok) rendererFacade.setMediaSource(puzzle.srcImage, "gif");
+                            if (!ok) {
+                                let reason = "";
+                                try {
+                                    const st = rendererFacade && rendererFacade.media && rendererFacade.media.getStatus
+                                        ? rendererFacade.media.getStatus()
+                                        : null;
+                                    reason = st && st.failureReason ? String(st.failureReason) : "";
+                                } catch (_e) {}
+                                showGifAnimationUnavailableNotice(imagePath, reason);
+                                rendererFacade.setMediaSource(puzzle.srcImage, "gif");
+                            }
                         }).catch(() => {
                             if (bindToken !== mediaBindToken) return;
+                            const reason = isCrossOriginHttpUrl(imagePath) ? "cors" : "decode";
+                            showGifAnimationUnavailableNotice(imagePath, reason);
                             rendererFacade.setMediaSource(puzzle.srcImage, "gif");
                         });
                     } else {
@@ -132,9 +401,6 @@
         }
 
         async function loadVideoFile(file) {
-            teardownActiveVideoSource();
-            const rendererFacade = getRendererFacade();
-            if (rendererFacade && rendererFacade.media && rendererFacade.media.stop) rendererFacade.media.stop();
             const url = URL.createObjectURL(file);
             const video = document.createElement("video");
             video.src = url;
@@ -143,15 +409,34 @@
             video.autoplay = true;
             video.playsInline = true;
             video.preload = "auto";
+            await bindVideoElement(video, { objectUrl: url, kind: "video" });
+        }
 
-            const posterDataUrl = await captureVideoPosterDataUrl(video);
-            activeCustomVideoEl = video;
-            activeCustomVideoUrl = url;
-            setImagePath(posterDataUrl, { preserveVideo: true, skipRendererMediaBind: true });
-            try { await video.play(); } catch (_e) {}
-            const cfg = deps.getRendererConfig();
-            if (cfg) cfg.media = "video";
-            if (rendererFacade) rendererFacade.setVideoSource(video, "video");
+        async function loadVideoUrl(url) {
+            if (typeof url !== "string" || !url) throw new Error("Video URL is required.");
+
+            const createVideoEl = (withCors) => {
+                const video = document.createElement("video");
+                video.src = url;
+                video.muted = true;
+                video.loop = true;
+                video.autoplay = true;
+                video.playsInline = true;
+                video.preload = "auto";
+                if (withCors) video.crossOrigin = "anonymous";
+                return video;
+            };
+
+            const crossOriginHttp = isCrossOriginHttpUrl(url);
+            if (crossOriginHttp) {
+                try {
+                    await bindVideoElement(createVideoEl(true), { kind: "video" });
+                    return;
+                } catch (_e) {
+                    // Retry without CORS so playback can continue even if poster extraction is tainted.
+                }
+            }
+            await bindVideoElement(createVideoEl(false), { kind: "video" });
         }
 
         async function startWebcamSource() {
@@ -222,6 +507,7 @@
             isGifSource: isGifSource,
             setImagePath: setImagePath,
             loadVideoFile: loadVideoFile,
+            loadVideoUrl: loadVideoUrl,
             startWebcamSource: startWebcamSource,
             startLinkCaptureSource: startLinkCaptureSource,
             loadInitialFile: loadInitialFile,
