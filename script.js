@@ -106,6 +106,23 @@ function touchMidpoint(touches) {
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
 
+function getPolyPieceSyncId(pp) {
+    if (!pp) return null;
+    if (typeof pp.syncId === "number" && Number.isFinite(pp.syncId)) return pp.syncId;
+    // Compatibility fallback: older paths may still expect first-piece identity.
+    if (pp.pieces && pp.pieces[0] && typeof pp.pieces[0].index === "number") return pp.pieces[0].index;
+    return null;
+}
+
+function addIgnoreBouncePiece(index, durationMs = 1000) {
+    if (typeof index !== "number" || !Number.isFinite(index)) return;
+    if (!window.ignore_bounce_pieces.includes(index)) window.ignore_bounce_pieces.push(index);
+    setTimeout(() => {
+        const found = window.ignore_bounce_pieces.indexOf(index);
+        if (found !== -1) window.ignore_bounce_pieces.splice(found, 1);
+    }, durationMs);
+}
+
 var puzzle;
 var rendererFacade = null;
 var hitTestService = null;
@@ -546,6 +563,9 @@ class PolyPiece {
         this.pckymax = Math.max(...initialPieces.map(piece => piece.ky)) + 1;
         this.pieces = initialPieces;
         this.puzzle = puzzle;
+        this.syncId = (initialPieces && initialPieces[0] && typeof initialPieces[0].index === "number")
+            ? initialPieces[0].index
+            : null;
         this.listLoops();
         this.hinted = false;
         this.hasMovedEver = false;
@@ -575,7 +595,11 @@ class PolyPiece {
             return;
         }
 
-        const changingIndex = Math.max(this.pieces[0].index, otherPoly.pieces[0].index);
+        const thisSyncIdBefore = getPolyPieceSyncId(this);
+        const otherSyncIdBefore = getPolyPieceSyncId(otherPoly);
+        const thisIdentity = (typeof thisSyncIdBefore === "number") ? thisSyncIdBefore : this.pieces[0].index;
+        const otherIdentity = (typeof otherSyncIdBefore === "number") ? otherSyncIdBefore : otherPoly.pieces[0].index;
+        const changingIndex = Math.max(thisIdentity, otherIdentity);
 
         const orgpckxmin = this.pckxmin;
         const orgpckymin = this.pckymin;
@@ -599,17 +623,13 @@ class PolyPiece {
             otherPoly.pieces[k].drawn = false;
 
             if (window.gameplayStarted && notifyMerge) {
-                const min = Math.min(this.pieces[0].index, otherPoly.pieces[k].index)
-                const max = Math.max(this.pieces[0].index, otherPoly.pieces[k].index)
+                const absorbedId = otherPoly.pieces[k].index;
+                const min = Math.min(thisIdentity, absorbedId);
+                const max = Math.max(thisIdentity, absorbedId);
                 // console.log("merge", max, "to", min);
 
-                window.ignore_bounce_pieces.push(min);
-                setTimeout(() => {
-                    const index = window.ignore_bounce_pieces.indexOf(min);
-                    if (index !== -1) {
-                        window.ignore_bounce_pieces.splice(index, 1);
-                    }
-                }, 1000);
+                addIgnoreBouncePiece(min);
+                addIgnoreBouncePiece(max);
                 
                 change_savedata_datastorage(max, min, true);
                 // console.log("done merge", max, "to", min);
@@ -645,6 +665,7 @@ class PolyPiece {
         this.pieces.sort(function (p1, p2) {
             return p1.index - p2.index;
         });
+        this.syncId = Math.min(thisIdentity, otherIdentity);
 
         // redefine consecutive edges
         this.listLoops();
@@ -2928,10 +2949,11 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                         moving.pp.hasMovedEver = true;
                         if (window.gameplayStarted && !window.play_solo) {
                             // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                 
+                            const movingSyncId = getPolyPieceSyncId(moving.pp);
                             if(window.rotations == 0){
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
                             }else{
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
                             }    
                         }
 
@@ -2960,21 +2982,14 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                         } // for k
 
                         if (window.gameplayStarted && !window.play_solo) {
-                            
+                            const movingSyncId = getPolyPieceSyncId(moving.pp);
                             if(window.rotations == 0){
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
                             }else{
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], true);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], true);
                             }    
                             
-                            const currentPieceIndex = moving.pp.pieces[0].index;
-                            window.ignore_bounce_pieces.push(currentPieceIndex);
-                            setTimeout(() => {
-                                const index = window.ignore_bounce_pieces.indexOf(currentPieceIndex);
-                                if (index !== -1) {
-                                    window.ignore_bounce_pieces.splice(index, 1);
-                                }
-                            }, 1000);
+                            if (movingSyncId !== null) addIgnoreBouncePiece(movingSyncId);
                         }
 
                         if (moving && moving.pp) setHeldPieceState(moving.pp, false);
@@ -3515,6 +3530,14 @@ function findPolyPieceUsingPuzzlePiece(index, needsToBeFirst = false){
     return null;
 }
 
+function findPolyPieceBySyncId(syncId) {
+    if (typeof syncId !== "number" || !Number.isFinite(syncId)) return null;
+    for (let i = 0; i < puzzle.polyPieces.length; i++) {
+        if (getPolyPieceSyncId(puzzle.polyPieces[i]) === syncId) return puzzle.polyPieces[i];
+    }
+    return null;
+}
+
 var puzzle_ini = false;
 var unlocked_pieces = [];
 
@@ -3594,11 +3617,15 @@ function doSwapTrap(){
     pp1.moveAwayFromBorder();
     pp2.moveAwayFromBorder();
     if(window.rotations == 0){
-        change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight], true);
-        change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight], true);
+        const pp1Sync = getPolyPieceSyncId(pp1);
+        const pp2Sync = getPolyPieceSyncId(pp2);
+        if (pp1Sync !== null) change_savedata_datastorage(pp1Sync, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight], true);
+        if (pp2Sync !== null) change_savedata_datastorage(pp2Sync, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight], true);
     }else{
-        change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight, pp1.rot], true);
-        change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight, pp2.rot], true);
+        const pp1Sync = getPolyPieceSyncId(pp1);
+        const pp2Sync = getPolyPieceSyncId(pp2);
+        if (pp1Sync !== null) change_savedata_datastorage(pp1Sync, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight, pp1.rot], true);
+        if (pp2Sync !== null) change_savedata_datastorage(pp2Sync, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight, pp2.rot], true);
     }   
 }
 function doRotateTrap(){
@@ -3613,7 +3640,8 @@ function doRotateTrap(){
             pp.rotate(false, Math.round(Math.random() * (num_rots)));
         }
         pp.moveAwayFromBorder();
-        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
+        const ppSync = getPolyPieceSyncId(pp);
+        if (ppSync !== null) change_savedata_datastorage(ppSync, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
     }
 }
 
@@ -3722,7 +3750,9 @@ if (window.JigsawArchipelagoBridge && typeof window.JigsawArchipelagoBridge.crea
         getMoving: () => moving,
         setMoving: (value) => { moving = value; },
         getPuzzle: () => puzzle,
-        findPolyPieceUsingPuzzlePiece: (idx, first) => findPolyPieceUsingPuzzlePiece(idx, first)
+        findPolyPieceUsingPuzzlePiece: (idx, first) => findPolyPieceUsingPuzzlePiece(idx, first),
+        findPolyPieceBySyncId: (syncId) => findPolyPieceBySyncId(syncId),
+        getPolyPieceSyncId: (pp) => getPolyPieceSyncId(pp)
     });
 }
 
@@ -3830,7 +3860,8 @@ function rotateCurrentPiece(counter = false){
                 moving.pp.rotate(moving);
             }
         }
-        change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
+        const movingSyncId = getPolyPieceSyncId(moving.pp);
+        if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
     }
     
 }

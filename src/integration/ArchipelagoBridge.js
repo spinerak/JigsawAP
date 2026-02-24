@@ -2,6 +2,38 @@
 
 (function initArchipelagoBridge(globalScope) {
     function create(deps) {
+        function resolvePolyPieceById(receivedId) {
+            const id = Number(receivedId);
+            if (!Number.isFinite(id)) return null;
+            if (deps.findPolyPieceBySyncId) {
+                const bySync = deps.findPolyPieceBySyncId(id);
+                if (bySync) return bySync;
+            }
+            if (deps.findPolyPieceUsingPuzzlePiece) {
+                // Compatibility fallback for older clients: they identify a cluster
+                // by the first piece index rather than the newer syncId.
+                const byLegacyFirst = deps.findPolyPieceUsingPuzzlePiece(id, true);
+                if (byLegacyFirst) return byLegacyFirst;
+                // Final compatibility fallback: resolve by piece membership in case
+                // root/first-piece identity drifted after merges.
+                const byContains = deps.findPolyPieceUsingPuzzlePiece(id, false);
+                if (byContains) return byContains;
+            }
+            return null;
+        }
+
+        function getPolyPieceId(pp) {
+            if (!pp) return null;
+            if (deps.getPolyPieceSyncId) {
+                const syncId = deps.getPolyPieceSyncId(pp);
+                if (typeof syncId === "number" && Number.isFinite(syncId)) return syncId;
+            }
+            // Compatibility fallback for legacy state where the transport identity
+            // still comes from the first piece index in the cluster.
+            if (pp.pieces && pp.pieces[0] && typeof pp.pieces[0].index === "number") return pp.pieces[0].index;
+            return null;
+        }
+
         async function changeSavedataDatastorage(key, value, final) {
             if (globalScope.play_solo) return;
             const keyName = `JIG_PROG_${globalScope.slot}_${key}`;
@@ -53,9 +85,10 @@
 
             const ppIndex = parseInt(key.split("_")[3]);
             const moving = deps.getMoving();
-            const movingThatPiece = moving && moving.pp && moving.pp.pieces && moving.pp.pieces[0].index == ppIndex;
+            const movingId = moving && moving.pp ? getPolyPieceId(moving.pp) : null;
+            const movingThatPiece = movingId === ppIndex;
 
-            const pp = deps.findPolyPieceUsingPuzzlePiece(ppIndex, true);
+            const pp = resolvePolyPieceById(ppIndex);
             if (!pp) {
                 console.log("Ignore action not found", pp, ppIndex);
                 return;
@@ -100,11 +133,12 @@
                 value = parseInt(value);
                 if (typeof oldValue === "number") return;
 
-                if (movingThatPiece || (moving && moving.pp && moving.pp.pieces && moving.pp.pieces[0].index == value)) {
+                if (movingThatPiece || movingId === value) {
                     if (moving && moving.pp && moving.pp.polypiece_canvas) moving.pp.polypiece_canvas.classList.remove("moving");
                     deps.setMoving(null);
                 }
-                const pp2 = deps.findPolyPieceUsingPuzzlePiece(value);
+                const pp2 = resolvePolyPieceById(value);
+                if (!pp2 || !pp) return;
                 if (pp != pp2) {
                     console.log("merging because of action", key, value, bounce);
                     if (pp.pieces.length > pp2.pieces.length || (pp.pieces.length == pp2.pieces.length && pp.pieces[0].index > pp2.pieces[0].index)) {
