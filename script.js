@@ -940,12 +940,7 @@ class PolyPiece {
             } // for kEdge
         } // for k
 
-        let loopcount = 0;
         while (tbEdges.length > 0) {
-            loopcount++;
-            if(loopcount > 1){
-                console.log("PANIC!")
-            }
             lp = []; // new loop
             currEdge = tbEdges[0];   // we begin with first available edge
             lp.push(currEdge);       // add it to loop
@@ -1068,10 +1063,11 @@ class PolyPiece {
         const webglActive = activeRendererName === "WebGLRenderer";
         const w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
         const h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
-        const gd = puzzle._gifDraw || puzzle.drawParams || { dx: 0, dy: 0 };
+        // drawParams dx/dy are already applied when source media is rendered into gameCanvas.
+        // Per-piece sampling must stay in gameCanvas coordinates (no second offset).
         this._mediaSample = {
-            sx: srcx + (gd.dx || 0),
-            sy: srcy + (gd.dy || 0),
+            sx: srcx,
+            sy: srcy,
             destx,
             desty,
             w,
@@ -1100,9 +1096,8 @@ class PolyPiece {
     _drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty) {
         const w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
         const h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
-        const gd = puzzle._gifDraw || puzzle.drawParams || { dx: 0, dy: 0 };
-        const sx = srcx + (gd.dx || 0);
-        const sy = srcy + (gd.dy || 0);
+        const sx = srcx;
+        const sy = srcy;
         this._mediaSample = { sx, sy, destx, desty, w, h };
 
         this.polypiece_ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1895,11 +1890,14 @@ class Puzzle {
 
         console.log(this.diff_scalex, this.gameWidth * window.downsize_to_fit * image_enlarge_x, this.nx)
 
+        // Keep media draw-space aligned with piece sample-space.
+        // Piece sampling uses coordinates derived from final scalex/scaley, so
+        // source media must be drawn from (0,0) with matching span.
         this.drawParams = {
-            dx: - this.diff_scalex * this.nx / 2,
-            dy: - this.diff_scaley * this.ny / 2,
-            dw: this.gameWidth * window.downsize_to_fit * image_enlarge_x,
-            dh: this.gameHeight * window.downsize_to_fit * image_enlarge_y,
+            dx: 0,
+            dy: 0,
+            dw: this.scalex * this.nx * image_enlarge_x,
+            dh: this.scaley * this.ny * image_enlarge_y,
           };
         this._gifDraw = this.drawParams;
 
