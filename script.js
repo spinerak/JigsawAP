@@ -2121,7 +2121,7 @@ function updateGrayscaleReferenceCanvas() {
     grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
     grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
     if (!grayscaleReferenceCtx) return;
-    grayscaleReferenceCtx.filter = "grayscale(1)";
+    grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
     grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, w, h);
     grayscaleReferenceCtx.filter = "none";
     if (!grayscaleReferenceCanvas.parentNode) {
