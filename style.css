@@ -529,7 +529,8 @@
     }
     #draggable5 {
       display: inline-block;
-      width: min(760px, 94vw);
+      width: min(440px, 94vw);
+      max-width: min(520px, 95vw);
       min-width: 240px;
       height: auto;
       min-height: 148px;
