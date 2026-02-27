@@ -903,14 +903,19 @@
     }
 
     /* Chat / Log window – themed like the drawer */
+    .chat-window {
+      position: relative;
+    }
     .chat-panel {
+      position: absolute;
+      inset: 0;
       padding: 0 14px 14px;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      height: 100%;
       min-height: 0;
       box-sizing: border-box;
+      overflow: hidden;
     }
 
     @media (max-width: 820px) {
@@ -994,7 +999,7 @@
     }
     .chat-log {
       flex: 1 1 0;
-      min-height: 0;
+      min-height: 80px;
       overflow-y: auto;
       overflow-x: hidden;
       padding: 8px 10px;
@@ -1004,9 +1009,7 @@
       font-size: 0.9rem;
       line-height: 1.45;
       color: #cbd5e1;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
+      display: block;
       text-align: left;
     }
     .chat-log > div {
@@ -1061,7 +1064,7 @@
       bottom: auto;
       left: auto;
       width: auto;
-      height: auto;
+      /* Do not set height so flex layout can constrain it and overflow-y: auto can scroll */
     }
 
     #sendButton {
