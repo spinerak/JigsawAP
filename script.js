@@ -4,54 +4,128 @@ window.pieceSides = 4;
 const corner_to_shape_dist = 1/3; // distance from corner to shape in hexagonal piece
 
 window.downsize_to_fit = 0.85;
+window.PUZZLE_AREA_SURFACE_MULTIPLIER = 2;
 window.show_clue = true;
 window.rotations = 0;
 window.zero_list = [0,0];
+window.rendererConfig = {
+    mode: "auto", // canvas2d | webgl | auto
+    media: "image", // image | gif | video | camera
+    autoFallback: true,
+    perfBudgetMs: 8
+};
 
 var accept_pending_actions = false;
 var process_pending_actions = false;
+window.jigsawRuntime = window.jigsawRuntime || {};
+Object.defineProperty(window.jigsawRuntime, "acceptPendingActions", {
+    get: () => accept_pending_actions,
+    set: (value) => { accept_pending_actions = !!value; }
+});
+Object.defineProperty(window.jigsawRuntime, "processPendingActions", {
+    get: () => process_pending_actions,
+    set: (value) => { process_pending_actions = !!value; }
+});
 
 var bevel_size = localStorage.getItem("option_bevel_2");
 if (bevel_size === null) bevel_size = 0.1;
 
-var shadow_size = localStorage.getItem("option_shadow_2");
-if (shadow_size === null) shadow_size = 0;
+// View/cosmetic control wiring is initialized later by src/ui/ViewControls.js.
 
-// Set starting values from localStorage or defaults
-document.addEventListener('DOMContentLoaded', function() {
-    const borderSelect = document.getElementById('options_bt');
-    const shadowSelect = document.getElementById('options_st');
-
-    // Load from localStorage or use default
-    function formatValue(val, def) {
-        val = parseFloat(localStorage.getItem(val));
-        if (isNaN(val)) val = def;
-        return (val % 1 === 0) ? val.toString() : val.toFixed(1);
+const viewState = {
+    enableZoom: true,
+    enablePan: true,
+    enableScaling: true,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    minZoom: 0.05,
+    maxZoom: 24,
+    zoomStep: 1.2,
+    zoomSensitivity: 1,
+    panSensitivity: 1,
+    panButton: 0,
+    fitScaleLocked: null,
+    isScalingLocked: false,
+    puzzleResolution: "1080p",
+    showGrayscaleReference: false,
+    useCustomDropLocation: false,
+    customDropNormX: 0.1,
+    customDropNormY: 0.1,
+    dropLocationColor: "#FC8"
+};
+try {
+    const storedDrop = localStorage.getItem("useCustomDropLocation");
+    if (storedDrop === "true") viewState.useCustomDropLocation = true;
+} catch (_e) {}
+try {
+    const storedRef = localStorage.getItem("showGrayscaleReference");
+    if (storedRef === "true") viewState.showGrayscaleReference = true;
+} catch (_e) {}
+try {
+    const stored = localStorage.getItem("puzzleResolution");
+    if (stored === "1080p" || stored === "720p" || stored === "540p") {
+        viewState.puzzleResolution = stored;
     }
-    borderSelect.value = formatValue('option_bevel_2', 0.1);
-    shadowSelect.value = formatValue('option_shadow_2', 0);
+} catch (_e) {}
+try {
+    const storedColor = localStorage.getItem("dropLocationColor");
+    if (storedColor && /^#[0-9A-Fa-f]{3}$/.test(storedColor)) viewState.dropLocationColor = storedColor;
+} catch (_e) {}
+window.viewState = viewState;
 
-    // Save to localStorage on change
-    borderSelect.addEventListener('change', function() {
-        localStorage.setItem('option_bevel_2', borderSelect.value);
-    });
-    shadowSelect.addEventListener('change', function() {
-        localStorage.setItem('option_shadow_2', shadowSelect.value);
-    });
-});
+function getPuzzleResolution() {
+    return viewState.puzzleResolution || "1080p";
+}
 
-let allow_zoom = true;
-const zoomBtn = document.getElementById('m11a');
-zoomBtn.addEventListener('click', function() {
-    allow_zoom = !allow_zoom;
-    zoomBtn.innerHTML = allow_zoom ? '🔍✅' : '🔍❌';
-});
+function getDropPositionPixels(puz, scatterFraction) {
+    if (!puz) return { x: 0, y: 0 };
+    const w = puz.contWidth || 1;
+    const h = puz.contHeight || 1;
+    const nx = viewState.customDropNormX != null ? viewState.customDropNormX : 0.1;
+    const ny = viewState.customDropNormY != null ? viewState.customDropNormY : 0.1;
+    let cx = nx * w;
+    let cy = ny * h;
+    if (scatterFraction && scatterFraction > 0) {
+        const s = Math.min(scatterFraction * w, scatterFraction * h, w * 0.1, h * 0.1);
+        cx += (Math.random() * 2 - 1) * s;
+        cy += (Math.random() * 2 - 1) * s;
+    }
+    return { x: cx, y: cy };
+}
+
+const VIEW_DEBUG = false;
+function touchDistance(touches) {
+    return Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+}
+function touchMidpoint(touches) {
+    return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
+}
 
 
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
 
+function getPolyPieceSyncId(pp) {
+    if (!pp) return null;
+    if (typeof pp.syncId === "number" && Number.isFinite(pp.syncId)) return pp.syncId;
+    // Compatibility fallback: older paths may still expect first-piece identity.
+    if (pp.pieces && pp.pieces[0] && typeof pp.pieces[0].index === "number") return pp.pieces[0].index;
+    return null;
+}
+
+function addIgnoreBouncePiece(index, durationMs = 1000) {
+    if (typeof index !== "number" || !Number.isFinite(index)) return;
+    if (!window.ignore_bounce_pieces.includes(index)) window.ignore_bounce_pieces.push(index);
+    setTimeout(() => {
+        const found = window.ignore_bounce_pieces.indexOf(index);
+        if (found !== -1) window.ignore_bounce_pieces.splice(found, 1);
+    }, durationMs);
+}
+
 var puzzle;
+var rendererFacade = null;
+var hitTestService = null;
 
 let seed = 1;
 
@@ -79,6 +153,60 @@ const mhypot = Math.hypot,
     msqrt = Math.sqrt,
     mabs = Math.abs;
 //-----------------------------------------------------------------------------
+
+function clamp(value, min, max) {
+    return mmin(max, mmax(min, value));
+}
+
+function getResponsiveBaseScale() {
+    const cssScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
+    if (!Number.isFinite(cssScale) || cssScale <= 0) return 1;
+    return 1 / cssScale;
+}
+
+function getActiveBaseScale() {
+    if (!viewState.enableScaling && viewState.fitScaleLocked) {
+        return viewState.fitScaleLocked;
+    }
+    return getResponsiveBaseScale();
+}
+
+function getBaseScaleMultiplier() {
+    const activeBase = getActiveBaseScale();
+    if (activeBase === 0) return 1;
+    return 1 / activeBase;
+}
+
+function getEffectivePuzzleAreaAspectRatio(srcImage) {
+    const mode = window.puzzleAreaScale;
+    if (mode === "Landscape") return 16 / 9;
+    if (mode === "Portrait") return 9 / 16;
+    if (mode === "Square") return 1;
+    if (mode === "Picture") {
+        if (window.useCanonicalAspectForLayout && window.canonicalPictureAspectRatio != null && Number.isFinite(window.canonicalPictureAspectRatio)) {
+            return window.canonicalPictureAspectRatio;
+        }
+        if (srcImage) {
+            const nw = srcImage.naturalWidth | 0;
+            const nh = srcImage.naturalHeight | 0;
+            if (nw > 0 && nh > 0) return nw / nh;
+        }
+    }
+    return 16 / 9;
+}
+
+function getZoomedViewScaleMultiplier() {
+    return getBaseScaleMultiplier() * viewState.zoom;
+}
+
+function getEffectiveZoomStep() {
+    return 1 + (viewState.zoomStep - 1) * viewState.zoomSensitivity;
+}
+
+function syncLegacyViewGlobals() {
+    window.scaleFactor = 1 / getActiveBaseScale();
+    window.additional_zoom = viewState.zoom;
+}
 
 function alea(min, max) {
     // random number [min..max[ . If no max is provided, [0..min[
@@ -435,6 +563,9 @@ class PolyPiece {
         this.pckymax = Math.max(...initialPieces.map(piece => piece.ky)) + 1;
         this.pieces = initialPieces;
         this.puzzle = puzzle;
+        this.syncId = (initialPieces && initialPieces[0] && typeof initialPieces[0].index === "number")
+            ? initialPieces[0].index
+            : null;
         this.listLoops();
         this.hinted = false;
         this.hasMovedEver = false;
@@ -446,6 +577,7 @@ class PolyPiece {
         // size and z-index will be defined later
         puzzle.container.appendChild(this.polypiece_canvas);
         this.polypiece_canvas.classList.add('polypiece');
+        this.polypiece_canvas.style.display = "none";
         this.polypiece_ctx = this.polypiece_canvas.getContext("2d");
     } // PolyPiece
 
@@ -463,7 +595,11 @@ class PolyPiece {
             return;
         }
 
-        const changingIndex = Math.max(this.pieces[0].index, otherPoly.pieces[0].index);
+        const thisSyncIdBefore = getPolyPieceSyncId(this);
+        const otherSyncIdBefore = getPolyPieceSyncId(otherPoly);
+        const thisIdentity = (typeof thisSyncIdBefore === "number") ? thisSyncIdBefore : this.pieces[0].index;
+        const otherIdentity = (typeof otherSyncIdBefore === "number") ? otherSyncIdBefore : otherPoly.pieces[0].index;
+        const changingIndex = Math.max(thisIdentity, otherIdentity);
 
         const orgpckxmin = this.pckxmin;
         const orgpckymin = this.pckymin;
@@ -477,11 +613,9 @@ class PolyPiece {
         const kOther = this.puzzle.polyPieces.indexOf(otherPoly);
         this.puzzle.polyPieces.splice(kOther, 1);
 
-        // remove other canvas from container
-        if (this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
-            this.puzzle.container.removeChild(otherPoly.polypiece_canvas);
-        } else {
-            console.log("The canvas is not a child of the container??", this, otherPoly);
+        // Keep old pieces visible until merged canvas has rendered.
+        if (otherPoly.polypiece_canvas) {
+            otherPoly.polypiece_canvas.style.pointerEvents = "none";
         }
 
         let forceRedraw = false;
@@ -489,17 +623,13 @@ class PolyPiece {
             otherPoly.pieces[k].drawn = false;
 
             if (window.gameplayStarted && notifyMerge) {
-                const min = Math.min(this.pieces[0].index, otherPoly.pieces[k].index)
-                const max = Math.max(this.pieces[0].index, otherPoly.pieces[k].index)
+                const absorbedId = otherPoly.pieces[k].index;
+                const min = Math.min(thisIdentity, absorbedId);
+                const max = Math.max(thisIdentity, absorbedId);
                 // console.log("merge", max, "to", min);
 
-                window.ignore_bounce_pieces.push(min);
-                setTimeout(() => {
-                    const index = window.ignore_bounce_pieces.indexOf(min);
-                    if (index !== -1) {
-                        window.ignore_bounce_pieces.splice(index, 1);
-                    }
-                }, 1000);
+                addIgnoreBouncePiece(min);
+                addIgnoreBouncePiece(max);
                 
                 change_savedata_datastorage(max, min, true);
                 // console.log("done merge", max, "to", min);
@@ -535,26 +665,34 @@ class PolyPiece {
         this.pieces.sort(function (p1, p2) {
             return p1.index - p2.index;
         });
+        this.syncId = Math.min(thisIdentity, otherIdentity);
 
         // redefine consecutive edges
         this.listLoops();
 
-        this.polypiece_drawImage(!forceRedraw);
+        // Keep merge positioning deterministic even when drawing is deferred.
+        this.nx = this.pckxmax - this.pckxmin + 1;
+        this.ny = this.pckymax - this.pckymin + 1;
 
         const r1 =  -(this.pckxmin - orgpckxmin) * this.puzzle.scalex / 2 - (this.pckxmax - orgpckxmax) * this.puzzle.scalex / 2;
         const r2 =  -(this.pckymin - orgpckymin) * this.puzzle.scaley / 2 - (this.pckymax - orgpckymax) * this.puzzle.scaley / 2;
         const r = rotateVector(r1, r2, -this.rot);
+        const targetX = orgcx - (this.nx-1) * this.puzzle.scalex / 2 - r.x;
+        const targetY = orgcy - (this.ny-1) * this.puzzle.scaley / 2 - r.y;
 
-        this.moveTo(
-            orgcx - (this.nx-1) * this.puzzle.scalex / 2 - r.x,
-            orgcy - (this.ny-1) * this.puzzle.scaley / 2 - r.y
-        );
+        // Update logical position now; defer DOM move until merged render completes
+        // to avoid visible jumps/flicker while old canvases are still on screen.
+        this.x = targetX;
+        this.y = targetY;
         this.hasMovedEver = true;
 
-
-
-
-        this.puzzle.evaluateZIndex();
+        queuePolyPieceSetup(this, !forceRedraw, true, () => {
+            this.moveTo(targetX, targetY);
+            if (this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
+                this.puzzle.container.removeChild(otherPoly.polypiece_canvas);
+            }
+            this.puzzle.evaluateZIndex();
+        });
 
         newMerge(changingIndex);
 
@@ -802,12 +940,7 @@ class PolyPiece {
             } // for kEdge
         } // for k
 
-        let loopcount = 0;
         while (tbEdges.length > 0) {
-            loopcount++;
-            if(loopcount > 1){
-                console.log("PANIC!")
-            }
             lp = []; // new loop
             currEdge = tbEdges[0];   // we begin with first available edge
             lp.push(currEdge);       // add it to loop
@@ -916,98 +1049,142 @@ class PolyPiece {
             }
         }
 
-        let w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
-        let h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
+        const rendererReady = !!(
+            rendererFacade &&
+            rendererFacade.activeRenderer &&
+            rendererFacade.activeRenderer.enabled &&
+            rendererFacade.activeRenderer.canvas &&
+            rendererFacade.activeRenderer.canvas.parentElement
+        );
+        const activeRendererName = rendererReady && rendererFacade.activeRenderer && rendererFacade.activeRenderer.constructor
+            ? rendererFacade.activeRenderer.constructor.name
+            : "";
+        const canvas2dActive = activeRendererName === "CanvasRenderer";
+        const webglActive = activeRendererName === "WebGLRenderer";
+        const w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
+        const h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
+        // drawParams dx/dy are already applied when source media is rendered into gameCanvas.
+        // Per-piece sampling must stay in gameCanvas coordinates (no second offset).
+        this._mediaSample = {
+            sx: srcx,
+            sy: srcy,
+            destx,
+            desty,
+            w,
+            h
+        };
 
-        // Create an offscreen canvas the size of your destination draw area
-        if(!this.maskCanvas){
-            this.maskCanvas = document.createElement("canvas");
-        }
-        this.maskCanvas.width = w;
-        this.maskCanvas.height = h;
-        const maskCtx = this.maskCanvas.getContext("2d");
-
-        // 1. Draw your puzzle piece shape onto the mask canvas
-        maskCtx.save();
-        maskCtx.translate(-destx, -desty); // Align the path correctly relative to mask
-        maskCtx.fill(this.path);
-        maskCtx.restore();
-
-        // 2. Set composite mode to keep only pixels inside the shape
-        maskCtx.globalCompositeOperation = "source-in";
-
-        // console.log(w, h, offsetw, offseth);
-        // 3. Draw the source image (only visible inside the shape now)
-        maskCtx.drawImage(puzzle.gameCanvas, srcx, srcy, w, h, 0,0, w, h);
-
-        // 4. Draw the final result onto your main canvas
-        this.polypiece_ctx.drawImage(this.maskCanvas, destx, desty);
-
-
-        let borders = apnx * apny < 150 && (bevel_size > 0 || shadow_size > 0);
-
-        if(borders){
-        
-            this.pieces.forEach((pp, kk) => {
-
-                if(true) { //!pp.drawn || !ignoreRedraw
-                    this.polypiece_ctx.save();
-
-                    const path = new Path2D();
-                    const shiftx = -this.offsx;
-                    const shifty = -this.offsy;
-                    pp.sides.forEach((side, i) => {
-                        if (i == 0) {
-                            side.drawPath(path, shiftx, shifty, false);
-                        } else {
-                            side.drawPath(path, shiftx, shifty, true);
-                        }
-                    });
-                    path.closePath();
-
-                    this.polypiece_ctx.clip(path);
-                    
-                    let embth = puzzle.scalex * 0.01 * bevel_size * window.scaleFactor * window.additional_zoom;
-                    // if(this.hinted){
-                    //     embth = puzzle.scalex * 0.01 * window.scaleFactor * window.additional_zoom;
-                    // }
-                    
-
-                    this.polypiece_ctx.translate(embth / 2, -embth / 2);
-                    this.polypiece_ctx.lineWidth = embth;
-                    this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-                    // if(this.hinted){
-                    //     this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
-                    // }
-                    this.polypiece_ctx.stroke(path);
-
-                    this.polypiece_ctx.translate(-embth, embth);
-                    this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-                    
-                    // if(this.hinted){
-                    //     this.polypiece_ctx.strokeStyle = "rgba(250, 0, 0, 1)";
-                    // }
-                    this.polypiece_ctx.stroke(path);
-                    
-                    this.polypiece_ctx.restore();
-
-                    pp.drawn = true;
-                }
-            });
+        // In single-canvas 2D mode, keep per-piece canvases as overlay/path data only.
+        // Other paths still draw media pixels into each piece canvas.
+        if (!canvas2dActive && !webglActive) {
+            this._drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty);
         }
 
-        
-        
-        // Draw a red outline
-        if(this.hinted){
-            this.polypiece_ctx.strokeStyle = hint_color;
-            this.polypiece_ctx.lineWidth = Math.max(.03 * puzzle.scalex, 7);
-            this.polypiece_ctx.stroke(this.path);
-        }
-
+        // Keep only overlay/hit-test data on piece canvases for renderer-backed modes.
+        this.polypiece_canvas.style.backgroundImage = "none";
+        this.polypiece_canvas.style.maskImage = "none";
+        this.polypiece_canvas.style.webkitMaskImage = "none";
+        this._drawOverlayOnly(puzzle, canvas2dActive || webglActive);
+        this._overlayVersion = (this._overlayVersion || 0) + 1;
+        if (webglActive) this._ensureWebGLMaskCanvas();
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
+        this.polypiece_canvas.style.display = rendererReady ? "none" : "block";
+        return;
 
     } // PolyPiece.polypiece_drawImage
 
+    _drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty) {
+        const w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
+        const h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
+        const sx = srcx;
+        const sy = srcy;
+        this._mediaSample = { sx, sy, destx, desty, w, h };
+
+        this.polypiece_ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.polypiece_ctx.clearRect(0, 0, this.polypiece_canvas.width, this.polypiece_canvas.height);
+        this.polypiece_ctx.save();
+        this.polypiece_ctx.clip(this.path);
+        this.polypiece_ctx.drawImage(
+            puzzle.gameCanvas,
+            sx, sy, w, h,
+            destx, desty, w, h
+        );
+        this.polypiece_ctx.restore();
+    }
+
+    _drawOverlayOnly(puz, clearCanvas = true) {
+        this.polypiece_ctx.setTransform(1, 0, 0, 1, 0, 0);
+        if (clearCanvas) {
+            this.polypiece_ctx.clearRect(0, 0, this.polypiece_canvas.width, this.polypiece_canvas.height);
+        }
+
+        const borders = apnx * apny < 150 && bevel_size > 0;
+        const embth = puz.scalex * 0.01 * bevel_size;
+        const worldLight = this._worldToPieceLocal(embth / 2, -embth / 2);
+
+        if (borders) {
+            this.pieces.forEach((pp, kk) => {
+                this.polypiece_ctx.save();
+
+                const path = new Path2D();
+                const shiftx = -this.offsx;
+                const shifty = -this.offsy;
+                pp.sides.forEach((side, i) => {
+                    if (i === 0) {
+                        side.drawPath(path, shiftx, shifty, false);
+                    } else {
+                        side.drawPath(path, shiftx, shifty, true);
+                    }
+                });
+                path.closePath();
+
+                this.polypiece_ctx.clip(path);
+                this.polypiece_ctx.translate(worldLight.x, worldLight.y);
+                this.polypiece_ctx.lineWidth = embth;
+                this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+                this.polypiece_ctx.stroke(path);
+                this.polypiece_ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
+                this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+                this.polypiece_ctx.stroke(path);
+
+                this.polypiece_ctx.restore();
+            });
+        }
+
+        if (this.hinted) {
+            this.polypiece_ctx.strokeStyle = hint_color;
+            this.polypiece_ctx.lineWidth = Math.max(0.03 * puz.scalex, 7);
+            this.polypiece_ctx.stroke(this.path);
+        }
+    }
+
+    _worldToPieceLocal(worldDx, worldDy) {
+        const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+        const angle = (this.rot || 0) * deg * Math.PI / 180;
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+        return {
+            x: worldDx * c + worldDy * s,
+            y: -worldDx * s + worldDy * c
+        };
+    }
+
+    _ensureWebGLMaskCanvas() {
+        const w = this.polypiece_canvas.width | 0;
+        const h = this.polypiece_canvas.height | 0;
+        if (w <= 0 || h <= 0 || !this.path) return;
+        if (!this._maskCanvas) this._maskCanvas = document.createElement("canvas");
+        if (this._maskCanvas.width !== w || this._maskCanvas.height !== h) {
+            this._maskCanvas.width = w;
+            this._maskCanvas.height = h;
+        }
+        const mctx = this._maskCanvas.getContext("2d");
+        mctx.setTransform(1, 0, 0, 1, 0, 0);
+        mctx.clearRect(0, 0, w, h);
+        mctx.fillStyle = "#fff";
+        mctx.fill(this.path);
+        this._maskVersion = (this._maskVersion || 0) + 1;
+    }
 
     moveTo(x, y) {
         // sets the left, top properties (relative to container) of this.canvas
@@ -1015,6 +1192,7 @@ class PolyPiece {
         this.y = y;
         this.polypiece_canvas.style.left = (this.x) + 'px';
         this.polypiece_canvas.style.top = (this.y) + 'px';
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
     } //
 
     moveAwayFromBorder(){
@@ -1065,6 +1243,7 @@ class PolyPiece {
             rotamount = 90;
         }
         this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * rotamount}deg)`;
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
 
         if(moving){
             // Adjust position to ensure the piece stays under the cursor
@@ -1113,6 +1292,12 @@ class Puzzle {
             document.getElementById(params.container) :
             params.container;
 
+        this._releaseHandled = false;
+        this.handleLeave = () => {
+            this._releaseHandled = false;
+            events.push({ event: 'leave' });
+        };
+
         /* the following code will add the event Handlers several times if
             new Puzzle objects are created with same container.
             the presence of previous event listeners is NOT detectable
@@ -1135,20 +1320,43 @@ class Puzzle {
             events.push({ event: 'touch', button: 0, position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
-        this.container.addEventListener("mouseup", event => {
+        this._boundMouseUp = (event) => {
             event.preventDefault();
-            handleLeave();
-        });
+            // Ignore synthetic mouseup emitted from touch interactions.
+            if (event && event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) {
+                return;
+            }
+            if (this._releaseHandled) this.handleLeave();
+        };
+        this._boundTouchEnd = (event) => {
+            if (event.touches.length == 0 && this._releaseHandled) this.handleLeave();
+        };
+        this._boundTouchLeave = (event) => {
+            if (event.touches.length == 0 && this._releaseHandled) this.handleLeave();
+        };
+        this._boundTouchCancel = (event) => {
+            if (event.touches.length == 0 && this._releaseHandled) this.handleLeave();
+        };
+        document.addEventListener("mouseup", this._boundMouseUp);
+        document.addEventListener("touchend", this._boundTouchEnd);
+        document.addEventListener("touchleave", this._boundTouchLeave);
+        document.addEventListener("touchcancel", this._boundTouchCancel);
 
-        this.container.addEventListener("touchend", event => {
-            if (event.touches.length == 0) handleLeave();
-        });
-        this.container.addEventListener("touchleave", event => {
-            if (event.touches.length == 0) handleLeave();
-        });
-        this.container.addEventListener("touchcancel", event => {
-            if (event.touches.length == 0) handleLeave();
-        });
+        this._boundPointerDown = (event) => {
+            this.container.setPointerCapture(event.pointerId);
+        };
+        this._boundPointerUp = (event) => {
+            // On touch devices, pointerup can fire while another finger is still down.
+            // Drop should be controlled by touchend when touches.length reaches 0.
+            if (event && event.pointerType === "touch") {
+                this.container.releasePointerCapture(event.pointerId);
+                return;
+            }
+            if (this._releaseHandled) this.handleLeave();
+            this.container.releasePointerCapture(event.pointerId);
+        };
+        this.container.addEventListener("pointerdown", this._boundPointerDown);
+        this.container.addEventListener("pointerup", this._boundPointerUp);
 
         this.container.addEventListener("mousemove", event => {
             event.preventDefault();
@@ -1172,17 +1380,29 @@ class Puzzle {
         this.container.appendChild(this.gameCanvas)
 
         this.srcImage = new Image();
+        this.srcImage.crossOrigin = "anonymous";
         this.imageLoaded = false;
+        this._webglStartBlockedReason = "";
+        // PolyPiece groups are still the runtime piece containers; keep this
+        // initialized for pre-start interactions (preview/pan/click paths).
+        this.polyPieces = [];
         this.srcImage.addEventListener("load", () => imageLoaded(this));
-
-        function handleLeave() {
-            // console.log("HANDLING LEAVE")
-            events.push({ event: 'leave' }); //
-        }
 
         this.scale_zoom = 1;
 
     } // Puzzle
+
+    destroy() {
+        document.removeEventListener("mouseup", this._boundMouseUp);
+        document.removeEventListener("touchend", this._boundTouchEnd);
+        document.removeEventListener("touchleave", this._boundTouchLeave);
+        document.removeEventListener("touchcancel", this._boundTouchCancel);
+        this.container.removeEventListener("pointerdown", this._boundPointerDown);
+        this.container.removeEventListener("pointerup", this._boundPointerUp);
+        if (this.srcImage && this.srcImage.parentElement) {
+            this.srcImage.parentElement.removeChild(this.srcImage);
+        }
+    }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     getContainerSize() {
@@ -1192,6 +1412,32 @@ class Puzzle {
         this.contWidth = parseFloat(styl.width);
         this.contHeight = parseFloat(styl.height);
         
+    }
+
+    //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    sizeContainerByAspectRatio(aspectRatio) {
+        const puzzleDIV = this.container.parentElement;
+        const baseScale = getActiveBaseScale();
+        let maxContentW, maxContentH;
+        if (puzzleDIV && baseScale > 0) {
+            maxContentW = puzzleDIV.clientWidth / baseScale;
+            maxContentH = puzzleDIV.clientHeight / baseScale;
+        } else {
+            this.getContainerSize();
+            maxContentW = this.contWidth || 800;
+            maxContentH = this.contHeight || 600;
+        }
+        let contWidth, contHeight;
+        if (maxContentW / maxContentH > aspectRatio) {
+            contHeight = maxContentH;
+            contWidth = maxContentH * aspectRatio;
+        } else {
+            contWidth = maxContentW;
+            contHeight = maxContentW / aspectRatio;
+        }
+        this.container.style.width = contWidth + 'px';
+        this.container.style.height = contHeight + 'px';
+        this.getContainerSize();
     }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1284,33 +1530,28 @@ class Puzzle {
             return;
         }
 
-        let kx, ky, width = this.srcImage.naturalWidth, height = this.srcImage.naturalHeight, npieces = this.nbPieces;
-        let err, errmin = 1e9;
-        let ncv, nch;
+        const pairs = [];
+        for (let nch = 1; nch <= this.nbPieces; nch++) {
+            const ncv = Math.round(this.nbPieces / nch);
+            if (ncv >= 1) pairs.push([nch, ncv]);
+        }
 
+        let best = pairs[0];
+        let bestErr = Infinity;
 
-        let nHPieces = mround(msqrt(npieces * width / height));
-        let nVPieces = mround(npieces / nHPieces);
-        
-        /* based on the above estimation, we will try up to + / - 2 values
-            and evaluate (arbitrary) quality criterion to keep best result
-        */
-
-        for (ky = 0; ky < 5; ky++) {
-            ncv = nVPieces + ky - 2;
-            for (kx = 0; kx < 5; kx++) {
-            nch = nHPieces + kx - 2;
-            err = nch * height / ncv / width;
-            err = (err + 1 / err) - 2; // error on pieces dimensions ratio)
-            err += mabs(1 - nch * ncv / npieces); // adds error on number of pieces
-
-            if (err < errmin) { // keep smallest error
-                errmin = err;
-                this.nx = nch;
-                this.ny = ncv;
+        for (const [nch, ncv] of pairs) {
+            let err;
+            const ratio = (nch * this.srcImage.naturalHeight) / (ncv * this.srcImage.naturalWidth);
+            err = (ratio + 1 / ratio) - 2;
+            if (err < bestErr) {
+                bestErr = err;
+                best = [nch, ncv];
             }
-            } // for kx
-        } // for ky
+        }
+
+        this.nx = best[0];
+        this.ny = best[1];
+        this.nbPieces = this.nx * this.ny;
 
     } // computenxAndny
 
@@ -1568,29 +1809,40 @@ class Puzzle {
 
     puzzle_scale() {
 
-        // we suppose we want the picture to fill 90% on width or height and less or same on other dimension
-        // this 90% might be changed and depend on the number of columns / rows.
+        const aspectRatio = getEffectivePuzzleAreaAspectRatio(this.srcImage);
 
-        // suppose image fits in height
-        puzzle.getContainerSize();
-
-        const aspectRatio = this.srcImage.naturalWidth / this.srcImage.naturalHeight;
-        if (this.contWidth / this.contHeight > aspectRatio) {
-            this.gameHeight = this.contHeight;
-            this.gameWidth = this.contHeight * aspectRatio;
+        if (this.srcImage) {
+            this.sizeContainerByAspectRatio(aspectRatio);
+            const sqrtMultiplier = Math.sqrt(window.PUZZLE_AREA_SURFACE_MULTIPLIER || 1.25);
+            const availableW = this.contWidth / sqrtMultiplier;
+            const availableH = this.contHeight / sqrtMultiplier;
+            const nw = this.srcImage.naturalWidth | 0;
+            const nh = this.srcImage.naturalHeight | 0;
+            const imageAspect = (nw > 0 && nh > 0) ? (nw / nh) : aspectRatio;
+            if (availableW / availableH > imageAspect) {
+                this.gameHeight = availableH;
+                this.gameWidth = availableH * imageAspect;
+            } else {
+                this.gameWidth = availableW;
+                this.gameHeight = availableW / imageAspect;
+            }
         } else {
-            this.gameWidth = this.contWidth;
-            this.gameHeight = this.contWidth / aspectRatio;
+            this.getContainerSize();
+            if (this.contWidth / this.contHeight > aspectRatio) {
+                this.gameHeight = this.contHeight;
+                this.gameWidth = this.contHeight * aspectRatio;
+            } else {
+                this.gameWidth = this.contWidth;
+                this.gameHeight = this.contWidth / aspectRatio;
+            }
         }
 
-        // this.gameWidth *= 2;
-        // this.gameHeight *= 2;
-
-
         /* get a scaled copy of the source picture into a canvas */
+        if (!Number.isFinite(this.gameWidth) || this.gameWidth <= 0) this.gameWidth = mmax(1, this.contWidth || 1);
+        if (!Number.isFinite(this.gameHeight) || this.gameHeight <= 0) this.gameHeight = mmax(1, this.contHeight || 1);
         this.gameCanvas = document.createElement('CANVAS');
-        this.gameCanvas.width = this.gameWidth;
-        this.gameCanvas.height = this.gameHeight;
+        this.gameCanvas.width = mmax(1, Math.round(this.gameWidth));
+        this.gameCanvas.height = mmax(1, Math.round(this.gameHeight));
         this.gameCtx = this.gameCanvas.getContext("2d");
 
         let image_enlarge_x=1, image_enlarge_y=1;
@@ -1638,13 +1890,24 @@ class Puzzle {
 
         console.log(this.diff_scalex, this.gameWidth * window.downsize_to_fit * image_enlarge_x, this.nx)
 
+        // Keep media draw-space aligned with piece sample-space.
+        // Piece sampling uses coordinates derived from final scalex/scaley, so
+        // source media must be drawn from (0,0) with matching span.
+        this.drawParams = {
+            dx: 0,
+            dy: 0,
+            dw: this.scalex * this.nx * image_enlarge_x,
+            dh: this.scaley * this.ny * image_enlarge_y,
+          };
+        this._gifDraw = this.drawParams;
+
         this.gameCtx.drawImage(
             this.srcImage, 
-            - this.diff_scalex * this.nx / 2, 
-            - this.diff_scaley * this.ny / 2, 
-            this.gameWidth * window.downsize_to_fit * image_enlarge_x, 
-            this.gameHeight * window.downsize_to_fit * image_enlarge_y
-        ); //safe
+            this.drawParams.dx, 
+            this.drawParams.dy, 
+            this.drawParams.dw, 
+            this.drawParams.dh
+        );
         
 
         this.gameCanvas.classList.add("gameCanvas");
@@ -1661,84 +1924,130 @@ class Puzzle {
         this.offsx = (this.contWidth - this.gameWidth) / 2;
         this.offsy = (this.contHeight - this.gameHeight) / 2;
 
-        /* computes the distance below which two pieces connect
-            depends on the actual size of pieces, with lower limit */
-        this.dConnect = 0.85 * mmax(10, mmin(this.scalex, this.scaley) / 10) * window.scaleFactor * window.additional_zoom;
-        this.dConnect *= this.dConnect; // square of distance
+        this.refreshConnectionDistance();
 
 
     } // Puzzle.scale
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    refreshConnectionDistance() {
+        /* computes the distance below which two pieces connect
+           depends on the actual size of pieces, with lower limit */
+        // Keep merge threshold independent from camera zoom level.
+        this.dConnect = 0.85 * mmax(10, mmin(this.scalex, this.scaley) / 10) * getBaseScaleMultiplier();
+        this.dConnect *= this.dConnect; // square of distance
+    } // Puzzle.refreshConnectionDistance
+
+    getViewMetrics() {
+        const br = this.container.getBoundingClientRect();
+        const baseScale = getActiveBaseScale();
+        const effectiveScale = baseScale * viewState.zoom;
+        return { br, baseScale, effectiveScale };
+    }
+
+    screenToPuzzle(clientX, clientY) {
+        const { br, effectiveScale } = this.getViewMetrics();
+        return {
+            x: (clientX - br.x) / effectiveScale,
+            y: (clientY - br.y) / effectiveScale,
+            p_x: (clientX - br.x) / br.width,
+            p_y: (clientY - br.y) / br.height,
+            clientX,
+            clientY
+        };
+    }
+
+    puzzleToScreen(x, y) {
+        const { br, effectiveScale } = this.getViewMetrics();
+        return {
+            x: br.x + x * effectiveScale,
+            y: br.y + y * effectiveScale
+        };
+    }
+
     relativeMouseCoordinates(event) {
 
         /* takes mouse coordinates from mouse event
             returns coordinates relative to container, even if page is scrolled or zoommed */
 
-        const br = this.container.getBoundingClientRect();
-        
-        return {
-            x: (event.clientX - br.x) * window.scaleFactor / window.additional_zoom,
-            y: (event.clientY - br.y) * window.scaleFactor / window.additional_zoom,
-            p_x: (event.clientX - br.x) / br.width,
-            p_y: (event.clientY - br.y) / br.height
-        };
+        return this.screenToPuzzle(event.clientX, event.clientY);
     } // Puzzle.relativeMouseCoordinates
 
     
 
     evaluateZIndex() {
+        if (!Array.isArray(this.polyPieces) || this.polyPieces.length === 0) {
+            this._zOrderVersion = (this._zOrderVersion || 0) + 1;
+            if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
+            return;
+        }
         // re-assign zIndex
         this.polyPieces.forEach((pp, k) => {
             pp.polypiece_canvas.style.zIndex = -pp.pieces.length * 10000 + k + 100000000;
         });
+        this._zOrderVersion = (this._zOrderVersion || 0) + 1;
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
     } // Puzzle.evaluateZIndex
+
+    renderSourceToGameCanvas(sourceOverride = null) {
+        if (!this.gameCtx || !this._gifDraw) return;
+      
+        const { dx, dy, dw, dh } = this._gifDraw;
+        const source = sourceOverride || this.srcImage;
+        if (!source) return;
+        this.gameCtx.clearRect(0, 0, this.gameCanvas.width, this.gameCanvas.height);
+        this.gameCtx.drawImage(source, dx, dy, dw, dh);
+      }
+
+      applyMediaFrame(frameSource, nowMs) {
+        if (!frameSource || !this.polyPieces || !this.polyPieces.length) return false;
+        this.renderSourceToGameCanvas(frameSource);
+        if (viewState.showGrayscaleReference && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
+        const activeRendererName = (rendererFacade && rendererFacade.activeRenderer && rendererFacade.activeRenderer.constructor)
+            ? rendererFacade.activeRenderer.constructor.name
+            : "";
+        if (activeRendererName !== "CanvasRenderer" && activeRendererName !== "WebGLRenderer") {
+            for (const pp of this.polyPieces) pp.polypiece_drawImage(true);
+        }
+        this._lastMediaFrameMs = nowMs || 0;
+        return true;
+      }
+      
 } // class Puzzle
 //-----------------------------------------------------------------------------
 
 let loadFile;
-{ // scope for loadFile
-
-    let options;
-
-    let elFile = document.createElement('input');
-    elFile.setAttribute('type', 'file');
-    elFile.setAttribute('multiple', 'multiple');
-    elFile.style.display = 'none';
-    elFile.addEventListener("change", getFile);
-
-    function getFile() {
-        if (this.files.length == 0) {
-            //      returnLoadFile ({fail: 'no file'});
-            return;
-        }
-        
-        let reader = new FileReader();
-        let randomIndex = Math.floor(Math.random() * this.files.length);
-
-        reader.addEventListener('load', () => {
-            setImagePath(reader.result);
-        });
-        reader.readAsDataURL(this.files[randomIndex]);
-    } // getFile
-
-    loadFile = function (ooptions) {
-        elFile.setAttribute("accept", "image/*");
-        elFile.value = null; // else, re-selecting the same file does not trigger "change"
-        elFile.click();
-    } // loadFile
-} //  // scope for loadFile
+let startWebcamSource;
+let startLinkCaptureSource;
+let mediaBindings = null;
 
 var defaultImagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
 var imagePath = "https://images.pexels.com/photos/147411/italy-mountains-dawn-daybreak-147411.jpeg";
 
 function loadInitialFile() {
-    setImagePath(window.defaultImagePath);
+    if (mediaBindings && mediaBindings.loadInitialFile) {
+        mediaBindings.loadInitialFile();
+    } else {
+        setImagePath(window.defaultImagePath);
+    }
 }
 
 //-----------------------------------------------------------------------------
 function imageLoaded(puzzle) {
+    try {
+        const probe = document.createElement("canvas");
+        probe.width = 1;
+        probe.height = 1;
+        const pctx = probe.getContext("2d");
+        if (pctx) {
+            pctx.drawImage(puzzle.srcImage, 0, 0, 1, 1);
+            pctx.getImageData(0, 0, 1, 1);
+            puzzle._webglStartBlockedReason = "";
+        }
+    } catch (_e) {
+        puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
+    }
     events.push({ event: "srcImageLoaded" });
     puzzle.imageLoaded = true;
 } // imageLoaded
@@ -1750,8 +2059,9 @@ function fitImage(img, width, height) {
     (width and height must be less than or equal to the container dimensions)
     */
 
-    let wn = img.naturalWidth;
-    let hn = img.naturalHeight;
+    let wn = img.naturalWidth || img.videoWidth || img.width;
+    let hn = img.naturalHeight || img.videoHeight || img.height;
+    if (!wn || !hn) return;
     let w = width;
     let h = w * hn / wn;
     if (h > height) {
@@ -1774,39 +2084,321 @@ window.gameplayStarted = false;
 let manually_load_save_file = false;
 
 
-// Fetch scale factor from CSS
-window.scaleFactor = getComputedStyle(document.documentElement).getPropertyValue('--scale-factor').trim();
+syncLegacyViewGlobals();
 
 let tmpImage;
+let tmpPreviewCtx = null;
+let syncedPreviewCanvas = null;
+let syncedPreviewCtx = null;
+let grayscaleReferenceCanvas = null;
+let grayscaleReferenceCtx = null;
+
+function updateGrayscaleReferenceCanvas() {
+    if (!puzzle || !puzzle.container) return;
+    if (!viewState.showGrayscaleReference) {
+        if (grayscaleReferenceCanvas && grayscaleReferenceCanvas.parentNode) {
+            grayscaleReferenceCanvas.parentNode.removeChild(grayscaleReferenceCanvas);
+        }
+        grayscaleReferenceCanvas = null;
+        grayscaleReferenceCtx = null;
+        return;
+    }
+    if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
+    const w = Math.max(1, Math.round(puzzle.gameWidth));
+    const h = Math.max(1, Math.round(puzzle.gameHeight));
+    if (!grayscaleReferenceCanvas) {
+        grayscaleReferenceCanvas = document.createElement("canvas");
+        grayscaleReferenceCtx = grayscaleReferenceCanvas.getContext("2d");
+        grayscaleReferenceCanvas.className = "grayscale-reference-canvas";
+        grayscaleReferenceCanvas.style.position = "absolute";
+        grayscaleReferenceCanvas.style.pointerEvents = "none";
+        grayscaleReferenceCanvas.style.zIndex = "99999997";
+    }
+    grayscaleReferenceCanvas.width = w;
+    grayscaleReferenceCanvas.height = h;
+    grayscaleReferenceCanvas.style.width = w + "px";
+    grayscaleReferenceCanvas.style.height = h + "px";
+    grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
+    grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
+    if (!grayscaleReferenceCtx) return;
+    grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
+    grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, w, h);
+    grayscaleReferenceCtx.filter = "none";
+    if (!grayscaleReferenceCanvas.parentNode) {
+        puzzle.container.insertBefore(grayscaleReferenceCanvas, puzzle.container.firstChild);
+    }
+}
+window.updateGrayscaleReferenceCanvas = updateGrayscaleReferenceCanvas;
+
+let dropLocationTarget = null;
+let dropTargetDragState = null;
+
+function applyDropLocationTargetColor(el) {
+    if (!el || !viewState.dropLocationColor) return;
+    const hex = viewState.dropLocationColor.replace(/^#/, "");
+    const r = hex.length === 3 ? (parseInt(hex[0] + hex[0], 16)) : parseInt(hex.slice(0, 2), 16);
+    const g = hex.length === 3 ? (parseInt(hex[1] + hex[1], 16)) : parseInt(hex.slice(2, 4), 16);
+    const b = hex.length === 3 ? (parseInt(hex[2] + hex[2], 16)) : parseInt(hex.slice(4, 6), 16);
+    el.style.borderColor = viewState.dropLocationColor;
+    el.style.background = "rgba(" + r + "," + g + "," + b + ",0.2)";
+}
+
+function createDropLocationTarget() {
+    if (dropLocationTarget) return dropLocationTarget;
+    const el = document.createElement("div");
+    el.id = "dropLocationTarget";
+    el.className = "drop-location-target";
+    el.setAttribute("aria-label", "Drop location for new pieces (drag to move)");
+    el.title = "Drag to set where new pieces appear";
+    el.style.cssText = "position:absolute;width:48px;height:48px;border-radius:50%;border:3px solid;transform:translate(-50%,-50%);pointer-events:auto;z-index:2147483646;box-sizing:border-box;";
+    applyDropLocationTargetColor(el);
+    function clampNorm(v) { return Math.max(0.02, Math.min(0.98, v)); }
+    function updatePositionFromClient(clientX, clientY) {
+        if (!puzzle || !puzzle.container) return;
+        const br = puzzle.container.getBoundingClientRect();
+        if (br.width <= 0 || br.height <= 0) return;
+        const normX = clampNorm((clientX - br.left) / br.width);
+        const normY = clampNorm((clientY - br.top) / br.height);
+        viewState.customDropNormX = normX;
+        viewState.customDropNormY = normY;
+        el.style.left = (normX * 100) + "%";
+        el.style.top = (normY * 100) + "%";
+    }
+    function onPointerMove(e) {
+        if (!dropTargetDragState || !dropTargetDragState.active) return;
+        e.preventDefault();
+        const clientX = e.clientX != null ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientY = e.clientY != null ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        updatePositionFromClient(clientX, clientY);
+    }
+    function onPointerUp() {
+        if (!dropTargetDragState) return;
+        dropTargetDragState.active = false;
+        document.removeEventListener("pointermove", onPointerMove, true);
+        document.removeEventListener("pointerup", onPointerUp, true);
+        document.removeEventListener("pointercancel", onPointerUp, true);
+    }
+    el.addEventListener("pointerdown", function (e) {
+        if (!viewState.useCustomDropLocation || !puzzle || !puzzle.container) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dropTargetDragState = { active: true };
+        updatePositionFromClient(e.clientX, e.clientY);
+        document.addEventListener("pointermove", onPointerMove, true);
+        document.addEventListener("pointerup", onPointerUp, true);
+        document.addEventListener("pointercancel", onPointerUp, true);
+    });
+    dropLocationTarget = el;
+    return el;
+}
+
+function updateDropLocationTarget() {
+    if (!viewState.useCustomDropLocation) {
+        if (dropLocationTarget) {
+            dropLocationTarget.style.display = "none";
+            dropLocationTarget.style.pointerEvents = "none";
+        }
+        return;
+    }
+    if (!puzzle || !puzzle.container) return;
+    const el = createDropLocationTarget();
+    const nx = viewState.customDropNormX != null ? viewState.customDropNormX : 0.1;
+    const ny = viewState.customDropNormY != null ? viewState.customDropNormY : 0.1;
+    el.style.left = (nx * 100) + "%";
+    el.style.top = (ny * 100) + "%";
+    el.style.display = "block";
+    el.style.pointerEvents = "auto";
+    applyDropLocationTargetColor(el);
+    if (el.parentNode !== puzzle.container) {
+        puzzle.container.appendChild(el);
+    }
+}
+window.updateDropLocationTarget = updateDropLocationTarget;
+
+function getPreviewSourceDimensions(source) {
+    if (!source) return { w: 0, h: 0 };
+    const w = source.videoWidth || source.naturalWidth || source.width || 0;
+    const h = source.videoHeight || source.naturalHeight || source.height || 0;
+    return { w: w | 0, h: h | 0 };
+}
+
+function resolvePrestartPreviewSource() {
+    if (rendererFacade && rendererFacade.media && rendererFacade.media.getFrameSource) {
+        const src = rendererFacade.media.getFrameSource();
+        if (src) return src;
+    }
+    return puzzle && puzzle.srcImage ? puzzle.srcImage : null;
+}
+
+function drawSyncedPreviewWindowFrame() {
+    if (!syncedPreviewCanvas) {
+        syncedPreviewCanvas = document.getElementById("prevsync");
+        if (!syncedPreviewCanvas) return;
+        syncedPreviewCtx = syncedPreviewCanvas.getContext("2d");
+    }
+    if (!syncedPreviewCtx) return;
+    const source = resolvePrestartPreviewSource();
+    if (!source) return;
+    if (source.tagName === "VIDEO" && source.readyState < 2) return;
+    const dims = getPreviewSourceDimensions(source);
+    if (dims.w <= 0 || dims.h <= 0) return;
+    let resized = false;
+    if (syncedPreviewCanvas.width !== dims.w || syncedPreviewCanvas.height !== dims.h) {
+        syncedPreviewCanvas.width = dims.w;
+        syncedPreviewCanvas.height = dims.h;
+        resized = true;
+    }
+    syncedPreviewCtx.clearRect(0, 0, syncedPreviewCanvas.width, syncedPreviewCanvas.height);
+    syncedPreviewCtx.drawImage(source, 0, 0, syncedPreviewCanvas.width, syncedPreviewCanvas.height);
+    if (resized && typeof window.requestPreviewSyncResize === "function") {
+        window.requestPreviewSyncResize();
+    }
+}
+
+function drawPrestartPreviewFrame() {
+    if (!tmpImage || tmpImage.tagName !== "CANVAS" || !tmpPreviewCtx) return;
+    const source = resolvePrestartPreviewSource();
+    if (!source) return;
+    if (source.tagName === "VIDEO" && source.readyState < 2) return;
+    const dims = getPreviewSourceDimensions(source);
+    if (dims.w <= 0 || dims.h <= 0) return;
+    if (tmpImage.width !== dims.w || tmpImage.height !== dims.h) {
+        tmpImage.width = dims.w;
+        tmpImage.height = dims.h;
+        fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+    }
+    tmpPreviewCtx.clearRect(0, 0, tmpImage.width, tmpImage.height);
+    tmpPreviewCtx.drawImage(source, 0, 0, tmpImage.width, tmpImage.height);
+}
+
 function loadImageFunction(){
+    if (!window.play_solo && window.is_connected && window.puzzleAreaScale === "Picture" && !window.canonicalOAspectFetched) {
+        window.canonicalOAspectFetched = true;
+        const keyO = `JIG_PROG_${window.slot}_O`;
+        const client = window.getAPClient && window.getAPClient();
+        if (client && client.storage && typeof client.storage.fetch === "function") {
+            client.storage.fetch([keyO]).then(function (results) {
+                const val = results && results[keyO];
+                if (val != null && val !== "" && Number.isFinite(parseFloat(val))) {
+                    window.canonicalPictureAspectRatio = parseFloat(val);
+                } else {
+                    window.canonicalPictureAspectRatio = null;
+                }
+            }).catch(function () {
+                window.canonicalPictureAspectRatio = null;
+            });
+        }
+    }
     puzzle.container.innerHTML = ""; // forget contents
-    tmpImage = document.createElement("img");
-    tmpImage.src = puzzle.srcImage.src;
+    tmpImage = document.createElement("canvas");
+    tmpPreviewCtx = tmpImage.getContext("2d");
+    const source = resolvePrestartPreviewSource();
+    const dims = getPreviewSourceDimensions(source);
+    tmpImage.width = Math.max(1, dims.w || (puzzle.srcImage.naturalWidth | 0) || 1);
+    tmpImage.height = Math.max(1, dims.h || (puzzle.srcImage.naturalHeight | 0) || 1);
     // console.log(puzzle.srcImage.src)
-    puzzle.getContainerSize();
+    if (window.puzzleAreaScale && typeof puzzle.sizeContainerByAspectRatio === "function") {
+        const ar = getEffectivePuzzleAreaAspectRatio(puzzle.srcImage);
+        puzzle.sizeContainerByAspectRatio(ar);
+    } else {
+        puzzle.getContainerSize();
+    }
     fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
     
     tmpImage.style.boxShadow = `${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px rgba(0, 0, 0, 0.5)`;
     
     puzzle.container.appendChild(tmpImage);
+    drawPrestartPreviewFrame();
     
     puzzle.prevWidth = puzzle.contWidth;
     puzzle.prevHeight = puzzle.contHeight;
 }
 
+if (window.JigsawMediaBindings && typeof window.JigsawMediaBindings.create === "function") {
+    mediaBindings = window.JigsawMediaBindings.create({
+        getPuzzle: () => puzzle,
+        getRendererFacade: () => rendererFacade,
+        getRendererConfig: () => window.rendererConfig,
+        getImagePath: () => imagePath,
+        setImagePath: (value) => { imagePath = value; },
+        loadImageFunction: loadImageFunction
+    });
+    loadFile = mediaBindings.buildLoadFileHandler();
+    startWebcamSource = function () { return mediaBindings.startWebcamSource(); };
+    startLinkCaptureSource = function (stream) { return mediaBindings.startLinkCaptureSource(stream); };
+}
+if (!loadFile) loadFile = function () {};
+if (!startWebcamSource) startWebcamSource = async function () {};
+if (!startLinkCaptureSource) startLinkCaptureSource = async function () {};
+
 let moving; // for information about moved piece
+function setMovingState(nextMoving) {
+    moving = nextMoving;
+    window.moving = nextMoving || null;
+}
+setMovingState(null);
+
+function preventZoomWhileHoldingPiece(e) {
+    if (moving && moving.pp) e.preventDefault();
+}
+document.addEventListener("gesturestart", preventZoomWhileHoldingPiece, { passive: false, capture: true });
+document.addEventListener("gesturechange", preventZoomWhileHoldingPiece, { passive: false, capture: true });
+document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive: false, capture: true });
 { // scope for animate
     let state = 0;
+    let stateAfterPan = 50;
+    const HELD_Z_INDEX = 2147483647;
+
+    function setHeldPieceState(pp, held) {
+        if (!pp || !pp.polypiece_canvas) return;
+        pp._isHeld = !!held;
+        pp.polypiece_canvas.classList.toggle("moving", !!held);
+        if (held) {
+            pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
+            puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
+        }
+        queuePolyPieceSetup(pp, true, true);
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(pp);
+    }
 
     animate = function () {
         requestAnimationFrame(animate);
+        const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+        if (rendererFacade) rendererFacade.renderFrame(nowMs);
+        drawSyncedPreviewWindowFrame();
+        if (state === 15) drawPrestartPreviewFrame();
+        if (state >= 50 && puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
 
         let event;
         
         if (events.length) event = events.shift(); // read event from queue
+
+        if (event && event.event === "puzzleAreaScaleChanged" && puzzle) {
+            const srcImg = puzzle.srcImage || null;
+            const ar = getEffectivePuzzleAreaAspectRatio(srcImg);
+            if (state === 15 && tmpImage) {
+                puzzle.sizeContainerByAspectRatio(ar);
+                fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+            } else if (state >= 25) {
+                puzzle.puzzle_scale();
+                if (rendererFacade) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+            }
+            applyViewTransform();
+            return;
+        }
         
         // resize event
         if (event && event.event == "resize") {
+
+            if (!viewState.enableScaling) {
+                if (puzzle) {
+                    puzzle.getContainerSize();
+                    puzzle.prevWidth = puzzle.contWidth;
+                    puzzle.prevHeight = puzzle.contHeight;
+                    applyViewTransform();
+                }
+                return;
+            }
 
             // remember dimensions of container before resize
             puzzle.getContainerSize();
@@ -1814,12 +2406,12 @@ let moving; // for information about moved piece
                 fitImage(tmpImage, puzzle.contWidth * window.downsize_to_fit, puzzle.contHeight * window.downsize_to_fit);
             }
             else if (state >= 25) { // resize pieces
-                
+                puzzle.puzzle_scale();
+                if (rendererFacade) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+
                 const x_change = puzzle.contWidth / puzzle.prevWidth;
                 const y_change = puzzle.contHeight / puzzle.prevHeight;
 
-                puzzle.puzzle_scale();
-                
                 console.log("start scaling pieces")
                 puzzle.polyPieces.forEach(pp => {                    
                     let nnx = pp.x;
@@ -1837,6 +2429,10 @@ let moving; // for information about moved piece
             
             puzzle.prevWidth = puzzle.contWidth;
             puzzle.prevHeight = puzzle.contHeight;
+
+            applyViewTransform();
+            if (rendererFacade && puzzle) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+            if (state >= 25 && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
 
             return;
         } // resize event
@@ -1873,13 +2469,14 @@ let moving; // for information about moved piece
                 } 
                 
                 if ((event && event.event == "nbpieces") || (window.LoginStart && window.is_connected) || (window.start_solo_immediately)) {
+                    if (!puzzle.imageLoaded || !(puzzle.srcImage.naturalWidth > 0) || !(puzzle.srcImage.naturalHeight > 0)) {
+                        document.getElementById("m4").textContent = "Loading image...";
+                        return;
+                    }
                     document.getElementById("m4").textContent = "Loading pieces...";
 
                     bevel_size = localStorage.getItem("option_bevel_2");
                     if (bevel_size === null) bevel_size = 0.1;
-
-                    shadow_size = localStorage.getItem("option_shadow_2");
-                    if (shadow_size === null) shadow_size = 0;
 
                     state = 17;
                     if(window.is_connected){
@@ -1915,6 +2512,16 @@ let moving; // for information about moved piece
                             };
                         }
                     }
+                }
+
+                /* allow pan during pre-start (preview) phase */
+                if (event && event.event === "touch" && event.button === viewState.panButton && viewState.enablePan) {
+                    startDragClientX = event.position.clientX;
+                    startDragClientY = event.position.clientY;
+                    stateAfterPan = 15;
+                    puzzle._releaseHandled = true;
+                    state = 52;
+                    break;
                 }
                 
                 return;
@@ -1962,16 +2569,12 @@ let moving; // for information about moved piece
                         for (let [key, value] of Object.entries(results)) {
                             let spl = key.split("_")[3];
                             if (spl === "O"){
-                                if(!window.ignoreAspectRatio){
-                                    console.log("value is", value)
-                                    if(value){
-                                        if(Math.abs(parseFloat(value) - puzzle.srcImage.width / puzzle.srcImage.height) > 0.05){
-                                            alert("Warning, you are not using the same aspect ratio as before. Pieces might not be in the correct relative position. You can refresh now to discard this login (if you do ignore this error next time).")
-                                        }
-                                    }
-                                    console.log("put to ", puzzle.srcImage.width / puzzle.srcImage.height)
-                                    change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
+                                if (value != null && value !== "" && Number.isFinite(parseFloat(value))) {
+                                    window.canonicalPictureAspectRatio = parseFloat(value);
+                                } else {
+                                    window.canonicalPictureAspectRatio = null;
                                 }
+                                change_savedata_datastorage("O", puzzle.srcImage.width / puzzle.srcImage.height, true);
                             }else{
                                 if(value){
                                     if (spl === "M") {
@@ -2045,6 +2648,7 @@ let moving; // for information about moved piece
 
 
             case 19:  // process save file and start game
+                window.useCanonicalAspectForLayout = true;
                 let coordinates = {}
                 let groups = {}
                 let hasmoved = {}
@@ -2095,16 +2699,19 @@ let moving; // for information about moved piece
                 gameStarted = true;
                 menu.open();
 
-                document.getElementById("m1").style.display = "none";
                 document.getElementById("m2").style.display = "none";
                 document.getElementById("m3").style.display = "none";
+                document.getElementById("m3a").style.display = "none";
+                document.getElementById("m3b").style.display = "none";
+                document.getElementById("m3c").style.display = "none";
                 document.getElementById("m4").style.display = "none";
                 document.getElementById("m5").style.display = "none";
-                document.getElementById("m10b").style.display = "none";
-                document.getElementById("o1a").style.display = "none";
-                document.getElementById("o1b").style.display = "none";
+                const mediaWindow = document.getElementById("draggable6");
+                if (mediaWindow) mediaWindow.style.display = "none";
 
                 /* prepare puzzle */
+                viewState.customDropNormX = 0.1;
+                viewState.customDropNormY = 0.1;
                 puzzle.puzzle_create(coordinates, groups, hasmoved, unlocked); // create shape of pieces, independant of size
 
 
@@ -2114,6 +2721,21 @@ let moving; // for information about moved piece
                 console.log("done getting backlog of actions")
                 
                 puzzle.puzzle_scale();
+                if (rendererFacade) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+                let downgradedAtStart = false;
+                if (rendererFacade) {
+                    if (puzzle._webglStartBlockedReason) {
+                        if (rendererFacade.setWebGLUnavailableForSession) {
+                            rendererFacade.setWebGLUnavailableForSession(puzzle._webglStartBlockedReason, "prestart-probe");
+                        }
+                    }
+                    const mode = (window.rendererConfig && window.rendererConfig.mode) || "canvas2d";
+                    rendererFacade.selectMode(mode, puzzle);
+                    rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+                    if (rendererFacade.ensureStartRendererCompatibility) {
+                        downgradedAtStart = rendererFacade.ensureStartRendererCompatibility() === true;
+                    }
+                }
 
                 for (let pp of puzzle.polyPieces) {
                     if (!pp.hasMovedEver) {
@@ -2124,13 +2746,30 @@ let moving; // for information about moved piece
                 }
 
                 console.log("done scaling puzzle")
-                puzzle.polyPieces.forEach(pp => {
-                    pp.polypiece_drawImage(false);
-                }); // puzzle.polypieces.forEach
-                console.log("drawn each piece")
+                // Queue initial render setup only after puzzle_scale has finalized dimensions.
+                for (let pp of puzzle.polyPieces) {
+                    queuePolyPieceSetup(pp, false, false);
+                }
+                if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) {
+                    pieceSetupQueueApi.processPieceSetupQueue();
+                }
+                if (rendererFacade) rendererFacade.renderDirtyPieces();
+                if (downgradedAtStart && rendererFacade) {
+                    if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) {
+                        pieceSetupQueueApi.processPieceSetupQueue();
+                    }
+                    if (rendererFacade.sceneState && rendererFacade.sceneState.markAllDirty) {
+                        rendererFacade.sceneState.markAllDirty();
+                    }
+                    rendererFacade.renderDirtyPieces();
+                }
+                refreshRendererModeControl();
                 puzzle.gameCanvas.style.top = puzzle.offsy + "px";
                 puzzle.gameCanvas.style.left = puzzle.offsx + "px";
                 puzzle.gameCanvas.style.display = "block";
+
+                if (typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
+                applyViewTransform();
 
                 window.save_loaded = true;
 
@@ -2151,6 +2790,7 @@ let moving; // for information about moved piece
 
                 console.log("DONE WITH INI!", puzzle)
 
+                if (window.play_solo) updateMergesLabels();
                 state = 25;
                 break;
 
@@ -2183,7 +2823,9 @@ let moving; // for information about moved piece
                 if (!window.is_connected && !window.play_solo) return;
 
                 if (event.event == "leave") {
-                    moving = null;
+                    if (moving && moving.pp) setHeldPieceState(moving.pp, false);
+                    setMovingState(null);
+                    puzzle.evaluateZIndex();
                 }
                 
                 if (event.event != "touch") return;
@@ -2194,43 +2836,63 @@ let moving; // for information about moved piece
                     const event_y = event.position.y;
                     // console.log(event_x, event_y)
     
-                    moving = {
+                    setMovingState({
                         xMouseInit: event_x,
                         yMouseInit: event_y,
                         xMouse: event_x,
                         yMouse: event_y
-                    }
+                    });
     
                     /* evaluates if contact inside a PolyPiece, by decreasing z-index */
-                    puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
-                    for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
-                        let pp = puzzle.polyPieces[k];
-                        
-                        const cx = pp.x + pp.nx * puzzle.scalex / 2;
-                        const cy = pp.y + pp.ny * puzzle.scaley / 2;
-                        
-                        const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
-    
-                        if (pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) { // event_x - pp.x, event_y - pp.y
-                            moving.pp = pp;
-                            moving.ppXInit = pp.x;
-                            moving.ppYInit = pp.y;
-                            // move selected piece to top of polypieces stack
-                            puzzle.polyPieces.splice(k, 1);
-                            puzzle.polyPieces.push(pp);
-                            pp.polypiece_canvas.style.zIndex = 100000001; // to foreground
-                            
-                            state = 55;
-                            return;
+                    let hitPiece = null;
+                    if (rendererFacade) {
+                        hitPiece = rendererFacade.findTopPieceAt(puzzle, event_x, event_y);
+                    } else if (hitTestService) {
+                        hitPiece = hitTestService.findTopPieceAt(puzzle, event_x, event_y);
+                    }
+                    if (!hitPiece) {
+                        puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+                        for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
+                            let pp = puzzle.polyPieces[k];
+                            const cx = pp.x + pp.nx * puzzle.scalex / 2;
+                            const cy = pp.y + pp.ny * puzzle.scaley / 2;
+                            const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
+                            if (pp.path && pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) {
+                                hitPiece = pp;
+                                break;
+                            }
                         }
-                    } // for k
+                    }
+                    if (hitPiece) {
+                        const hitIndex = puzzle.polyPieces.indexOf(hitPiece);
+                        moving.pp = hitPiece;
+                        moving.ppXInit = hitPiece.x;
+                        moving.ppYInit = hitPiece.y;
+                        // move selected piece to top of polypieces stack
+                        if (hitIndex !== -1) puzzle.polyPieces.splice(hitIndex, 1);
+                        puzzle.polyPieces.push(hitPiece);
+                        setHeldPieceState(hitPiece, true);
+                        
+                        puzzle._releaseHandled = true;
+                        state = 55;
+                        return;
+                    }
                 }
 
-                if(zoomP == 1) return;
+                if (!viewState.enablePan) {
+                    setMovingState(null);
+                    return;
+                }
+                if (event.button !== viewState.panButton) {
+                    setMovingState(null);
+                    return;
+                }
 
-                startDragX = event.position.p_x;
-                startDragY = event.position.p_y;
+                startDragClientX = event.position.clientX;
+                startDragClientY = event.position.clientY;
+                stateAfterPan = 50;
 
+                puzzle._releaseHandled = true;
                 state = 52;
                 break;
 
@@ -2238,17 +2900,25 @@ let moving; // for information about moved piece
                 if (!event) return;
                 switch (event.event) {
                     case "move":
-                        // console.log(event.position.p_x, startDragX, zoomX)
-                        zoomX += (event.position.p_x - startDragX) * zoomP;
-                        zoomY += (event.position.p_y - startDragY) * zoomP;
-                        startDragX = event.position.p_x - (event.position.p_x - startDragX);
-                        startDragY = event.position.p_y - (event.position.p_y - startDragY);
-                        updateZoomAndPosition();
+                        // Anchor under cursor: 1:1 pan in screen pixels. Pan translate is applied after scale(zoom), so screen delta = panDelta * contSize * baseScale (zoom does not scale the pan).
+                        const deltaClientX = event.position.clientX - startDragClientX;
+                        const deltaClientY = event.position.clientY - startDragClientY;
+                        if (!puzzle.contWidth || !puzzle.contHeight) puzzle.getContainerSize();
+                        const baseScale = getActiveBaseScale();
+                        const panScaleW = (puzzle.contWidth || 1) * baseScale;
+                        const panScaleH = (puzzle.contHeight || 1) * baseScale;
+                        viewState.panX += (deltaClientX / panScaleW) * viewState.panSensitivity;
+                        viewState.panY += (deltaClientY / panScaleH) * viewState.panSensitivity;
+                        startDragClientX = event.position.clientX;
+                        startDragClientY = event.position.clientY;
+                        applyViewTransform();
                         
                         break;
                     case "leave":
-                        moving = null;
-                        state = 50;
+                        if (moving && moving.pp) setHeldPieceState(moving.pp, false);
+                        setMovingState(null);
+                        puzzle.evaluateZIndex();
+                        state = stateAfterPan;
                         break;
                 }
                 break;
@@ -2277,10 +2947,11 @@ let moving; // for information about moved piece
                         moving.pp.hasMovedEver = true;
                         if (window.gameplayStarted && !window.play_solo) {
                             // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                 
+                            const movingSyncId = getPolyPieceSyncId(moving.pp);
                             if(window.rotations == 0){
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
                             }else{
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
                             }    
                         }
 
@@ -2299,34 +2970,28 @@ let moving; // for information about moved piece
                                 if (pp.pieces.length > moving.pp.pieces.length || (pp.pieces.length == moving.pp.pieces.length && pp.pieces[0].index > moving.pp.pieces[0].index)) {
                                     pp.merge(moving.pp);
                                     moving.pp = pp; // memorize piece to follow
+                                    setHeldPieceState(moving.pp, true);
                                 } else {
                                     moving.pp.merge(pp);
+                                    setHeldPieceState(moving.pp, true);
                                 }
                                 console.log("done merging")
                             }
                         } // for k
 
                         if (window.gameplayStarted && !window.play_solo) {
-                            
+                            const movingSyncId = getPolyPieceSyncId(moving.pp);
                             if(window.rotations == 0){
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight], true);
                             }else{
-                                change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], true);
+                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], true);
                             }    
                             
-                            const currentPieceIndex = moving.pp.pieces[0].index;
-                            window.ignore_bounce_pieces.push(currentPieceIndex);
-                            setTimeout(() => {
-                                const index = window.ignore_bounce_pieces.indexOf(currentPieceIndex);
-                                if (index !== -1) {
-                                    window.ignore_bounce_pieces.splice(index, 1);
-                                }
-                            }, 1000);
+                            if (movingSyncId !== null) addIgnoreBouncePiece(movingSyncId);
                         }
 
-                        
-
-                        moving = null;
+                        if (moving && moving.pp) setHeldPieceState(moving.pp, false);
+                        setMovingState(null);
 
                         // not at its right place
                         puzzle.evaluateZIndex();
@@ -2363,22 +3028,37 @@ let menu = (function () {
 
     menu.open = function () {
     if(!gameStarted){
-        document.getElementById("m1").style.display = "block"
         document.getElementById("m2").style.display = "block"
-        document.getElementById("m3").style.display = "block"
+        if (window.play_solo) {
+            document.getElementById("m3").style.display = "block"
+            document.getElementById("m3a").style.display = "block"
+            document.getElementById("m3b").style.display = "block"
+            document.getElementById("m3c").style.display = "block"
+            if (!window.puzzleAreaScale) window.puzzleAreaScale = "Landscape";
+            const scaleSelect = document.getElementById("puzzleAreaScale");
+            if (scaleSelect) scaleSelect.value = window.puzzleAreaScale;
+        } else {
+            document.getElementById("m3").style.display = "none"
+            document.getElementById("m3a").style.display = "none"
+            document.getElementById("m3b").style.display = "none"
+            document.getElementById("m3c").style.display = "none"
+        }
         document.getElementById("m4").style.display = "block"
         document.getElementById("m5").style.display = "block"
-        document.getElementById("m10b").style.display = "block"
-        document.getElementById("o1a").style.display = "block";
-        document.getElementById("o1b").style.display = "block";
     }
     document.getElementById("m6").style.display = "block"
-    document.getElementById("m11").style.display = "inline-block"
-    document.getElementById("m11a").style.display = "inline-block"
+    document.getElementById("m11a").style.display = "none"
+    const tbFullscreen = document.getElementById("taskbarFullscreen");
+    const tbView = document.getElementById("taskbarViewControls");
+    const tbCosmetic = document.getElementById("taskbarCosmeticControls");
+    if (tbFullscreen) tbFullscreen.style.display = "flex";
+    if (tbView) tbView.style.display = "flex";
+    if (tbCosmetic) tbCosmetic.style.display = "flex";
     if(gameStarted){
         document.getElementById("m9a").style.display = "block"
         document.getElementById("m9").style.display = "block"
         document.getElementById("m10").style.display = "block"
+        if (typeof updateDisplayCaptureMenuItemVisibility === "function") updateDisplayCaptureMenuItemVisibility();
 
         console.log(window.show_clue)
         if(window.show_clue){
@@ -2402,10 +3082,153 @@ let menu = (function () {
     return menu;
 })();
 
-document.getElementById("m1").addEventListener("click", loadInitialFile);
-document.getElementById("m2").addEventListener("click", loadFile);
+document.getElementById("m2").addEventListener("click", () => {
+    if (typeof window.restoreDiv6 === "function") window.restoreDiv6();
+});
+
+function openSourceWindow(url) {
+    const raw = (url || "").trim();
+    if (!raw) {
+        alert("Please enter a YouTube or Twitch URL.");
+        return null;
+    }
+    const lower = raw.toLowerCase();
+    const isYouTube = lower.includes("youtube.com") || lower.includes("youtu.be");
+    const isTwitch = lower.includes("twitch.tv");
+    if (!isYouTube && !isTwitch) {
+        alert("URL must be a YouTube or Twitch link.");
+        return null;
+    }
+    const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, "");
+    const target = base + "source.html?url=" + encodeURIComponent(raw);
+    const features = "popup,width=960,height=540,toolbar=no,location=no,status=no,menubar=no,scrollbars=no";
+    const w = window.open(target, "puzzleSource", features);
+    if (!w) alert("Popup blocked—please allow popups for this site.");
+    return w;
+}
+
+const mediaLoadFileBtn = document.getElementById("mediaLoadFileBtn");
+if (mediaLoadFileBtn) {
+    mediaLoadFileBtn.addEventListener("click", () => {
+        if (typeof loadFile === "function") loadFile();
+    });
+}
+function updateDisplayCaptureMenuItemVisibility() {
+    const el = document.getElementById("mChangeCaptureSource");
+    if (!el) return;
+    const cfg = window.rendererConfig;
+    const isDisplay = cfg && cfg.media === "display";
+    el.style.display = isDisplay ? "block" : "none";
+}
+
+const mediaUseCameraBtn = document.getElementById("mediaUseCameraBtn");
+if (mediaUseCameraBtn) {
+    mediaUseCameraBtn.addEventListener("click", async () => {
+        try {
+            await startWebcamSource();
+            updateDisplayCaptureMenuItemVisibility();
+        } catch (err) {
+            console.error("Webcam start failed", err);
+            alert("Failed to start webcam.");
+        }
+    });
+}
+const mediaLinkUrlInput = document.getElementById("mediaLinkUrlInput");
+const mediaOpenSourceWindowBtn = document.getElementById("mediaOpenSourceWindowBtn");
+if (mediaOpenSourceWindowBtn && mediaLinkUrlInput) {
+    mediaOpenSourceWindowBtn.addEventListener("click", () => {
+        openSourceWindow(mediaLinkUrlInput.value);
+    });
+}
+function runDisplayCapture() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        alert("Capture not allowed or not supported.");
+        return Promise.resolve();
+    }
+    return navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+    }).then((stream) => {
+        if (startLinkCaptureSource) return startLinkCaptureSource(stream);
+    });
+}
+
+const mediaStartCaptureBtn = document.getElementById("mediaStartCaptureBtn");
+if (mediaStartCaptureBtn) {
+    mediaStartCaptureBtn.addEventListener("click", async () => {
+        try {
+            await runDisplayCapture();
+            updateDisplayCaptureMenuItemVisibility();
+        } catch (err) {
+            console.error("Display capture failed", err);
+            alert("Capture not allowed or not supported.");
+        }
+    });
+}
+const mChangeCaptureSource = document.getElementById("mChangeCaptureSource");
+if (mChangeCaptureSource) {
+    mChangeCaptureSource.addEventListener("click", async () => {
+        try {
+            const url = prompt("Enter a new YouTube or Twitch URL to open and capture, or cancel to just pick a window/tab again.", mediaLinkUrlInput ? mediaLinkUrlInput.value.trim() || "" : "");
+            if (url !== null && url.trim() !== "") {
+                const opened = openSourceWindow(url);
+                if (opened && mediaLinkUrlInput) mediaLinkUrlInput.value = url.trim();
+            }
+            await runDisplayCapture();
+            updateDisplayCaptureMenuItemVisibility();
+        } catch (err) {
+            console.error("Display capture failed", err);
+            alert("Capture not allowed or not supported.");
+        }
+    });
+}
+updateDisplayCaptureMenuItemVisibility();
 document.getElementById("m3").addEventListener("click", () => { });
-document.getElementById("m4").addEventListener("click", () => events.push({ event: "nbpieces", nbpieces: 81 }));
+const puzzleAreaScaleEl = document.getElementById("puzzleAreaScale");
+if (puzzleAreaScaleEl) {
+    puzzleAreaScaleEl.value = "Landscape";
+    puzzleAreaScaleEl.addEventListener("change", function () {
+        window.puzzleAreaScale = this.value;
+        events.push({ event: "puzzleAreaScaleChanged" });
+    });
+}
+document.getElementById("m4").addEventListener("click", () => {
+    if (window.play_solo) {
+        const soloSeedEl = document.getElementById("soloSeed");
+        const soloPieceCountEl = document.getElementById("soloPieceCount");
+        if (soloSeedEl && soloSeedEl.value.trim() !== "") {
+            const v = soloSeedEl.value.trim();
+            const num = Number(v);
+            window.apseed = Number.isInteger(num) ? num : v;
+        } else {
+            window.apseed = 0;
+        }
+        const pieceCountVal = soloPieceCountEl ? soloPieceCountEl.value : "";
+        const pieceCountNum = Number(pieceCountVal);
+        if (pieceCountVal === "" || !Number.isInteger(pieceCountNum) || pieceCountNum < 4 || pieceCountNum > 2500) {
+            alert("Pieces must be an integer between 4 and 2500.");
+            return;
+        }
+        const N = clamp(Math.floor(pieceCountNum), 4, 2500);
+        puzzle.nbPieces = N;
+        puzzle.computenxAndny(0, 0);
+        window.set_puzzle_dim(puzzle.nx, puzzle.ny);
+        const slot = (typeof window.slot === 'number' && Number.isInteger(window.slot)) ? window.slot : 0;
+        if (typeof window.apseed !== 'number' || !Number.isInteger(window.apseed)) {
+            const hash = Array.from(String(window.apseed)).reduce((acc, char) => acc * 31 + char.charCodeAt(0), 0);
+            setRandomSeed((hash + slot) % 10000);
+        } else {
+            setRandomSeed((window.apseed + slot) % 10000);
+        }
+        computeSoloUnlockOrder(apnx, apny);
+        buildPossibleMergesForSolo(apnx, apny);
+        unlocked_pieces.length = 0;
+        const K = Math.min(7, window.soloUnlockOrder.length);
+        for (let i = 0; i < K; i++) unlockPiece(window.soloUnlockOrder[i]);
+        updateMergesLabels();
+    }
+    events.push({ event: "nbpieces", nbpieces: 81 });
+});
 
 document.getElementById("m5").addEventListener("click", () => {
     window.open('credits.html', '_blank');
@@ -2432,141 +3255,102 @@ document.getElementById("m13c").addEventListener("click", () => {
 });
 
 
-document.getElementById("m10b").addEventListener("click", () => {   
-    const forPuzzleElement = document.getElementById("forPuzzle");     
-    const red = document.getElementById("bgcolorR").value;
-    const green = document.getElementById("bgcolorG").value;
-    const blue = document.getElementById("bgcolorB").value;
-    const newColor = `#${red}${green}${blue}`;
-    forPuzzleElement.style.backgroundColor = newColor;
-    localStorage.setItem("backgroundColor", newColor);
-
-    // const jsonList = [{ type: "text", text: "Example text with new background" }];
-    // window.jsonListener("", jsonList);
-});
-
-// Set the initial background color from localStorage if available
-window.addEventListener("load", () => {
-    let color = localStorage.getItem("backgroundColor");
-    if (color === null) {
-        color = "#DD9";
-    }
-    
-    document.getElementById("forPuzzle").style.backgroundColor = color;
-    document.getElementById("bgcolorR").value = color.slice(1, 2);
-    document.getElementById("bgcolorG").value = color.slice(2, 3);
-    document.getElementById("bgcolorB").value = color.slice(3, 4);
-});
-
-
 menu.open();
 
-let resizeTimeout = null
-window.addEventListener("resize", event => {
-    if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-    }
-    resizeTimeout = setTimeout(() => {
-        events.push({ event: "resize" });
-        resizeTimeout = null;
-    }, 300);
-});
-
-const forPuzzle = document.getElementById('forPuzzle');
-window.additional_zoom = 1;
-
-function updateZoomAndPosition() {
-    const puzzle = document.getElementById('forPuzzle');
-
-    // Extract scale and translate values using regex
-    const scaleFactor = 1 / parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-factor'));
-    
-    // Build the new transform string
-    const newTransform = `
-        translate(calc(-50% * (1 - ${scaleFactor})), -50%)
-        scale(${scaleFactor})
-
-        translate(${zoomX*100}%, ${zoomY*100}%)
-        scale(${zoomP})
-    `;
-
-    // Apply the new transform
-    puzzle.style.transform = newTransform;
-    window.additional_zoom = zoomP;
+let startDragClientX = 0;
+let startDragClientY = 0;
+let _viewControlsApi = null;
+if (window.JigsawViewControls && typeof window.JigsawViewControls.init === "function") {
+    _viewControlsApi = window.JigsawViewControls.init({
+        viewState: viewState,
+        clamp: clamp,
+        getActiveBaseScale: getActiveBaseScale,
+        syncLegacyViewGlobals: syncLegacyViewGlobals,
+        getEffectiveZoomStep: getEffectiveZoomStep,
+        touchDistance: touchDistance,
+        touchMidpoint: touchMidpoint,
+        rotateCurrentPiece: rotateCurrentPiece,
+        events: events,
+        getPuzzle: () => puzzle,
+        getBevelSize: () => bevel_size,
+        setBevelSize: (value) => { bevel_size = value; },
+        viewDebug: VIEW_DEBUG
+    });
 }
 
-let startDragX = 0;
-let startDragY = 0;
-let zoomX = 0;
-let zoomY = 0;
-let zoomP = 1;
-forPuzzle.addEventListener('wheel', (event) => {
-    if(moving){
-        rotateCurrentPiece(event.deltaY < 0);
-    }else{
-        if(!allow_zoom){
-            return;
-        }
-        event.preventDefault();
-        if (event.deltaY < 0) {
-            if(zoomP == 1){
-                const co = puzzle.relativeMouseCoordinates(event);
-                zoomX = -co.p_x + 1/2;
-                zoomY = -co.p_y + 1/2;
-                zoomP = 2;
-            }else{
-                const co = puzzle.relativeMouseCoordinates(event);
-                zoomX = 2 * (-co.p_x + 1/2);
-                zoomY = 2 * (-co.p_y + 1/2);
-                zoomP = 3;
-            }
-        } else {
-            zoomX = 0;
-            zoomY = 0;
-            zoomP = 1;
-        }
-        updateZoomAndPosition();
-    }
+function applyViewTransform() {
+    if (_viewControlsApi && _viewControlsApi.applyViewTransform) _viewControlsApi.applyViewTransform();
+}
 
-});
+function resetView() {
+    if (_viewControlsApi && _viewControlsApi.resetView) _viewControlsApi.resetView();
+}
 
-let lastTap = 0;
-forPuzzle.addEventListener('touchend', (event) => {
-    if (event.touches.length != 0) return;
-    const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTap;
-    if (tapLength < 300 && tapLength > 0) {
-        event.preventDefault();
-        if(!allow_zoom){
-            return;
-        }
-        const co = puzzle.relativeMouseCoordinates(event.changedTouches[0]);
-        if (window.additional_zoom === 1) {
-            zoomX = -co.p_x + 1/2;
-            zoomY = -co.p_y + 1/2;
-            zoomP = 2;
-        } else if(window.additional_zoom === 2) {
-            zoomX = 2 * (-co.p_x + 1/2);
-            zoomY = 2 * (-co.p_y + 1/2);
-            zoomP = 3;
-        } else{
-            zoomX = 0;
-            zoomY = 0;
-            zoomP = 1;
-        }
-        updateZoomAndPosition();
-    }
-    lastTap = currentTime;
-});
+function updateViewControlLabels() {
+    if (_viewControlsApi && _viewControlsApi.updateViewControlLabels) _viewControlsApi.updateViewControlLabels();
+}
 
-
-
-
-
-
-
+function setScalingEnabled(enabled) {
+    if (_viewControlsApi && _viewControlsApi.setScalingEnabled) _viewControlsApi.setScalingEnabled(enabled);
+}
 
 puzzle = new Puzzle({ container: "forPuzzle" });
+if (window.JigsawRendererFacade) {
+    rendererFacade = new window.JigsawRendererFacade({
+        container: document.getElementById("forPuzzle"),
+        config: window.rendererConfig || { mode: "auto", media: "image" },
+        getPuzzleResolution: getPuzzleResolution
+    });
+    rendererFacade.init(puzzle);
+    hitTestService = rendererFacade.hitTest || null;
+} else if (window.JigsawHitTestService) {
+    hitTestService = new window.JigsawHitTestService();
+}
+
+let rendererModeApi = null;
+if (window.JigsawRendererModeControl && typeof window.JigsawRendererModeControl.create === "function") {
+    rendererModeApi = window.JigsawRendererModeControl.create({
+        getRendererFacade: () => rendererFacade,
+        getPuzzle: () => puzzle,
+        getRendererConfig: () => window.rendererConfig,
+        setRendererConfig: (cfg) => { window.rendererConfig = cfg; },
+        queuePolyPieceSetup: (...args) => queuePolyPieceSetup(...args),
+        getPuzzleResolution: getPuzzleResolution,
+        setPuzzleResolution: (value) => {
+            if (value === "1080p" || value === "720p" || value === "540p") {
+                viewState.puzzleResolution = value;
+                try { localStorage.setItem("puzzleResolution", value); } catch (_e) {}
+            }
+        }
+    });
+    rendererModeApi.initRendererModeControl();
+}
+
+function refreshRendererModeControl() {
+    if (rendererModeApi && rendererModeApi.refreshRendererModeControl) {
+        rendererModeApi.refreshRendererModeControl();
+    }
+}
+
+let pieceSetupQueueApi = null;
+if (window.JigsawPieceSetupQueue && typeof window.JigsawPieceSetupQueue.create === "function") {
+    pieceSetupQueueApi = window.JigsawPieceSetupQueue.create({
+        getRendererConfig: () => window.rendererConfig,
+        getRendererFacade: () => rendererFacade
+    });
+    pieceSetupQueueApi.startLoop();
+}
+
+function queuePolyPieceSetup(pp, ignoreRedraw = false, highPriority = false, onDone = null) {
+    if (pieceSetupQueueApi && pieceSetupQueueApi.queuePolyPieceSetup) {
+        pieceSetupQueueApi.queuePolyPieceSetup(pp, ignoreRedraw, highPriority, onDone);
+    } else if (pp) {
+        pp.polypiece_drawImage(ignoreRedraw);
+        if (onDone) {
+            try { onDone(); } catch (_e) {}
+        }
+    }
+}
 
 requestAnimationFrame(animate);
 
@@ -2581,6 +3365,153 @@ function set_puzzle_dim(x, y){
 }
 window.set_puzzle_dim = set_puzzle_dim
 
+/** Returns grid-neighbor piece indices (1-based) for piece p. Uses same rules as ifNear. */
+function getPieceNeighbors(p, apnx, apny) {
+    const N = apnx * apny;
+    const out = [];
+    if (window.pieceSides === 6) {
+        const col = (p % apnx === 0) ? apnx : (p % apnx);
+        const cand = [
+            p + apnx, p - apnx,
+            p - 1, p + 1,
+            col !== 1 ? (col % 2 === 1 ? p - 1 - apnx : p - 1 + apnx) : null,
+            col !== apnx ? (col % 2 === 1 ? p + 1 - apnx : p + 1 + apnx) : null
+        ];
+        cand.forEach(n => { if (n != null && n >= 1 && n <= N) out.push(n); });
+    } else {
+        [p + apnx, p - apnx].forEach(n => { if (n >= 1 && n <= N) out.push(n); });
+        if (p % apnx !== 1) out.push(p - 1);
+        if (p % apnx !== 0) out.push(p + 1);
+    }
+    return out;
+}
+
+/**
+ * Merge simulation board: simulates placing pieces in order and tracks cumulative merge count.
+ * Used only to build possible_merges / actual_possible_merges for local play.
+ * Index i = cell (i % width, i // width) (column, row).
+ */
+class PuzzleBoard {
+    constructor(width, height, hexagonal) {
+        const size = width * height;
+        this.board = Array(size).fill(null);
+        this.mergesCount = 0;
+        this.clusters = {};
+        const maxIsolated = (size >> 1) + (size % 2);
+        this._unusedIds = [];
+        for (let id = 0; id < maxIsolated; id++) this._unusedIds.push(id);
+
+        // Precompute adjacency for each index (0-based). Index i => column i % width, row i // width.
+        this.adjacentPieces = [];
+        for (let i = 0; i < size; i++) {
+            const x = i % width;
+            const y = (i / width) | 0;
+            const neighbors = [];
+            if (x > 0) neighbors.push(i - 1);
+            if (x < width - 1) neighbors.push(i + 1);
+            if (y > 0) neighbors.push(i - width);
+            if (y < height - 1) neighbors.push(i + width);
+            if (hexagonal) {
+                if (x % 2 === 0) {
+                    neighbors.push(i - width - 1, i - width + 1);
+                } else {
+                    neighbors.push(i + width - 1, i + width + 1);
+                }
+            }
+            this.adjacentPieces[i] = neighbors.filter(n => n >= 0 && n < size);
+        }
+    }
+
+    addPiece(pieceIndex) {
+        const adjIds = new Set();
+        for (const n of this.adjacentPieces[pieceIndex]) {
+            const id = this.board[n];
+            if (id != null) adjIds.add(id);
+        }
+        const numAdjacent = adjIds.size;
+
+        if (numAdjacent === 0) {
+            const id = this._unusedIds.pop();
+            this.board[pieceIndex] = id;
+            this.clusters[id] = [pieceIndex];
+            return;
+        }
+        if (numAdjacent === 1) {
+            const id = [...adjIds][0];
+            this.board[pieceIndex] = id;
+            this.clusters[id].push(pieceIndex);
+            this.mergesCount += 1;
+            return;
+        }
+        // 2+ adjacent: merge into largest
+        let largestId = null;
+        let largestSize = -1;
+        for (const id of adjIds) {
+            const len = this.clusters[id].length;
+            if (len > largestSize) {
+                largestSize = len;
+                largestId = id;
+            }
+        }
+        this.board[pieceIndex] = largestId;
+        this.clusters[largestId].push(pieceIndex);
+        for (const id of adjIds) {
+            if (id === largestId) continue;
+            const pieces = this.clusters[id];
+            for (const idx of pieces) {
+                this.board[idx] = largestId;
+                this.clusters[largestId].push(idx);
+            }
+            delete this.clusters[id];
+            this._unusedIds.push(id);
+        }
+        this.mergesCount += numAdjacent;
+    }
+}
+
+/** BFS unlock order for solo: sets window.soloUnlockOrder; returns order. */
+function computeSoloUnlockOrder(apnx, apny) {
+    const N = apnx * apny;
+    const indices = [];
+    for (let i = 1; i <= N; i++) indices.push(i);
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const numSeeds = Math.min(3, N);
+    const seeds = indices.slice(0, numSeeds);
+    const order = [];
+    const visited = new Set(seeds);
+    const queue = [...seeds];
+    while (queue.length) {
+        const p = queue.shift();
+        order.push(p);
+        for (const n of getPieceNeighbors(p, apnx, apny)) {
+            if (!visited.has(n) && n >= 1 && n <= N) {
+                visited.add(n);
+                queue.push(n);
+            }
+        }
+    }
+    window.soloUnlockOrder = order;
+    return order;
+}
+
+function buildPossibleMergesForSolo(nx, ny) {
+    const hexagonal = (window.pieceSides === 6);
+    const order = window.soloUnlockOrder;
+    if (!order || order.length !== nx * ny) return;
+    const board = new PuzzleBoard(nx, ny, hexagonal);
+    const possible_merges = [0];
+    const actual_possible_merges = [0];
+    for (let k = 0; k < order.length; k++) {
+        board.addPiece(order[k] - 1);
+        possible_merges.push(board.mergesCount);
+        actual_possible_merges.push(board.mergesCount);
+    }
+    window.possible_merges = possible_merges;
+    window.actual_possible_merges = actual_possible_merges;
+}
 
 function findPolyPieceUsingPuzzlePiece(index, needsToBeFirst = false){
     for (let i = 0; i < puzzle.polyPieces.length; i++) {
@@ -2597,6 +3528,14 @@ function findPolyPieceUsingPuzzlePiece(index, needsToBeFirst = false){
     return null;
 }
 
+function findPolyPieceBySyncId(syncId) {
+    if (typeof syncId !== "number" || !Number.isFinite(syncId)) return null;
+    for (let i = 0; i < puzzle.polyPieces.length; i++) {
+        if (getPolyPieceSyncId(puzzle.polyPieces[i]) === syncId) return puzzle.polyPieces[i];
+    }
+    return null;
+}
+
 var puzzle_ini = false;
 var unlocked_pieces = [];
 
@@ -2609,10 +3548,8 @@ function unlockPiece(index) {
             console.log("PolyPiece not found for index", index);
             return;
         }
-        pp.moveTo(
-            ((index+10)*43.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
-            ((index+10)*73.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
-        );
+        const drop = getDropPositionPixels(puzzle, 0.03);
+        pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
         if (window.rotations > 0) {
             let num_rots = Math.round(360 / window.rotations);
             let random_rotation = 0;
@@ -2643,10 +3580,8 @@ function unlockFakePiece() {
     if(process_pending_actions){
         let pp = findPolyPieceUsingPuzzlePiece(index);
         console.log(pp)
-        pp.moveTo(
-            ((index+10)*429.2345) % (0.05 * puzzle.contWidth) - puzzle.scalex * 0.5,
-            ((index+10)*723.6132) % (0.05 * puzzle.contHeight) - puzzle.scaley * 0.5
-        );
+        const drop = getDropPositionPixels(puzzle, 0.03);
+        pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
         if (window.rotations > 0) {
             let num_rots = Math.round(360 / window.rotations);
             let random_rotation = 0;
@@ -2680,11 +3615,15 @@ function doSwapTrap(){
     pp1.moveAwayFromBorder();
     pp2.moveAwayFromBorder();
     if(window.rotations == 0){
-        change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight], true);
-        change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight], true);
+        const pp1Sync = getPolyPieceSyncId(pp1);
+        const pp2Sync = getPolyPieceSyncId(pp2);
+        if (pp1Sync !== null) change_savedata_datastorage(pp1Sync, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight], true);
+        if (pp2Sync !== null) change_savedata_datastorage(pp2Sync, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight], true);
     }else{
-        change_savedata_datastorage(pp1.pieces[0].index, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight, pp1.rot], true);
-        change_savedata_datastorage(pp2.pieces[0].index, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight, pp2.rot], true);
+        const pp1Sync = getPolyPieceSyncId(pp1);
+        const pp2Sync = getPolyPieceSyncId(pp2);
+        if (pp1Sync !== null) change_savedata_datastorage(pp1Sync, [pp1.x / puzzle.contWidth, pp1.y / puzzle.contHeight, pp1.rot], true);
+        if (pp2Sync !== null) change_savedata_datastorage(pp2Sync, [pp2.x / puzzle.contWidth, pp2.y / puzzle.contHeight, pp2.rot], true);
     }   
 }
 function doRotateTrap(){
@@ -2699,7 +3638,8 @@ function doRotateTrap(){
             pp.rotate(false, Math.round(Math.random() * (num_rots)));
         }
         pp.moveAwayFromBorder();
-        change_savedata_datastorage(pp.pieces[0].index, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
+        const ppSync = getPolyPieceSyncId(pp);
+        if (ppSync !== null) change_savedata_datastorage(ppSync, [pp.x / puzzle.contWidth, pp.y / puzzle.contHeight, pp.rot], true);
     }
 }
 
@@ -2716,13 +3656,17 @@ function getRandomPiece(numberOfPieces, maxcluster) {
 }
 
 function updateMergesLabels(){
+    const logicVal = (window.possible_merges && window.possible_merges[unlocked_pieces.length] !== undefined)
+        ? window.possible_merges[unlocked_pieces.length] : "?";
+    const possibleVal = (window.actual_possible_merges && window.actual_possible_merges[unlocked_pieces.length] !== undefined)
+        ? window.actual_possible_merges[unlocked_pieces.length] : "?";
     try {
-        document.getElementById("m9").innerText = "Merges in logic: " + (window.possible_merges[unlocked_pieces.length] !== undefined ? window.possible_merges[unlocked_pieces.length] : "?");
+        document.getElementById("m9").innerText = "Merges in logic: " + logicVal;
     } catch (e) {
         document.getElementById("m9").innerText = "Merges in logic: ?";
     }
     try {
-        document.getElementById("m10").innerText = "Merges possible: " + (window.actual_possible_merges[unlocked_pieces.length] !== undefined ? window.actual_possible_merges[unlocked_pieces.length] : "?");
+        document.getElementById("m10").innerText = "Merges possible: " + possibleVal;
     } catch (e) {
         document.getElementById("m10").innerText = "Merges possible: ?";
     }
@@ -2757,6 +3701,7 @@ function newMerge(key, playSound = true){
         change_savedata_datastorage("M", numberOfMerges, true);
     }
     document.getElementById("m9a").innerText = "Merges: " + numberOfMerges + "/" + (apnx * apny - 1);
+    if (window.play_solo) updateMergesLabels();
     if(playSound){
         window.playNewMergeSound();
     }
@@ -2766,135 +3711,67 @@ var numberOfMerges = 0;
 var numberOfMergesAtStart = 0;
 
 
-function setImagePath(l){
-    imagePath = l;
-    document.getElementById("previm").src = imagePath;
-    puzzle.srcImage.src = imagePath;
-    console.log("SET!");
-    loadImageFunction();
+function setImagePath(l, options = {}) {
+    if (mediaBindings && mediaBindings.setImagePath) mediaBindings.setImagePath(l, options);
+    updateDisplayCaptureMenuItemVisibility();
 }
-
 window.setImagePath = setImagePath;
 
-function move_piece_bounced(data){ // pp_index, x, y, (r)
-    do_action(`x_x_x_${data[0]}`, data[1], window.zero_list, true);
+async function loadVideoUrl(url) {
+    if (mediaBindings && mediaBindings.loadVideoUrl) {
+        return mediaBindings.loadVideoUrl(url);
+    }
+    throw new Error("Video URL loading is unavailable.");
+}
+window.loadVideoUrl = loadVideoUrl;
+
+function setRendererMode(mode) {
+    if (rendererModeApi && rendererModeApi.setRendererMode) rendererModeApi.setRendererMode(mode);
+}
+window.setRendererMode = setRendererMode;
+
+window.runRendererPerfBench = function runRendererPerfBench(durationMs = 5000) {
+    if (rendererModeApi && rendererModeApi.runRendererPerfBench) {
+        return rendererModeApi.runRendererPerfBench(durationMs);
+    }
+    return Promise.resolve({ samples: 0, avgFrameMs: 0, avgDrawCalls: 0, avgMediaUploads: 0 });
+};
+
+let pending_actions = [];
+window.jigsawRuntime.pendingActions = pending_actions;
+let archipelagoBridge = null;
+if (window.JigsawArchipelagoBridge && typeof window.JigsawArchipelagoBridge.create === "function") {
+    archipelagoBridge = window.JigsawArchipelagoBridge.create({
+        getAcceptPendingActions: () => accept_pending_actions,
+        getProcessPendingActions: () => process_pending_actions,
+        getPendingActions: () => pending_actions,
+        getMoving: () => moving,
+        setMoving: (value) => { moving = value; },
+        getPuzzle: () => puzzle,
+        findPolyPieceUsingPuzzlePiece: (idx, first) => findPolyPieceUsingPuzzlePiece(idx, first),
+        findPolyPieceBySyncId: (syncId) => findPolyPieceBySyncId(syncId),
+        getPolyPieceSyncId: (pp) => getPolyPieceSyncId(pp)
+    });
 }
 
+function move_piece_bounced(data){ // pp_index, x, y, (r)
+    if (archipelagoBridge && archipelagoBridge.movePieceBounced) {
+        archipelagoBridge.movePieceBounced(data);
+    } else {
+        do_action(`x_x_x_${data[0]}`, data[1], window.zero_list, true);
+    }
+}
 window.move_piece_bounced = move_piece_bounced;
 
 async function change_savedata_datastorage(key, value, final) {
-    // console.log("change_savedata_datastorage", key, value, final);
-    
-    if(window.play_solo) return;
-
-    const key_name = `JIG_PROG_${window.slot}_${key}`;
-
-    if (key == "M" || key == "O") {
-        const client = window.getAPClient();
-        client.storage.prepare(key_name, 0).replace(value).commit();
-        return;
-    }
-    
-    if(final){ //make sure you only replace it to lower values.
-        const client = window.getAPClient();
-        let currentValue = 0;
-        currentValue = await client.storage.fetch([key_name], true);
-        currentValue = currentValue[key_name];
-        console.log("currentValue", currentValue, key_name)
-        if (currentValue === null) {
-            client.storage.prepare(key_name, window.zero_list).replace(value).commit();
-        } else if (Array.isArray(currentValue) && Array.isArray(value)) {
-            // Only replace if both are lists
-            client.storage.prepare(key_name, window.zero_list).replace(value).commit();
-        } else if (typeof currentValue === "number" && typeof value === "number") {
-            // Replace only if value < currentValue
-            client.storage.prepare(key_name, 999999).replace(Math.min(currentValue, value)).commit();
-        } else if (!Array.isArray(value)) {
-            // If X is not a list, replace the current value
-            client.storage.prepare(key_name, window.zero_list).replace(value).commit();
-        }
-    }else{
-        const client = window.getAPClient();
-        if (!window.bounceTimeout) {
-            // console.log("sending bounce", [key, value[0], value[1]])
-            client.bounce({"slots": [window.slot]}, [key, value]);
-            window.bounceTimeout = setTimeout(() => {
-                window.bounceTimeout = null;
-            }, 1000);
-        }
+    if (archipelagoBridge && archipelagoBridge.changeSavedataDatastorage) {
+        return archipelagoBridge.changeSavedataDatastorage(key, value, final);
     }
 }
 
-let pending_actions = []
 function do_action(key, value, oldValue, bounce){
-    // console.log("got response", key, value, oldValue, bounce);
-    if(accept_pending_actions){
-        if(!bounce){
-            pending_actions.push([key, value, oldValue]);
-            console.log("Add pending action", key, value, pending_actions)
-        }
-    } else if(process_pending_actions) {
-        let pp_index = parseInt(key.split("_")[3]);
-        let moving_that_piece = moving && moving.pp && moving.pp.pieces && moving.pp.pieces[0].index == pp_index;
-
-        const pp = findPolyPieceUsingPuzzlePiece(pp_index, true);
-        if(!pp){
-            console.log("Ignore action not found", pp, pp_index)
-            return;
-        }
-        if (Array.isArray(value) || value == "unlock") {
-            if(moving_that_piece){
-                return;
-            }
-            let [x,y,r] = [0,0,0];
-            if(value == "unlock"){
-                let num_rots = Math.round(360 / window.rotations);
-                if (window.rotations == 0) num_rots = 1;
-                let random_rotation = 0;
-                if (window.rotations == 180){
-                    random_rotation = Math.floor(2 * Math.floor((index * 2345.1234) % 2));
-                }else{
-                    random_rotation = Math.floor((index * 2345.1234) % num_rots);
-                }
-                [x,y,r] = 
-                    [
-                        ((pp_index+10)*43.2345) % 0.05,
-                        ((pp_index+10)*73.6132) % 0.05,
-                        random_rotation
-                    ];
-            }else{
-                if (value.length == 3) {
-                    [x, y, r] = value;
-                } else if (value.length == 2) {
-                    [x, y] = value;
-                    r = 0;
-                }
-            }
-            if (pp) {
-                if(!bounce || (bounce && !window.ignore_bounce_pieces.includes(pp_index))){
-                    // console.log("moving because of action", key, value, bounce);
-                    pp.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
-                    pp.rotateTo(r);
-                    pp.hasMovedEver = true;
-                }
-            }
-        } else { // value is an int
-            value = parseInt(value);
-            if (typeof oldValue === "number") return; //already merged!
-
-            if(moving_that_piece || (moving && moving.pp && moving.pp.pieces && moving.pp.pieces[0].index == value)){
-                moving = null; // let go of piece if someone else merges it...
-            }
-            const pp2 = findPolyPieceUsingPuzzlePiece(value);
-            if(pp != pp2){
-                console.log("merging because of action", key, value, bounce)
-                if (pp.pieces.length > pp2.pieces.length  || (pp.pieces.length == pp2.pieces.length && pp.pieces[0].index > pp2.pieces[0].index)) {
-                    pp.merge(pp2);
-                } else {
-                    pp2.merge(pp);
-                }
-            }
-        }
+    if (archipelagoBridge && archipelagoBridge.doAction) {
+        archipelagoBridge.doAction(key, value, oldValue, bounce);
     }
 }
 
@@ -2981,7 +3858,8 @@ function rotateCurrentPiece(counter = false){
                 moving.pp.rotate(moving);
             }
         }
-        change_savedata_datastorage(moving.pp.pieces[0].index, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
+        const movingSyncId = getPolyPieceSyncId(moving.pp);
+        if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [moving.pp.x / puzzle.contWidth, moving.pp.y / puzzle.contHeight, moving.pp.rot], false);
     }
     
 }
@@ -3096,6 +3974,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     x = 0.3;
                     y = 0.7;
                     break;
+                case "8": // Drop location (custom or default) - handled in forEach below
+                    x = 0;
+                    y = 0;
+                    break;
                 case "7": // Anywhere
                 default:
                     x = 0.7;
@@ -3113,7 +3995,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             piecesToDeposit.forEach(pp => {
-                pp.moveTo(Math.random() * x * puzzle.contWidth, Math.random() * y * puzzle.contHeight);
+                if (value === "8") {
+                    const d = getDropPositionPixels(puzzle, 0.05);
+                    pp.moveTo(d.x - puzzle.scalex * 0.5, d.y - puzzle.scaley * 0.5);
+                } else {
+                    pp.moveTo(Math.random() * x * puzzle.contWidth, Math.random() * y * puzzle.contHeight);
+                }
                 pp.withdrawn = false;
             });
 

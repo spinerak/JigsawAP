@@ -7,6 +7,49 @@ function getUrlParameter(name) {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 };
 
+const CHANGELOG_STORAGE_KEY = "jigsawChangelogVersionSeen";
+const CHANGELOG_VERSION = "0.10.0";
+
+function showChangelogModal() {
+    const overlay = document.getElementById("changelogModal");
+    if (overlay) overlay.style.display = "flex";
+}
+window.showChangelogModal = showChangelogModal;
+
+function hideChangelogModal() {
+    const overlay = document.getElementById("changelogModal");
+    if (overlay) overlay.style.display = "none";
+}
+
+function initChangelog() {
+    const overlay = document.getElementById("changelogModal");
+    const closeBtn = document.getElementById("closeChangelogBtn");
+    const showBtn = document.getElementById("showChangelogBtn");
+    const versionSpans = document.querySelectorAll(".changelog-current-version");
+
+    versionSpans.forEach((el) => {
+        el.textContent = CHANGELOG_VERSION;
+    });
+
+    if (showBtn) showBtn.addEventListener("click", showChangelogModal);
+    if (closeBtn) closeBtn.addEventListener("click", hideChangelogModal);
+    if (overlay) {
+        overlay.addEventListener("click", (event) => {
+            if (event.target === overlay) hideChangelogModal();
+        });
+    }
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hideChangelogModal();
+    });
+
+    const savedVersion = localStorage.getItem(CHANGELOG_STORAGE_KEY);
+    if (savedVersion !== CHANGELOG_VERSION) {
+        localStorage.setItem(CHANGELOG_STORAGE_KEY, CHANGELOG_VERSION);
+        showChangelogModal();
+    }
+}
+initChangelog();
+
 
 document.getElementById('hostport').value = getUrlParameter('hostport') || localStorage.getItem("hostport") || "archipelago.gg:38281";
 
@@ -56,18 +99,21 @@ function toggleFullscreen() {
         }
     }
 }
+window.toggleFullscreen = toggleFullscreen;
 
 // Show the fullscreen button only on mobile devices
 window.addEventListener('load', () => {
     if (isMobile()) {
-        document.getElementById('m11').style.display = 'inline-block';
-        document.getElementById('m11a').style.display = 'inline-block';
+        document.getElementById('m11a').style.display = 'none';
+        const tbFs = document.getElementById('taskbarFullscreen');
+        const tbV = document.getElementById('taskbarViewControls');
+        const tbC = document.getElementById('taskbarCosmeticControls');
+        if (tbFs) tbFs.style.display = 'flex';
+        if (tbV) tbV.style.display = 'flex';
+        if (tbC) tbC.style.display = 'flex';
         setTimeout(() => window.scrollTo(0, 1), 100); // URL bar hiding trick
     }
 });
-
-document.getElementById("m11").addEventListener("click", toggleFullscreen);
-
 
 function pressed_login(){
     localStorage.setItem("hostport", document.getElementById("hostport").value);
@@ -79,54 +125,38 @@ function pressed_login(){
 window.play_solo = false;
 function pressed_solo(){
     window.play_solo = true;
-    
-    if(window.pieceSides == 6){
-        window.possible_merges = [];
-        window.actual_possible_merges = [];
-    }else{
-        window.possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23];
-        window.actual_possible_merges = [0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 4, 6, 8, 10, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23];
-    }
+    window.puzzleAreaScale = "Landscape";
+
+    window.possible_merges = [];
+    window.actual_possible_merges = [];
 
     window.fake_pieces_mimic = []
 
     closeMenus();
 
+    window.slot = window.slot ?? 0;
+    const m3 = document.getElementById("m3");
+    const m3a = document.getElementById("m3a");
+    const m3b = document.getElementById("m3b");
+    const m3c = document.getElementById("m3c");
+    if (m3) m3.style.display = "block";
+    if (m3a) m3a.style.display = "block";
+    if (m3b) m3b.style.display = "block";
+    if (m3c) m3c.style.display = "block";
+    const soloPieceCount = document.getElementById("soloPieceCount");
+    const soloSeed = document.getElementById("soloSeed");
+    if (soloPieceCount) soloPieceCount.value = "24";
+    if (soloSeed) soloSeed.value = "";
+
     window.set_puzzle_dim(6, 4);
 
-    window.unlockPiece(23);
-    window.unlockPiece(2);
-    window.unlockPiece(12);
-    window.unlockPiece(18);
-    window.unlockPiece(7);
-    window.unlockPiece(13);
-    window.unlockPiece(21);
-    window.updateMergesLabels();
-
     function sendCheck(numberOfMerges){
-        let trans = {
-            1: 3,
-            2: 20,
-            3: 5,
-            4: 4,
-            5: 22,
-            6: 14,
-            7: 11,
-            8: 10,
-            9: 8,
-            10: 15,
-            11: 9,
-            12: 16,
-            13: 17,
-            14: 24,
-            15: 19,
-            16: 1,
-            17: 6
-        }
-        let val = trans.hasOwnProperty(numberOfMerges) ? trans[numberOfMerges] : -1;
-        if(val > 0){
+        if (!window.soloUnlockOrder || !window.soloUnlockOrder.length) return;
+        const initialCount = Math.min(7, window.soloUnlockOrder.length);
+        const idx = initialCount + numberOfMerges - 1;
+        if (idx >= 0 && idx < window.soloUnlockOrder.length) {
             setTimeout(() => {
-                window.unlockPiece(val);
+                window.unlockPiece(window.soloUnlockOrder[idx]);
                 playNewItemSound();
                 window.updateMergesLabels();
             }, 300);
@@ -154,9 +184,15 @@ function pressed_solo(){
     apstatus = "Playing solo";
     document.getElementById("m6").innerText = apstatus;
 
-    // document.getElementById('taskbar1').style.display = "flex";
+    document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
+    const tbf = document.getElementById('taskbarFullscreen');
+    const tbv = document.getElementById('taskbarViewControls');
+    const tbc = document.getElementById('taskbarCosmeticControls');
+    if (tbf) tbf.style.display = "flex";
+    if (tbv) tbv.style.display = "flex";
+    if (tbc) tbc.style.display = "flex";
 
     
     const messages = [
@@ -390,6 +426,11 @@ const connectedListener = (packet) => {
         window.make_pieces_square = packet.slot_data.uniform_piece_size === 1;
     }
 
+    const validPuzzleAreaScales = ["Landscape", "Portrait", "Square", "Picture"];
+    if (packet.slot_data.puzzle_area_scale != null && validPuzzleAreaScales.includes(packet.slot_data.puzzle_area_scale)) {
+        window.puzzleAreaScale = packet.slot_data.puzzle_area_scale;
+    }
+
     const shapeParam2 = getUrlParameter("shape");
     if (!shapeParam2) {
         if(packet.slot_data.border_type){
@@ -504,6 +545,12 @@ const connectedListener = (packet) => {
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
+    const tf = document.getElementById('taskbarFullscreen');
+    const tv = document.getElementById('taskbarViewControls');
+    const tc = document.getElementById('taskbarCosmeticControls');
+    if (tf) tf.style.display = "flex";
+    if (tv) tv.style.display = "flex";
+    if (tc) tc.style.display = "flex";
 
 
     
@@ -538,24 +585,69 @@ function setImage(url){
         }
     }
 
+    function detectMediaKind(src) {
+        if (typeof src !== "string") return "image";
+        const lowerSrc = src.toLowerCase();
+        if (lowerSrc.startsWith("data:video/")) return "video";
+        if (lowerSrc.startsWith("data:image/gif")) return "gif";
+        if (lowerSrc.startsWith("data:image/")) return "image";
+        if (/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(src)) return "video";
+        if (/\.gif(\?|#|$)/i.test(src)) return "gif";
+        if (/\.(png|jpe?g|webp|bmp|svg)(\?|#|$)/i.test(src)) return "image";
+        if (/(^|[?&])(format|fm|ext|type)=gif(&|$)/i.test(src)) return "gif";
+        if (/image\/gif/i.test(src)) return "gif";
+        return "unknown";
+    }
+
     function checkImage(url, callback) {
         let img = new Image();
         img.onload = () => callback(true);  // Image loaded successfully
         img.onerror = () => callback(false); // Image failed to load
         img.src = url;
     }
-            
+
+    const forcedMediaType = (getUrlParameter("imageType") || getUrlParameter("imagetype") || getUrlParameter("mediaType") || "").toLowerCase();
+    const mediaKind = (forcedMediaType === "gif" || forcedMediaType === "video" || forcedMediaType === "image")
+        ? forcedMediaType
+        : detectMediaKind(url);
+    if (mediaKind === "video" && typeof window.loadVideoUrl === "function") {
+        window.loadVideoUrl(url)
+            .then(() => {
+                imagePath = url;
+                window.choose_ap_image = true;
+                window.set_ap_image = true;
+                console.log("Set video!");
+            })
+            .catch((error) => {
+                console.error("Video is a dead link.", error);
+            });
+        return;
+    }
+
     checkImage(url, (isValid) => {
         if (isValid) {
             imagePath = url;
-            console.log("Set image!")
+            console.log("Set image!");
+            const options = mediaKind === "gif" ? { forceMediaKind: "gif" } : {};
+            window.setImagePath(imagePath, options);
+            window.choose_ap_image = true;
+            window.set_ap_image = true;
         } else {
             console.log("Image is a dead link.");
+            if (mediaKind !== "gif" && typeof window.loadVideoUrl === "function") {
+                window.loadVideoUrl(url)
+                    .then(() => {
+                        imagePath = url;
+                        window.choose_ap_image = true;
+                        window.set_ap_image = true;
+                        console.log("Set video!");
+                    })
+                    .catch((error) => {
+                        console.error("Image/video is a dead link.", error);
+                    });
+                return;
+            }
         }
-        window.setImagePath(imagePath);
-        
-        window.choose_ap_image = true;
-        window.set_ap_image = true;
     });
 }
 
@@ -942,5 +1034,3 @@ if(getUrlParameter("go") == "SS"){
     window.start_solo_immediately = true;
     pressed_solo();
 }
-
-console.log("0.9.0")

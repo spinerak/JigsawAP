@@ -99,7 +99,7 @@
             <label id="error-label" class="login-label" style="color: red;"></label>
           </div>
           <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
-            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">Try it out solo (fixed seed, no save)</div>
+            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">Try it out solo (no save)</div>
             <hr style="border: 1px solid #4dabf74d; margin: 8px 0;">
             <div style="display: flex; gap: 10px;">
               <input type="submit" value="Normal" id="solobutton" class="login-submit">
@@ -107,9 +107,15 @@
               <input type="submit" value="Hex" id="solobutton3" class="login-submit">
             </div>
           </div>
+          <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
+            <div style="color: #fff; font-weight: bold; margin-bottom: 8px;">What's new</div>
+            <hr style="border: 1px solid #4dabf74d; margin: 8px 0;">
+            <input type="button" value="Show changelog" id="showChangelogBtn" class="login-submit">
+          </div>
       </div>
 
       <div style="margin-top: 5px; font-size: 0.7em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
+        Made by Spineraks and fariel. <br>
         The images displayed on this website are loaded directly from external sources and are not hosted or distributed by this site. <br>
         Archipelago Logo © 2022 by Krista Corkos and Christopher Wilson is licensed under Attribution-NonCommercial 4.0 International. <br>
         Amazing artwork by le_becc.
@@ -117,6 +123,56 @@
         
   </div>
 
+</div>
+
+<div id="changelogModal" class="changelog-modal">
+  <div class="changelog-modal-card">
+    <div class="changelog-modal-title">Changelog</div>
+    <div class="changelog-modal-subtitle">
+      Current changelog version: <span class="changelog-current-version">0.10.0</span>
+    </div>
+    <div class="changelog-modal-scroll">
+      <div class="changelog-modal-intro">
+        This changelog appears automatically when a new changelog version is detected and can always be reopened from the login page.
+      </div>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Version 0.10.0</div>
+        <div class="changelog-entry-body">
+          <ul>
+            <li>Media source options expanded significantly: GIF support (usually best when uploaded locally), camera source support (including OBS Virtual Camera workflows so your game feed can become puzzle "screen space"), and capture-source support for YouTube/Twitch via a helper window + browser capture flow. It can capture anything your browser allows, but minimizing the captured source window may freeze playback in some browser setups.</li>
+            <li>The URL loader is smarter for extension-less links: you can force media interpretation with <code>imageType=image</code>, <code>imageType=gif</code>, or <code>imageType=video</code>.</li>
+            <li>Linked media now handles cross-origin (CORS) issues more gracefully. If an external host blocks secure media access, the game explains what happened and downgrades rendering when possible. The main hard limitation is animated GIFs from CORS-blocked URLs; for those, local upload is usually the best fix.</li>
+            <li>When a media compatibility issue happens, you now get an in-game popup with guidance instead of a silent failure. If you are sharing GIF puzzles, the most reliable workflow is usually to save the GIF locally and have both players load that file directly.</li>
+            <li>A built-in changelog was added. New versions now show an update modal once, and players can reopen it anytime from the login page with "Show changelog."</li>
+            <li>The renderer was rewritten to use WebGL/OpenGL-style acceleration when available, with automatic fallback to Canvas2D when not. Both paths are a major upgrade over the old renderer, and scale to much larger puzzles more reliably.</li>
+            <li>Overall puzzle performance was improved in general, especially in heavier scenarios where rendering and piece updates used to bottleneck sooner.</li>
+            <li>Local puzzle generation now supports up to 2500 client-generated pieces.</li>
+            <li>Performance was improved for piece placement when pieces are added onto the board (separate from local piece generation), so drops feel snappier under load.</li>
+            <li>The image preview now scales by image aspect ratio to remove the gray dead zone it used to make... except with GIFs, because browsers still hate GIFs.</li>
+            <li>A new puzzle-area scaling option based on image aspect ratio is available. It tends to feel best in local play, but can be used in AP too if you prefer unusual puzzle shapes.</li>
+            <li>A brand-new drop-location handle was added. It is a movable placement marker inside the play area, and you can use it to choose exactly where board-added pieces should land. It is hidden by default; enable it from Cosmetic Options.</li>
+            <li>Drawer-to-board dropping can now target the drop-location handle position as well, making drawer placement more predictable.</li>
+            <li>View/navigation controls were expanded: pan by click-drag, near-infinite zoom (within reason), zoom/pan toggles, scaling toggle, reset view, pan-button selection, and adjustable zoom/pan speeds from the View Controls window.</li>
+            <li>The play area got a visual upgrade: felt-like texture, rounded corners, and clearer "held piece" shadow feedback.</li>
+            <li>Cosmetic controls are now accessible from a dedicated bottom-right window, including: board background color, piece bevel depth, held-piece shadow darkness, corner radius, renderer selection, puzzle resolution/performance settings, grayscale reference background (Banjo-Kazooie style), and drop-handle visibility/color.</li>
+            <li>Several in-game windows were cleaned up and refactored for readability and easier navigation, including the main start-game menu flow.</li>
+            <li>Also included: a curated assortment of brand-new, artisanal bugs, handcrafted for your personal puzzling experience.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Before we recorded history.</div>
+        <div class="changelog-entry-body">
+          we don't know what happened. It's lost
+        </div>
+      </article>
+    </div>
+    <div class="changelog-modal-actions">
+      <button type="button" id="closeChangelogBtn" class="changelog-close-btn">Close</button>
+    </div>
+  </div>
 </div>
 
 <audio id="newItemSound">
@@ -129,67 +185,10 @@
 <div id=forPuzzle></div>
   <ul id="menu">
     <li id="m0">&#x2630;</li>
-    <li id="m1">default image  | #:
-      <select id="defaultImageIndex">
-        <option value="1" selected>1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-        <option value="11">11</option>
-        <option value="12">12</option>
-        <option value="13">13</option>
-        <option value="14">14</option>
-        <option value="15">15</option>
-        <option value="16">16</option>
-        <option value="17">17</option>
-        <option value="18">18</option>
-        <option value="19">19</option>
-        <option value="20">20</option>
-        <option value="21">21</option>
-        <option value="22">22</option>
-        <option value="23">23</option>
-        <option value="24">24</option>
-        <option value="25">25</option>
-        <option value="26">26</option>
-        <option value="27">27</option>
-        <option value="28">28</option>
-        <option value="29">29</option>
-        <option value="30">30</option>
-        <option value="31">31</option>
-        <option value="32">32</option>
-        <option value="33">33</option>
-        <option value="34">34</option>
-        <option value="35">35</option>
-        <option value="36">36</option>
-        <option value="37">37</option>
-        <option value="38">38</option>
-        <option value="39">39</option>
-        <option value="40">40</option>
-        <option value="41">41</option>
-        <option value="42">42</option>
-        <option value="43">43</option>
-        <option value="44">44</option>
-        <option value="45">45</option>
-        <option value="46">46</option>
-        <option value="47">47</option>
-        <option value="48">48</option>
-        <option value="49">49</option>
-        <option value="50">50</option>
-        <option value="51">51</option>
-        <option value="52">52</option>
-        <option value="53">53</option>
-        <option value="54">54</option>
-        <option value="55">55</option>
-      </select>
-    </li>
-    <li id="m2">load custom image</li>
-    <li id="m3">shape: 
+    <li id="m2">Select image</li>
+    <li id="m3a">Seed: <input type="text" id="soloSeed" placeholder="optional"></li>
+    <li id="m3b">Pieces: <input type="text" id="soloPieceCount" placeholder="4-2500" value="24"></li>
+    <li id="m3">Piece shape:
       <select id="shape">
         <option value="1" selected>classic</option>
         <option value="2">triangle</option>
@@ -199,11 +198,17 @@
         <option value="6">chaos</option>
       </select>
     </li>
+    <li id="m3c" style="display: none;">Puzzle area: <select id="puzzleAreaScale" aria-label="Puzzle area scaling" autocomplete="off">
+        <option value="Landscape" selected>Landscape</option>
+        <option value="Portrait">Portrait</option>
+        <option value="Square">Square</option>
+        <option value="Picture">Picture</option>
+      </select></li>
       
     <li id="m4" style="background-color: green;">Start!</li>
     
     <li id="m5">Credits</li>
-     
+    <li id="mChangeCaptureSource" style="display: none;" title="Video or stream ended? Choose the capture source again.">Change capture source</li>
     <li id="m9a"></li> <!-- number of merges -->
     <li id="m9"></li> <!-- logic1 -->
     <li id="m10"></li> <!-- logic2 -->
@@ -211,186 +216,326 @@
     <li id="m13b" style="background-color: #ff0000; " title="Change color of clue">🎨</li>
     <li id="m13c" style="background-color: #888888; " title="Remove all clues">🗑️</li>
     
-    <li id="m10b" style="background-color: #45aabe;">BG color: #
-      <select id="bgcolorR">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-        <option value="D">D</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-      </select>
-      <select id="bgcolorG">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-        <option value="D">D</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-      </select>
-      <select id="bgcolorB">
-        <option value="0">0</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-        <option value="D">D</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-      </select>
-    </li>
-
-    <li id="o1a" style="background-color: #45aabe;">Border thickness
-      <select id="options_bt">
-        <option value="0">0</option>
-        <option value="0.1">0.1</option>
-        <option value="0.2">0.2</option>
-        <option value="0.3">0.3</option>
-        <option value="0.4">0.4</option>
-        <option value="0.5">0.5</option>
-        <option value="0.6">0.6</option>
-        <option value="0.7">0.7</option>
-        <option value="0.8">0.8</option>
-        <option value="0.9">0.9</option>
-        <option value="1">1</option>
-        <option value="1.1">1.1</option>
-        <option value="1.2">1.2</option>
-        <option value="1.3">1.3</option>
-        <option value="1.4">1.4</option>
-        <option value="1.5">1.5</option>
-        <option value="1.6">1.6</option>
-        <option value="1.7">1.7</option>
-        <option value="1.8">1.8</option>
-        <option value="1.9">1.9</option>
-        <option value="2">2</option>
-      </select>
-    </li>
-    <li id="o1b" style="background-color: #45aabe;">Shadow thickness
-      <select id="options_st">
-        <option value="0">0</option>
-        <option value="0.1">0.1</option>
-        <option value="0.2">0.2</option>
-        <option value="0.3">0.3</option>
-        <option value="0.4">0.4</option>
-        <option value="0.5">0.5</option>
-        <option value="0.6">0.6</option>
-        <option value="0.7">0.7</option>
-        <option value="0.8">0.8</option>
-        <option value="0.9">0.9</option>
-        <option value="1">1</option>
-        <option value="1.1">1.1</option>
-        <option value="1.2">1.2</option>
-        <option value="1.3">1.3</option>
-        <option value="1.4">1.4</option>
-        <option value="1.5">1.5</option>
-        <option value="1.6">1.6</option>
-        <option value="1.7">1.7</option>
-        <option value="1.8">1.8</option>
-        <option value="1.9">1.9</option>
-        <option value="2">2</option>
-      </select>
-    </li>
-
     <br>
-    <li id="m11" style="background-color: #c58e3c;">Full screen 🖥️</li>
     <li id="m11a" style="background-color: #c58e3c; cursor: pointer;" title="Enable/disable zooming">🔍✅</li> 
-    
     <li id="m6" style="background-color: #555;">AP: not connected</li>
   </ul>
-  
 </div>
 
-<div class="draggable" id="draggable1" style="display: none;">
-  <div class="controls">
-      <button class="control-btn" id="control-btn1">-</button>
+<div class="draggable drawer-window" id="draggable4" style="display: none;">
+  <div class="view-controls-window-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">View controls</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn4" title="Minimize">−</button>
+    </header>
+    <div class="view-controls-body view-controls-window-body">
+      <div class="view-controls-row">
+        <button id="viewZoomToggle" class="view-toggle-btn" type="button" title="Turn zoom on or off. When on, use scroll/pinch to zoom in and out on the puzzle.">Zoom: On</button>
+        <button id="viewPanToggle" class="view-toggle-btn" type="button" title="Turn panning on or off. When on, drag the puzzle background to move the view.">Pan: On</button>
+      </div>
+      <div class="view-controls-row">
+        <button id="viewScalingToggle" class="view-toggle-btn" type="button" title="Turn auto-scaling on or off. When on, the puzzle fits to the window; when off, you can zoom and pan freely.">Scaling: On</button>
+        <button id="viewResetButton" class="view-toggle-btn" type="button" title="Reset zoom and pan to the default view (puzzle centered and fitted).">Reset View</button>
+      </div>
+      <div class="view-controls-row view-controls-row--full">
+        <button id="viewPanButtonToggle" class="view-toggle-btn view-pan-with-btn" type="button" title="Choose which mouse button starts panning (Left / Middle / Right).">Pan with: Left</button>
+      </div>
+      <div class="view-controls-slider" title="Adjust how fast zooming responds to scroll or pinch.">
+        <label for="viewZoomSensitivity">Zoom speed</label>
+        <input id="viewZoomSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
+        <span id="viewZoomSensitivityValue">1.0x</span>
+      </div>
+      <div class="view-controls-slider" title="Adjust how fast panning responds when dragging the puzzle.">
+        <label for="viewPanSensitivity">Pan speed</label>
+        <input id="viewPanSensitivity" type="range" min="0.2" max="3" step="0.1" value="1">
+        <span id="viewPanSensitivityValue">1.0x</span>
+      </div>
+    </div>
   </div>
+  <div class="resizer corner" id="resizerCorner4"></div>
+</div>
+<div class="draggable drawer-window" id="draggable5" style="display: none;">
+  <div class="drawer-panel cosmetic-window-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">Cosmetic options</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn5" title="Minimize">−</button>
+    </header>
+    <div class="display-options-body cosmetic-window-body">
+      <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
+        <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
+        <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="bgcolorG" class="display-options-select" aria-label="Background color green">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="bgcolorB" class="display-options-select" aria-label="Background color blue">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+      </div>
+      <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
+        <label for="displayPieceBevel">Piece bevel</label>
+        <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
+        <span id="displayPieceBevelValue">0.1</span>
+      </div>
+      <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
+        <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
+        <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
+        <span id="displayHeldPieceShadowDarknessValue">0.35</span>
+      </div>
+      <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
+        <label for="displayFeltOpacity">Felt opacity</label>
+        <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
+        <span id="displayFeltOpacityValue">0.5</span>
+      </div>
+      <div class="display-options-slider" title="Rounded corners of the play area (px).">
+        <label for="displayPlayAreaRadius">Rounded corners</label>
+        <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
+        <span id="displayPlayAreaRadiusValue">64px</span>
+      </div>
+      <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources). Canvas2D is the compatibility path and is used when WebGL is unavailable, blocked, or downgraded for this session.">
+        <label for="rendererModeSelect" title="Auto: preferred default. It attempts WebGL and falls back to Canvas2D when needed. WebGL: GPU path for best performance with large piece counts/animated media. Canvas2D: CPU single-canvas compatibility path.">Renderer backend</label>
+        <select id="rendererModeSelect" class="display-options-select" title="Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available. Canvas2D: compatibility path used when WebGL is unavailable/blocked.">
+          <option value="auto">auto</option>
+          <option value="webgl">webgl</option>
+          <option value="canvas2d">canvas2d</option>
+        </select>
+      </div>
+      <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited.">
+        <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen.">Puzzle resolution</label>
+        <select id="puzzleResolutionSelect" class="display-options-select" aria-label="Puzzle render resolution cap">
+          <option value="1080p">1080p</option>
+          <option value="720p">720p</option>
+          <option value="540p">540p</option>
+        </select>
+      </div>
+      <div class="display-options-row display-options-row--label-wide" title="Show the puzzle image in grayscale behind the pieces as a reference while solving.">
+        <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
+        <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">
+      </div>
+      <div class="display-options-row display-options-row--label-wide" title="Show a draggable handle for where new pieces will appear; drag to move it. The drop location is reset when you start a new puzzle.">
+        <label for="useCustomDropLocation" class="display-options-label-inline">Show drop location handle</label>
+        <input type="checkbox" id="useCustomDropLocation" class="display-options-checkbox" aria-label="Show drop location handle">
+      </div>
+      <div class="display-options-row" title="Color of the drop location target (hex R, G, B).">
+        <label for="dropLocationR" class="display-options-label-inline">Drop location color #</label>
+        <select id="dropLocationR" class="display-options-select" aria-label="Drop location color red">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="dropLocationG" class="display-options-select" aria-label="Drop location color green">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+        <select id="dropLocationB" class="display-options-select" aria-label="Drop location color blue">
+          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+        </select>
+      </div>
+      <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
+        <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
+        <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>
+      </div>
+    </div>
+  </div>
+  <div class="resizer corner" id="resizerCorner5"></div>
+</div>
+<div class="draggable drawer-window" id="draggable6" style="display: none;">
+  <div class="drawer-panel media-window-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">Load custom media</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn6" title="Minimize">−</button>
+    </header>
+    <div class="media-window-body">
+      <section class="media-window-card">
+        <h4 class="media-window-title">Preset images</h4>
+        <p class="media-window-text">These are built-in image links. Some hosts block CORS, which can cause WebGL upload restrictions and force Canvas2D fallback.</p>
+        <div class="media-window-row">
+          <label for="defaultImageIndex" class="drawer-label">Default image #</label>
+          <select id="defaultImageIndex" class="drawer-select" aria-label="Default image preset">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+            <option value="13">13</option>
+            <option value="14">14</option>
+            <option value="15">15</option>
+            <option value="16">16</option>
+            <option value="17">17</option>
+            <option value="18">18</option>
+            <option value="19">19</option>
+            <option value="20">20</option>
+            <option value="21">21</option>
+            <option value="22">22</option>
+            <option value="23">23</option>
+            <option value="24">24</option>
+            <option value="25">25</option>
+            <option value="26">26</option>
+            <option value="27">27</option>
+            <option value="28">28</option>
+            <option value="29">29</option>
+            <option value="30">30</option>
+            <option value="31">31</option>
+            <option value="32">32</option>
+            <option value="33">33</option>
+            <option value="34">34</option>
+            <option value="35">35</option>
+            <option value="36">36</option>
+            <option value="37">37</option>
+            <option value="38">38</option>
+            <option value="39">39</option>
+            <option value="40">40</option>
+            <option value="41">41</option>
+            <option value="42">42</option>
+            <option value="43">43</option>
+            <option value="44">44</option>
+            <option value="45">45</option>
+            <option value="46">46</option>
+            <option value="47">47</option>
+            <option value="48">48</option>
+            <option value="49">49</option>
+            <option value="50">50</option>
+            <option value="51">51</option>
+            <option value="52">52</option>
+            <option value="53">53</option>
+            <option value="54">54</option>
+            <option value="55">55</option>
+          </select>
+        </div>
+      </section>
+      <section class="media-window-card">
+        <h4 class="media-window-title">Use media</h4>
+        <p class="media-window-text">Pick an image, GIF, or video from your device. Animated sources work best with WebGL for smoother playback and lower CPU usage on larger puzzles.</p>
+        <button id="mediaLoadFileBtn" type="button" class="drawer-btn drawer-btn--primary">Use media</button>
+      </section>
+      <section class="media-window-card">
+        <h4 class="media-window-title">Capture from link (YouTube / Twitch)</h4>
+        <p class="media-window-text">Open a source window with the link, then click Start capture in this tab and select that window or tab in the chooser. Some DRM content may capture as black.</p>
+        <p class="media-window-text">The source window cannot be minimized during play, or capture may stop. Use the menu during play to change the capture source if needed.</p>
+        <div class="media-window-row">
+          <input type="text" id="mediaLinkUrlInput" class="drawer-input" placeholder="Paste YouTube or Twitch URL" aria-label="YouTube or Twitch URL">
+        </div>
+        <div class="media-window-row">
+          <button id="mediaOpenSourceWindowBtn" type="button" class="drawer-btn">Open source window</button>
+          <button id="mediaStartCaptureBtn" type="button" class="drawer-btn">Start capture</button>
+        </div>
+      </section>
+      <section class="media-window-card">
+        <h4 class="media-window-title">Use camera</h4>
+        <p class="media-window-text">Use a webcam or a virtual camera (for example, an OBS virtual camera) as the puzzle source so you can puzzle over live video.</p>
+        <button id="mediaUseCameraBtn" type="button" class="drawer-btn">Use camera</button>
+      </section>
+    </div>
+  </div>
+  <div class="resizer corner" id="resizerCorner6"></div>
+</div>
+<div class="taskbar" id="taskbarFullscreen" style="display: none;" title="Full screen">🖥️</div>
+<div class="taskbar taskbar-view-controls" id="taskbarViewControls" style="display: none;" title="View controls"><span class="taskbar-view-controls-icon">📷</span></div>
+<div class="taskbar" id="taskbarCosmeticControls" style="display: none;" title="Cosmetic options">✨</div>
 
-  <div id="log"></div>
-  <input type="text" id="messageInput" placeholder="Type your message here">
-  <button id="sendButton">➜</button>
-  
-  <!-- <div class="resizer right" id="resizerRight1"></div>
-  <div class="resizer bottom" id="resizerBottom1"></div> -->
+<div class="draggable drawer-window chat-window" id="draggable1" style="display: none;">
+  <div class="chat-panel">
+    <header class="chat-header">
+      <h3 class="chat-title">Chat / Log</h3>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn1" title="Minimize">−</button>
+    </header>
+    <div id="log" class="chat-log" aria-live="polite"></div>
+    <div class="chat-input-row">
+      <input type="text" id="messageInput" class="chat-input" placeholder="Type a message…" aria-label="Chat message" autocomplete="off">
+      <button type="button" id="sendButton" class="chat-send drawer-btn drawer-btn--primary" title="Send">➜</button>
+    </div>
+  </div>
   <div class="resizer corner" id="resizerCorner1"></div>
 </div>
-<div class="taskbar" id="taskbar1" style="display: none;">📝</div>
+<div class="taskbar" id="taskbar1" style="display: none;" title="Chat / Log">📝</div>
 
 
 <div class="draggable" id="draggable2" style="display: none;">
   <div class="controls">
       <button class="control-btn" id="control-btn2a">-</button>
   </div>
-  <img id="previm" src="portrait2.png" alt="Image">
+  <canvas id="prevsync" aria-label="Synchronized media preview"></canvas>
   <!-- <div class="resizer right" id="resizerRight2"></div>
   <div class="resizer bottom" id="resizerBottom2"></div> -->
   <div class="resizer corner" id="resizerCorner2"></div>
 </div>
-<div class="taskbar" id="taskbar2" style="display: none;">🔍</div>
+<div class="taskbar" id="taskbar2" style="display: none;" title="Image preview">🔍</div>
 
-<div class="draggable" id="draggable3" style="display: none;">
-  <div class="controls">
-      <button class="control-btn" id="control-btn3a">-</button>
-  </div>
-  <div class="button-group">
-    --Drawer-- <button id="btnInfo" onclick="window.open('drawer_info.html', '_blank')">Info</button>
-    <br>
-    Pcs stored: <span id="pcsStored">0</span>
-    <br>
-    <br>
-    
-    <label for="numPieces"># pcs:</label>
-    <select id="numPieces">
-      <option value="1" selected>1</option>
-      <option value="10">10</option>
-      <option value="100">100</option>
-      <option value="all">All</option>
-    </select>
-    <br>
-    <button id="btnWithdraw">Move to drawer</button>
-    <button id="btnWithdrawAll">Move all to drawer</button>
-    <br>
-     
-    <button id="btnDeposit">Move from drawer</button>
-    <select id="depositPosition">
-      <option value="1">Top-left corner</option>
-      <option value="2">Top-left area</option>
-      <option value="3">Top edge</option>
-      <option value="4">Top area</option>
-      <option value="5">Left edge</option>
-      <option value="6">Left area</option>
-      <option value="7">Anywhere</option>
-    </select>
+<div class="draggable drawer-window" id="draggable3" style="display: none;">
+  <div class="drawer-panel">
+    <header class="drawer-header">
+      <h3 class="drawer-title">Piece drawer</h3>
+      <details class="drawer-info-details" id="drawerInfoDetails">
+        <summary class="drawer-info-summary" id="btnInfo" title="Drawer help">Info</summary>
+        <div class="drawer-info-body">
+          <h4 class="drawer-info-heading">What is the drawer?</h4>
+          <ul class="drawer-info-list">
+            <li>You can store pieces in the drawer so they don’t show on the board.</li>
+            <li>Useful when you want to avoid moving large stacks of pieces by hand.</li>
+          </ul>
+          <h4 class="drawer-info-heading">Good to know</h4>
+          <ul class="drawer-info-list">
+            <li>The drawer only works for pieces that have <strong>never been moved manually</strong>.</li>
+            <li>Drawer actions are local only. Other players don’t see them, and they reset on refresh.</li>
+          </ul>
+          <h4 class="drawer-info-heading">How does it work?</h4>
+          <ul class="drawer-info-list">
+            <li><strong>Pieces stored</strong> shows how many pieces are currently in the drawer.</li>
+            <li>Use <strong># pieces</strong> to choose how many to move (1, 10, 100, or All).</li>
+            <li><strong>Withdraw to drawer:</strong> <em>Move to drawer</em> / <em>Move all to drawer</em> — removes pieces from the board into the drawer.</li>
+            <li><strong>Deposit from drawer:</strong> set <strong>Place at</strong>, then <em>Move to board</em> — returns pieces from the drawer to the board in the chosen area.</li>
+          </ul>
+        </div>
+      </details>
+      <button type="button" class="control-btn drawer-header-minimize" id="control-btn3a" title="Minimize">−</button>
+    </header>
+    <div class="drawer-stat">
+      <span class="drawer-stat-label">Pieces stored</span>
+      <span id="pcsStored" class="drawer-stat-value" aria-live="polite">0</span>
+    </div>
+    <section class="drawer-section" aria-labelledby="drawer-withdraw-heading">
+      <h4 id="drawer-withdraw-heading" class="drawer-section-title">Withdraw to drawer</h4>
+      <div class="drawer-row">
+        <label for="numPieces" class="drawer-label"># pieces</label>
+        <select id="numPieces" class="drawer-select" aria-label="Number of pieces to withdraw">
+          <option value="1" selected>1</option>
+          <option value="10">10</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" id="btnWithdraw" class="drawer-btn drawer-btn--primary">Move to drawer</button>
+        <button type="button" id="btnWithdrawAll" class="drawer-btn">Move all to drawer</button>
+      </div>
+    </section>
+    <section class="drawer-section" aria-labelledby="drawer-deposit-heading">
+      <h4 id="drawer-deposit-heading" class="drawer-section-title">Deposit from drawer</h4>
+      <div class="drawer-row drawer-row--deposit">
+        <label for="depositPosition" class="drawer-label">Place at</label>
+        <select id="depositPosition" class="drawer-select" aria-label="Where to place pieces from drawer">
+          <option value="1">Top-left corner</option>
+          <option value="2">Top-left area</option>
+          <option value="3">Top edge</option>
+          <option value="4">Top area</option>
+          <option value="5">Left edge</option>
+          <option value="6">Left area</option>
+          <option value="7">Anywhere</option>
+          <option value="8">Drop location</option>
+        </select>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" id="btnDeposit" class="drawer-btn drawer-btn--primary">Move to board</button>
+      </div>
+    </section>
   </div>
 </div>
-<div class="taskbar" id="taskbar3" style="display: none;">🗄️</div>
+<div class="taskbar" id="taskbar3" style="display: none;" title="Piece drawer">🗄️</div>
 
 
 
@@ -401,6 +546,18 @@
   <script type="module" src="./clientandpreview.js"></script>
   <script type="module" src="./loadimages.js"></script>
   <script type="module" src="./aplogin.js"></script>
+  <script src="./src/core/PuzzleSceneState.js"></script>
+  <script src="./src/core/PieceSetupQueue.js"></script>
+  <script src="./src/core/HitTestService.js"></script>
+  <script src="./src/render/RenderScheduler.js"></script>
+  <script src="./src/media/MediaSourceAdapter.js"></script>
+  <script src="./src/media/MediaBindings.js"></script>
+  <script src="./src/render/canvas2d/CanvasRenderer.js"></script>
+  <script src="./src/render/webgl/WebGLRenderer.js"></script>
+  <script src="./src/render/RendererFacade.js"></script>
+  <script src="./src/ui/ViewControls.js"></script>
+  <script src="./src/ui/RendererModeControl.js"></script>
+  <script src="./src/integration/ArchipelagoBridge.js"></script>
   <script  src="./script.js"></script>
   <!-- <script  src="./debug.js"></script> -->
 
