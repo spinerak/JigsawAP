@@ -111,11 +111,11 @@
             const resolutionSelect = document.getElementById("puzzleResolutionSelect");
             if (resolutionSelect && typeof deps.getPuzzleResolution === "function" && typeof deps.setPuzzleResolution === "function") {
                 const current = deps.getPuzzleResolution();
-                const resolved = (current === "1080p" || current === "720p" || current === "540p") ? current : "1080p";
+                const resolved = (current === "16k" || current === "8k" || current === "4k" || current === "1440p" || current === "1080p" || current === "720p" || current === "540p") ? current : "1080p";
                 resolutionSelect.value = resolved;
                 resolutionSelect.addEventListener("change", () => {
                     const value = resolutionSelect.value;
-                    if (value !== "1080p" && value !== "720p" && value !== "540p") return;
+                    if (value !== "16k" && value !== "8k" && value !== "4k" && value !== "1440p" && value !== "1080p" && value !== "720p" && value !== "540p") return;
                     deps.setPuzzleResolution(value);
                     const facade = deps.getRendererFacade();
                     const puzzle = deps.getPuzzle();

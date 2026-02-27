@@ -281,7 +281,11 @@
                 return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };
             }
             let maxW = 1920, maxH = 1080;
-            if (preset === "1080p") { maxW = 1920; maxH = 1080; }
+            if (preset === "16k") { maxW = 15360; maxH = 8640; }
+            else if (preset === "8k") { maxW = 7680; maxH = 4320; }
+            else if (preset === "4k") { maxW = 3840; maxH = 2160; }
+            else if (preset === "1440p") { maxW = 2560; maxH = 1440; }
+            else if (preset === "1080p") { maxW = 1920; maxH = 1080; }
             else if (preset === "720p") { maxW = 1280; maxH = 720; }
             else if (preset === "540p") { maxW = 960; maxH = 540; }
             else {

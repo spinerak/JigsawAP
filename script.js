@@ -64,7 +64,7 @@ try {
 } catch (_e) {}
 try {
     const stored = localStorage.getItem("puzzleResolution");
-    if (stored === "1080p" || stored === "720p" || stored === "540p") {
+    if (stored === "16k" || stored === "8k" || stored === "4k" || stored === "1440p" || stored === "1080p" || stored === "720p" || stored === "540p") {
         viewState.puzzleResolution = stored;
     }
 } catch (_e) {}
@@ -3317,7 +3317,7 @@ if (window.JigsawRendererModeControl && typeof window.JigsawRendererModeControl.
         queuePolyPieceSetup: (...args) => queuePolyPieceSetup(...args),
         getPuzzleResolution: getPuzzleResolution,
         setPuzzleResolution: (value) => {
-            if (value === "1080p" || value === "720p" || value === "540p") {
+            if (value === "16k" || value === "8k" || value === "4k" || value === "1440p" || value === "1080p" || value === "720p" || value === "540p") {
                 viewState.puzzleResolution = value;
                 try { localStorage.setItem("puzzleResolution", value); } catch (_e) {}
             }
