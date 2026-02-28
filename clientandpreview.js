@@ -215,6 +215,7 @@ function setMinSizeToContent(draggable, options = {}) {
     if (!draggable) return;
     const enforceHeight = options.enforceHeight !== false;
     const enforceWidth = options.enforceWidth !== false;
+    const setExplicitHeight = options.setExplicitHeight === true;
     requestAnimationFrame(() => {
         const panel = draggable.querySelector('.view-controls-window-panel, .cosmetic-window-panel, .media-window-panel');
         const resizer = draggable.querySelector('.resizer.corner');
@@ -222,7 +223,11 @@ function setMinSizeToContent(draggable, options = {}) {
         const panelW = panel ? panel.scrollWidth : 0;
         const resizerH = resizer ? resizer.offsetHeight : 0;
         if (enforceHeight) {
-            draggable.style.minHeight = Math.ceil(panelH + resizerH) + 'px';
+            const heightPx = Math.ceil(panelH + resizerH) + 'px';
+            draggable.style.minHeight = heightPx;
+            if (setExplicitHeight) {
+                draggable.style.height = heightPx;
+            }
         }
         if (enforceWidth) {
             // Add a small buffer for borders/scrollbars so controls don't clip.
@@ -256,7 +261,7 @@ function restoreDiv6() {
     if (!draggable6) return;
     draggable6.style.display = (draggable6.style.display === 'none') ? 'block' : 'none';
     if (draggable6.style.display === 'block' || draggable6.style.display === '') {
-        setMinSizeToContent(draggable6, { enforceHeight: true, enforceWidth: false });
+        setMinSizeToContent(draggable6, { enforceHeight: true, enforceWidth: false, setExplicitHeight: true });
     }
 }
 
