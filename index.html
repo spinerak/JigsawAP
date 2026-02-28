@@ -277,7 +277,7 @@
     </header>
     <div class="display-options-body cosmetic-window-body">
       <section class="cosmetic-window-card">
-        <h4 class="cosmetic-window-title">Background</h4>
+        <h4 class="cosmetic-window-title">Play area</h4>
         <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
           <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
           <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
@@ -290,19 +290,6 @@
             <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
           </select>
         </div>
-      </section>
-      <section class="cosmetic-window-card">
-        <h4 class="cosmetic-window-title">Pieces &amp; play area</h4>
-        <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
-          <label for="displayPieceBevel">Piece bevel</label>
-          <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
-          <span id="displayPieceBevelValue">0.1</span>
-        </div>
-        <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
-          <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
-          <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
-          <span id="displayHeldPieceShadowDarknessValue">0.35</span>
-        </div>
         <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
           <label for="displayFeltOpacity">Felt opacity</label>
           <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
@@ -312,6 +299,19 @@
           <label for="displayPlayAreaRadius">Rounded corners</label>
           <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
           <span id="displayPlayAreaRadiusValue">64px</span>
+        </div>
+      </section>
+      <section class="cosmetic-window-card">
+        <h4 class="cosmetic-window-title">Pieces</h4>
+        <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
+          <label for="displayPieceBevel">Piece bevel</label>
+          <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
+          <span id="displayPieceBevelValue">0.1</span>
+        </div>
+        <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
+          <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
+          <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
+          <span id="displayHeldPieceShadowDarknessValue">0.35</span>
         </div>
       </section>
       <section class="cosmetic-window-card">
