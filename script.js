@@ -2531,8 +2531,9 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
     animate = function () {
         requestAnimationFrame(animate);
         const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-        if (rendererFacade) rendererFacade.renderFrame(nowMs);
+        // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
         if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
+        if (rendererFacade) rendererFacade.renderFrame(nowMs);
         if (!(window.rendererConfig && window.rendererConfig.legacyMode)) {
             const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
             if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
