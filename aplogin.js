@@ -8,7 +8,7 @@ function getUrlParameter(name) {
 };
 
 const CHANGELOG_STORAGE_KEY = "jigsawChangelogVersionSeen";
-const CHANGELOG_VERSION = "0.10.0";
+const CHANGELOG_VERSION = "0.10.1";
 
 function showChangelogModal() {
     const overlay = document.getElementById("changelogModal");
