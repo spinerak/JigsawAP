@@ -301,6 +301,10 @@
           <option value="canvas2d">canvas2d</option>
         </select>
       </div>
+      <div class="display-options-row display-options-row--label-wide" title="Legacy mode: forces Canvas2D, reduces effects and frame rate to improve responsiveness on slow devices (e.g. old tablets).">
+        <label for="rendererLegacyMode" class="display-options-label-inline">Legacy mode (low‑performance devices)</label>
+        <input type="checkbox" id="rendererLegacyMode" class="display-options-checkbox" aria-label="Legacy mode for slow devices">
+      </div>
       <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited. Resolutions above 1080p can severely hinder performance, especially with animations.">
         <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen. Resolutions above 1080p can severely hinder performance, especially with animations.">Puzzle resolution</label>
         <select id="puzzleResolutionSelect" class="display-options-select" aria-label="Puzzle render resolution cap">

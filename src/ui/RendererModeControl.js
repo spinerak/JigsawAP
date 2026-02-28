@@ -17,24 +17,31 @@
             const cfg = deps.getRendererConfig() || {};
             const modeStatus = getModeStatus();
             const webglDowngraded = modeStatus.webglDowngraded === true;
+            const legacyMode = !!cfg.legacyMode;
             const requested = cfg.mode || "auto";
             const active = modeStatus.active || "none";
-            const wantedValue = webglDowngraded ? "canvas2d" : (active === "webgl" || active === "canvas2d" ? active : requested);
+            const forceCanvas = webglDowngraded || legacyMode;
+            const wantedValue = forceCanvas ? "canvas2d" : (active === "webgl" || active === "canvas2d" ? active : requested);
             if (document.activeElement !== rendererModeControl.select && !rendererModeControl.select._rendererSelecting) {
                 rendererModeControl.select.value = wantedValue;
             }
 
             const webglOpt = rendererModeControl.select.querySelector('option[value="webgl"]');
             const autoOpt = rendererModeControl.select.querySelector('option[value="auto"]');
-            if (webglOpt) webglOpt.disabled = webglDowngraded;
-            if (autoOpt) autoOpt.disabled = false;
-            rendererModeControl.select.title = webglDowngraded
-                ? "WebGL is disabled for this session after fallback/downgrade. Use Canvas2D. Refresh to retry WebGL."
-                : "Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU path when available. Canvas2D: most compatible fallback.";
+            if (webglOpt) webglOpt.disabled = forceCanvas;
+            if (autoOpt) autoOpt.disabled = forceCanvas;
+            rendererModeControl.select.title = legacyMode
+                ? "Legacy mode is on. Only Canvas2D is used; uncheck Legacy mode to enable WebGL/Auto."
+                : (webglDowngraded
+                    ? "WebGL is disabled for this session after fallback/downgrade. Use Canvas2D. Refresh to retry WebGL."
+                    : "Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU path when available. Canvas2D: most compatible fallback.");
 
             if (rendererModeControl.status && rendererModeControl.fallbackRow) {
                 const note = modeStatus.note || modeStatus.webglDowngradeReason || "";
-                if (webglDowngraded) {
+                if (legacyMode) {
+                    rendererModeControl.fallbackRow.style.display = "flex";
+                    rendererModeControl.status.textContent = "Legacy mode: Canvas2D only. Uncheck Legacy mode to enable WebGL.";
+                } else if (webglDowngraded) {
                     rendererModeControl.fallbackRow.style.display = "flex";
                     rendererModeControl.status.textContent = note ? `WebGL fallback: ${note}` : "WebGL fallback active for this session.";
                 } else {
@@ -44,10 +51,12 @@
                 rendererModeControl.status.title = rendererModeControl.select.title;
             }
             if (rendererModeControl.retryBtn) {
-                rendererModeControl.retryBtn.disabled = false;
-                rendererModeControl.retryBtn.title = webglDowngraded
-                    ? "Retry WebGL now. This clears the current downgrade lock and attempts WebGL again."
-                    : "WebGL retry is only shown after a downgrade.";
+                rendererModeControl.retryBtn.disabled = legacyMode || !webglDowngraded;
+                rendererModeControl.retryBtn.title = legacyMode
+                    ? "WebGL retry is disabled in Legacy mode. Uncheck Legacy mode first."
+                    : (webglDowngraded
+                        ? "Retry WebGL now. This clears the current downgrade lock and attempts WebGL again."
+                        : "WebGL retry is only shown after a downgrade.");
             }
         }
 
@@ -55,7 +64,11 @@
             const cfg = deps.getRendererConfig() || {};
             if (mode !== "canvas2d" && mode !== "webgl" && mode !== "auto") mode = "auto";
             const modeStatus = getModeStatus();
+            const legacyMode = !!cfg.legacyMode;
             if (modeStatus.webglDowngraded === true && mode === "webgl") {
+                mode = "canvas2d";
+            }
+            if (legacyMode && mode !== "canvas2d") {
                 mode = "canvas2d";
             }
             cfg.mode = mode;
@@ -122,6 +135,34 @@
                     if (facade && puzzle && typeof puzzle.contWidth === "number" && typeof puzzle.contHeight === "number") {
                         facade.onResize(puzzle.contWidth, puzzle.contHeight);
                     }
+                });
+            }
+
+            const legacyCheckbox = document.getElementById("rendererLegacyMode");
+            if (legacyCheckbox) {
+                const saved = globalScope.localStorage && globalScope.localStorage.getItem("rendererLegacyMode");
+                const initial = saved === "true";
+                legacyCheckbox.checked = initial;
+                const cfg = deps.getRendererConfig();
+                if (cfg) cfg.legacyMode = initial;
+                legacyCheckbox.addEventListener("change", () => {
+                    const legacy = !!legacyCheckbox.checked;
+                    const c = deps.getRendererConfig();
+                    if (c) c.legacyMode = legacy;
+                    if (globalScope.localStorage) globalScope.localStorage.setItem("rendererLegacyMode", legacy ? "true" : "false");
+                    const facade = deps.getRendererFacade();
+                    const puzzle = deps.getPuzzle();
+                    if (facade) {
+                        if (facade.scheduler) facade.scheduler.targetFrameMs = legacy ? 33 : 16;
+                        if (puzzle) {
+                            facade.selectMode(legacy ? "canvas2d" : (c && c.mode) || "auto", puzzle);
+                            if (typeof facade.onResize === "function" && typeof puzzle.contWidth === "number" && typeof puzzle.contHeight === "number") {
+                                facade.onResize(puzzle.contWidth, puzzle.contHeight);
+                            }
+                            if (legacy && facade.renderDirtyPieces) facade.renderDirtyPieces();
+                        }
+                    }
+                    refreshRendererModeControl();
                 });
             }
         }

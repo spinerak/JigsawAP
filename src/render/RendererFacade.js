@@ -9,7 +9,10 @@
             this.canvasRenderer = null;
             this.webglRenderer = null;
             this.activeRenderer = null;
-            this.scheduler = new globalScope.JigsawRenderScheduler();
+            const legacyMode = !!(config && config.legacyMode);
+            this.scheduler = new globalScope.JigsawRenderScheduler({
+                targetFrameMs: legacyMode ? 33 : 16
+            });
             this.sceneState = new globalScope.JigsawPuzzleSceneState();
             this.media = new globalScope.JigsawMediaSourceAdapter();
             this.hitTest = new globalScope.JigsawHitTestService();
@@ -63,12 +66,14 @@
         }
 
         selectMode(requestedMode, puzzle) {
+            const legacyMode = !!(this.config && this.config.legacyMode);
+            if (this.scheduler) this.scheduler.targetFrameMs = legacyMode ? 33 : 16;
             const normalizedMode = (requestedMode === "webgl" || requestedMode === "auto" || requestedMode === "canvas2d")
                 ? requestedMode
                 : "canvas2d";
-            this.requestedMode = normalizedMode;
-            this.mode = normalizedMode;
-            this.modeNote = "";
+            this.requestedMode = legacyMode ? "canvas2d" : normalizedMode;
+            this.mode = this.requestedMode;
+            this.modeNote = legacyMode ? "legacy mode" : "";
             if (this.activeRenderer) this.activeRenderer.setVisible(false);
             this.activeRenderer = null;
             this.activeMode = "none";
@@ -101,12 +106,12 @@
             };
 
             const webglBlockedThisSession = this.webglDowngraded === true;
-            if (webglBlockedThisSession && normalizedMode !== "canvas2d") {
-                this.modeNote = this.webglDowngradeReason || "webgl disabled for this session after downgrade";
+            if (legacyMode || (webglBlockedThisSession && normalizedMode !== "canvas2d")) {
+                if (webglBlockedThisSession) this.modeNote = this.webglDowngradeReason || "webgl disabled for this session after downgrade";
                 useCanvas();
-            } else if (normalizedMode === "webgl") {
+            } else if (this.requestedMode === "webgl") {
                 if (!tryWebGL() && this.config.autoFallback !== false) useCanvas();
-            } else if (normalizedMode === "auto") {
+            } else if (this.requestedMode === "auto") {
                 if (!tryWebGL()) useCanvas();
             } else {
                 useCanvas();

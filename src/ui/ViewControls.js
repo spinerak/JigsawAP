@@ -259,7 +259,10 @@
             syncLegacyViewGlobals();
             globalScope.additional_zoom = viewState.zoom;
             const puzzle = getPuzzle();
-            if (puzzle && Number.isFinite(puzzle.scalex)) puzzle.refreshConnectionDistance();
+            if (puzzle) {
+                if (puzzle._invalidateViewMetricsCache) puzzle._invalidateViewMetricsCache();
+                if (Number.isFinite(puzzle.scalex)) puzzle.refreshConnectionDistance();
+            }
         }
 
         function scheduleViewTransform() {

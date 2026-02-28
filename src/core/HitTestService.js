@@ -5,10 +5,16 @@
         findTopPieceAt(puzzle, eventX, eventY) {
             if (!puzzle || !puzzle.polyPieces || !puzzle.polyPieces.length) return null;
 
-            // Preserve existing behavior: highest z-index first.
-            const sorted = puzzle.polyPieces
+            const version = puzzle._zOrderVersion || 0;
+            const useCache = puzzle._sortedPolyPiecesByZ && puzzle._sortedPolyPiecesVersion === version
+                && puzzle._sortedPolyPiecesByZ.length === puzzle.polyPieces.length;
+            const sorted = useCache ? puzzle._sortedPolyPiecesByZ : puzzle.polyPieces
                 .slice()
-                .sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+                .sort((a, b) => {
+                    const za = (a._zIndex != null) ? a._zIndex : (Number(a.polypiece_canvas && a.polypiece_canvas.style.zIndex) || 0);
+                    const zb = (b._zIndex != null) ? b._zIndex : (Number(b.polypiece_canvas && b.polypiece_canvas.style.zIndex) || 0);
+                    return za - zb;
+                });
 
             for (let k = sorted.length - 1; k >= 0; k--) {
                 const pp = sorted[k];

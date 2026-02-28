@@ -58,9 +58,17 @@
             const puzzle = this.puzzle;
             if (!puzzle) return [];
             const version = puzzle._zOrderVersion || 0;
-            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== (puzzle.polyPieces || []).length) {
-                this._sortedPieces = (puzzle.polyPieces || []).slice();
-                this._sortedPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+            const pieces = puzzle.polyPieces || [];
+            if (puzzle._sortedPolyPiecesByZ && puzzle._sortedPolyPiecesVersion === version && puzzle._sortedPolyPiecesByZ.length === pieces.length) {
+                return puzzle._sortedPolyPiecesByZ;
+            }
+            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== pieces.length) {
+                this._sortedPieces = pieces.slice();
+                this._sortedPieces.sort((a, b) => {
+                    const za = (a._zIndex != null) ? a._zIndex : (Number(a.polypiece_canvas && a.polypiece_canvas.style.zIndex) || 0);
+                    const zb = (b._zIndex != null) ? b._zIndex : (Number(b.polypiece_canvas && b.polypiece_canvas.style.zIndex) || 0);
+                    return za - zb;
+                });
                 this._sortedPiecesVersion = version;
             }
             return this._sortedPieces;
@@ -99,9 +107,11 @@
             };
         }
 
-        _drawHeldShadow(pp, w, h) {
+        _drawHeldShadow(pp, w, h, cachedDarkness) {
             if (!pp.path) return;
-            const darkness = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
+            const darkness = typeof cachedDarkness === "number" && !isNaN(cachedDarkness)
+                ? Math.max(0, Math.min(1, cachedDarkness))
+                : Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
             const localShadow = this._worldToPieceLocal(pp, Math.max(6, w * 0.05), Math.max(6, h * 0.06));
             const blur = Math.max(18, Math.min(w, h) * 0.24);
             this.ctx.save();
@@ -127,6 +137,7 @@
             this.ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
             const pieces = this._getSortedPieces();
             const sourceCanvas = this.puzzle.gameCanvas || null;
+            const heldShadowDarkness = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
             let drawn = 0;
             for (const pp of pieces) {
                 if (!pp.polypiece_canvas) continue;
@@ -141,7 +152,9 @@
                 const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
                 this.ctx.rotate((pp.rot || 0) * deg * Math.PI / 180);
                 this.ctx.translate(-w / 2, -h / 2);
-                if (pp._isHeld) this._drawHeldShadow(pp, w, h);
+                if (pp._isHeld && !(typeof window !== "undefined" && window.rendererConfig && window.rendererConfig.legacyMode)) {
+                    this._drawHeldShadow(pp, w, h, heldShadowDarkness);
+                }
                 if (sourceCanvas && pp.path && pp._mediaSample) {
                     const ms = pp._mediaSample;
                     this.ctx.save();

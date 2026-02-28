@@ -12,8 +12,12 @@ window.rendererConfig = {
     mode: "auto", // canvas2d | webgl | auto
     media: "image", // image | gif | video | camera
     autoFallback: true,
-    perfBudgetMs: 8
+    perfBudgetMs: 8,
+    legacyMode: false // true = canvas2d, lower FPS, no/simple shadow, no preview sync
 };
+try {
+    if (typeof localStorage !== "undefined" && localStorage.getItem("rendererLegacyMode") === "true") window.rendererConfig.legacyMode = true;
+} catch (_e) {}
 
 var accept_pending_actions = false;
 var process_pending_actions = false;
@@ -29,6 +33,16 @@ Object.defineProperty(window.jigsawRuntime, "processPendingActions", {
 
 var bevel_size = localStorage.getItem("option_bevel_2");
 if (bevel_size === null) bevel_size = 0.1;
+
+/** Fisher-Yates in-place shuffle for uniform random order. */
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = arr[i];
+        arr[i] = arr[j];
+        arr[j] = t;
+    }
+}
 
 // View/cosmetic control wiring is initialized later by src/ui/ViewControls.js.
 
@@ -1186,12 +1200,18 @@ class PolyPiece {
         this._maskVersion = (this._maskVersion || 0) + 1;
     }
 
+    _applyPieceTransform() {
+        const el = this.polypiece_canvas;
+        el.style.left = "0";
+        el.style.top = "0";
+        const rotamount = (window.rotations === 180) ? 90 : (window.rotations || 0);
+        el.style.transform = `translate(${this.x}px, ${this.y}px) rotate(${(this.rot || 0) * rotamount}deg)`;
+    }
+
     moveTo(x, y) {
-        // sets the left, top properties (relative to container) of this.canvas
         this.x = x;
         this.y = y;
-        this.polypiece_canvas.style.left = (this.x) + 'px';
-        this.polypiece_canvas.style.top = (this.y) + 'px';
+        this._applyPieceTransform();
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
     } //
 
@@ -1237,12 +1257,7 @@ class PolyPiece {
             num_rots = 4;
         }
         this.rot = ((this.rot + increase + num_rots) % num_rots) | 0;
-        const currentTransform = this.polypiece_canvas.style.transform.replace(/rotate\([-\d.]+deg\)/, '');
-        let rotamount = window.rotations;
-        if(window.rotations == 180){
-            rotamount = 90;
-        }
-        this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * rotamount}deg)`;
+        this._applyPieceTransform();
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
 
         if(moving){
@@ -1411,7 +1426,7 @@ class Puzzle {
         /* dimensions of container */
         this.contWidth = parseFloat(styl.width);
         this.contHeight = parseFloat(styl.height);
-        
+        if (this._invalidateViewMetricsCache) this._invalidateViewMetricsCache();
     }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1940,10 +1955,16 @@ class Puzzle {
     } // Puzzle.refreshConnectionDistance
 
     getViewMetrics() {
+        if (this._viewMetricsCache) return this._viewMetricsCache;
         const br = this.container.getBoundingClientRect();
         const baseScale = getActiveBaseScale();
         const effectiveScale = baseScale * viewState.zoom;
-        return { br, baseScale, effectiveScale };
+        this._viewMetricsCache = { br, baseScale, effectiveScale };
+        return this._viewMetricsCache;
+    }
+
+    _invalidateViewMetricsCache() {
+        this._viewMetricsCache = null;
     }
 
     screenToPuzzle(clientX, clientY) {
@@ -1979,15 +2000,20 @@ class Puzzle {
     evaluateZIndex() {
         if (!Array.isArray(this.polyPieces) || this.polyPieces.length === 0) {
             this._zOrderVersion = (this._zOrderVersion || 0) + 1;
-            if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
+            this._sortedPolyPiecesByZ = [];
+            if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
             return;
         }
-        // re-assign zIndex
+        // re-assign zIndex (numeric on piece for sort cache, style for DOM)
         this.polyPieces.forEach((pp, k) => {
-            pp.polypiece_canvas.style.zIndex = -pp.pieces.length * 10000 + k + 100000000;
+            const z = -pp.pieces.length * 10000 + k + 100000000;
+            pp._zIndex = z;
+            pp.polypiece_canvas.style.zIndex = z;
         });
         this._zOrderVersion = (this._zOrderVersion || 0) + 1;
-        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
+        this._sortedPolyPiecesByZ = this.polyPieces.slice();
+        this._sortedPolyPiecesVersion = this._zOrderVersion;
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
     } // Puzzle.evaluateZIndex
 
     renderSourceToGameCanvas(sourceOverride = null) {
@@ -2237,6 +2263,8 @@ function drawSyncedPreviewWindowFrame() {
         syncedPreviewCtx = syncedPreviewCanvas.getContext("2d");
     }
     if (!syncedPreviewCtx) return;
+    const parent = syncedPreviewCanvas.parentElement;
+    if (parent && parent.style && parent.style.display === "none") return;
     const source = resolvePrestartPreviewSource();
     if (!source) return;
     if (source.tagName === "VIDEO" && source.readyState < 2) return;
@@ -2354,6 +2382,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         pp._isHeld = !!held;
         pp.polypiece_canvas.classList.toggle("moving", !!held);
         if (held) {
+            pp._zIndex = HELD_Z_INDEX;
             pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
             puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
         }
@@ -2365,7 +2394,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         requestAnimationFrame(animate);
         const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
         if (rendererFacade) rendererFacade.renderFrame(nowMs);
-        drawSyncedPreviewWindowFrame();
+        if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
+        if (!(window.rendererConfig && window.rendererConfig.legacyMode)) drawSyncedPreviewWindowFrame();
         if (state === 15) drawPrestartPreviewFrame();
         if (state >= 50 && puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
 
@@ -2412,19 +2442,11 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 const x_change = puzzle.contWidth / puzzle.prevWidth;
                 const y_change = puzzle.contHeight / puzzle.prevHeight;
 
-                console.log("start scaling pieces")
-                puzzle.polyPieces.forEach(pp => {                    
-                    let nnx = pp.x;
-                    let nny = pp.y;
-
-                    pp.moveTo(nnx, nny);
-                    pp.polypiece_drawImage(false);
-
-
+                puzzle.polyPieces.forEach(pp => {
                     pp.moveTo(pp.x * x_change, pp.y * y_change);
-
-                }); // puzzle.polypieces.forEach
-                console.log("end scaling pieces")
+                    queuePolyPieceSetup(pp, false, false);
+                });
+                if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
             }
             
             puzzle.prevWidth = puzzle.contWidth;
@@ -2802,8 +2824,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 break;
 
             case 40: // evaluate z index
-                
-                puzzle.polyPieces.sort((a, b) => Math.random() - 0.5);
+
+                shuffleArray(puzzle.polyPieces);
                 puzzle.evaluateZIndex();
                 state = 45;
 
@@ -2830,7 +2852,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 
                 if (event.event != "touch") return;
 
-                console.log(event)
                 if(event.button == 0){
                     const event_x = event.position.x;
                     const event_y = event.position.y;
@@ -2844,25 +2865,9 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     });
     
                     /* evaluates if contact inside a PolyPiece, by decreasing z-index */
-                    let hitPiece = null;
-                    if (rendererFacade) {
-                        hitPiece = rendererFacade.findTopPieceAt(puzzle, event_x, event_y);
-                    } else if (hitTestService) {
-                        hitPiece = hitTestService.findTopPieceAt(puzzle, event_x, event_y);
-                    }
-                    if (!hitPiece) {
-                        puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
-                        for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
-                            let pp = puzzle.polyPieces[k];
-                            const cx = pp.x + pp.nx * puzzle.scalex / 2;
-                            const cy = pp.y + pp.ny * puzzle.scaley / 2;
-                            const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
-                            if (pp.path && pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) {
-                                hitPiece = pp;
-                                break;
-                            }
-                        }
-                    }
+                    const hitPiece = rendererFacade
+                        ? rendererFacade.findTopPieceAt(puzzle, event_x, event_y)
+                        : (hitTestService && hitTestService.findTopPieceAt(puzzle, event_x, event_y));
                     if (hitPiece) {
                         const hitIndex = puzzle.polyPieces.indexOf(hitPiece);
                         moving.pp = hitPiece;
@@ -2959,14 +2964,20 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     case "leave":
                         // check if moved polypiece is close to a matching other polypiece
                         // check repeatedly since polypieces moved by merging may come close to other polypieces
+                        const m = moving.pp;
+                        const mRot = rotateVector(m.x + m.nx * puzzle.scalex / 2, m.y + m.ny * puzzle.scaley / 2, m.rot);
+                        const mx = mRot.x - puzzle.scalex * (m.pckxmax + m.pckxmin) / 2;
+                        const my = mRot.y - puzzle.scaley * (m.pckymax + m.pckymin) / 2;
 
                         for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
-                            // console.log(k)
                             let pp = puzzle.polyPieces[k];
-                            if (pp == moving.pp || pp.pieces[0].index < 0 || moving.pp.pieces[0].index < 0) continue; // don't match with myself
-                            if (moving.pp.ifNear(pp)) { // a match !
+                            if (pp === m || pp.pieces[0].index < 0 || m.pieces[0].index < 0) continue; // don't match with myself
+                            const ppRot = rotateVector(pp.x + pp.nx * puzzle.scalex / 2, pp.y + pp.ny * puzzle.scaley / 2, pp.rot);
+                            const ppx = ppRot.x - puzzle.scalex * (pp.pckxmax + pp.pckxmin) / 2;
+                            const ppy = ppRot.y - puzzle.scaley * (pp.pckymax + pp.pckymin) / 2;
+                            if (((mx - ppx) ** 2 + (my - ppy) ** 2) >= puzzle.dConnect) continue;
+                            if (m.ifNear(pp)) { // a match !
                                 // compare polypieces sizes to move smallest one
-                                console.log("found something!")
                                 if (pp.pieces.length > moving.pp.pieces.length || (pp.pieces.length == moving.pp.pieces.length && pp.pieces[0].index > moving.pp.pieces[0].index)) {
                                     pp.merge(moving.pp);
                                     moving.pp = pp; // memorize piece to follow
@@ -2975,7 +2986,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                                     moving.pp.merge(pp);
                                     setHeldPieceState(moving.pp, true);
                                 }
-                                console.log("done merging")
                             }
                         } // for k
 
@@ -3338,7 +3348,7 @@ if (window.JigsawPieceSetupQueue && typeof window.JigsawPieceSetupQueue.create =
         getRendererConfig: () => window.rendererConfig,
         getRendererFacade: () => rendererFacade
     });
-    pieceSetupQueueApi.startLoop();
+    // Queue is driven from animate() to avoid a second requestAnimationFrame loop.
 }
 
 function queuePolyPieceSetup(pp, ignoreRedraw = false, highPriority = false, onDone = null) {

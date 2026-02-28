@@ -42,6 +42,8 @@
             this._batchedVertexCapacity = 0;
             this._displayWidth = 0;
             this._displayHeight = 0;
+            this._cachedHeldShadowAlpha = null;
+            this._cachedHeldShadowFrameMs = -1;
         }
 
         init(puzzle) {
@@ -115,7 +117,12 @@
                 const sourceW = sourceCanvas.width || 1;
                 const sourceH = sourceCanvas.height || 1;
 
-                const heldShadowAlpha = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35") * 0.95));
+                const legacyMode = typeof globalScope !== "undefined" && globalScope.rendererConfig && globalScope.rendererConfig.legacyMode;
+                if (this._cachedHeldShadowFrameMs !== nowMs) {
+                    this._cachedHeldShadowFrameMs = nowMs;
+                    this._cachedHeldShadowAlpha = legacyMode ? 0 : Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35") * 0.95));
+                }
+                const heldShadowAlpha = legacyMode ? 0 : this._cachedHeldShadowAlpha;
                 const activePieces = new Set();
                 const drawItems = [];
                 let numHeld = 0;
@@ -571,11 +578,15 @@
             const puzzle = this.puzzle;
             if (!puzzle) return [];
             const version = puzzle._zOrderVersion || 0;
-            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== (puzzle.polyPieces || []).length) {
-                this._sortedPieces = (puzzle.polyPieces || []).slice();
+            const pieces = puzzle.polyPieces || [];
+            if (puzzle._sortedPolyPiecesByZ && puzzle._sortedPolyPiecesVersion === version && puzzle._sortedPolyPiecesByZ.length === pieces.length) {
+                return puzzle._sortedPolyPiecesByZ;
+            }
+            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== pieces.length) {
+                this._sortedPieces = pieces.slice();
                 this._sortedPieces.sort((a, b) => {
-                    const za = Number(a.polypiece_canvas && a.polypiece_canvas.style.zIndex) || 0;
-                    const zb = Number(b.polypiece_canvas && b.polypiece_canvas.style.zIndex) || 0;
+                    const za = (a._zIndex != null) ? a._zIndex : (Number(a.polypiece_canvas && a.polypiece_canvas.style.zIndex) || 0);
+                    const zb = (b._zIndex != null) ? b._zIndex : (Number(b.polypiece_canvas && b.polypiece_canvas.style.zIndex) || 0);
                     return za - zb;
                 });
                 this._sortedPiecesVersion = version;
