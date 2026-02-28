@@ -118,6 +118,10 @@
             }
 
             if (this.activeRenderer) this.activeRenderer.setVisible(true);
+            if (this.activeRenderer && puzzle && puzzle.polyPieces && puzzle.polyPieces.length) {
+                for (const pp of puzzle.polyPieces) pp.polypiece_drawImage(true);
+                if (this.sceneState && this.sceneState.markAllDirty) this.sceneState.markAllDirty();
+            }
             this._emitStatusChange();
         }
 
