@@ -138,6 +138,26 @@
                 });
             }
 
+            const videoFrameRateSelect = document.getElementById("videoFrameRateSelect");
+            if (videoFrameRateSelect) {
+                const viewState = globalScope.viewState;
+                const validValues = ["0", "16", "33", "42", "50", "66"];
+                const initialMs = (viewState && typeof viewState.videoFrameIntervalMs === "number") ? viewState.videoFrameIntervalMs : 33;
+                const initialValue = String(validValues.includes(String(initialMs)) ? initialMs : 33);
+                videoFrameRateSelect.value = initialValue;
+                const facade = deps.getRendererFacade();
+                if (facade && facade.media) facade.media.frameIntervalMs = initialMs;
+                videoFrameRateSelect.addEventListener("change", () => {
+                    const value = videoFrameRateSelect.value;
+                    if (!validValues.includes(value)) return;
+                    const ms = parseInt(value, 10);
+                    if (viewState) viewState.videoFrameIntervalMs = ms;
+                    if (globalScope.localStorage) globalScope.localStorage.setItem("videoFrameIntervalMs", String(ms));
+                    const fac = deps.getRendererFacade();
+                    if (fac && fac.media) fac.media.frameIntervalMs = ms;
+                });
+            }
+
             const legacyCheckbox = document.getElementById("rendererLegacyMode");
             if (legacyCheckbox) {
                 const saved = globalScope.localStorage && globalScope.localStorage.getItem("rendererLegacyMode");

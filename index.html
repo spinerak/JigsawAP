@@ -317,6 +317,17 @@
           <option value="540p">540p</option>
         </select>
       </div>
+      <div class="display-options-slider renderer-mode-slider" title="Cap how often video or animated media frames are applied. Lower framerates reduce CPU/GPU load; Uncapped uses the source&#39;s native rate.">
+        <label for="videoFrameRateSelect" title="Video / animation framerate cap. Lower values improve performance on slow devices.">Video / animation framerate</label>
+        <select id="videoFrameRateSelect" class="display-options-select" aria-label="Video animation framerate cap">
+          <option value="0">Uncapped</option>
+          <option value="16">60 fps</option>
+          <option value="33" selected>30 fps</option>
+          <option value="42">24 fps</option>
+          <option value="50">20 fps</option>
+          <option value="66">15 fps</option>
+        </select>
+      </div>
       <div class="display-options-row display-options-row--label-wide" title="Show the puzzle image in grayscale behind the pieces as a reference while solving.">
         <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
         <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">

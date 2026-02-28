@@ -62,6 +62,7 @@ const viewState = {
     fitScaleLocked: null,
     isScalingLocked: false,
     puzzleResolution: "1080p",
+    videoFrameIntervalMs: 33,
     showGrayscaleReference: false,
     useCustomDropLocation: false,
     customDropNormX: 0.1,
@@ -80,6 +81,13 @@ try {
     const stored = localStorage.getItem("puzzleResolution");
     if (stored === "16k" || stored === "8k" || stored === "4k" || stored === "1440p" || stored === "1080p" || stored === "720p" || stored === "540p") {
         viewState.puzzleResolution = stored;
+    }
+} catch (_e) {}
+try {
+    const storedVideoFps = localStorage.getItem("videoFrameIntervalMs");
+    if (storedVideoFps !== null && storedVideoFps !== "") {
+        const ms = parseInt(storedVideoFps, 10);
+        if (!isNaN(ms) && ms >= 0) viewState.videoFrameIntervalMs = ms;
     }
 } catch (_e) {}
 try {
@@ -587,12 +595,18 @@ class PolyPiece {
         this.withdrawn = false;
         this.rot = 0;
 
-        this.polypiece_canvas = document.createElement('CANVAS');
-        // size and z-index will be defined later
-        puzzle.container.appendChild(this.polypiece_canvas);
-        this.polypiece_canvas.classList.add('polypiece');
-        this.polypiece_canvas.style.display = "none";
-        this.polypiece_ctx = this.polypiece_canvas.getContext("2d");
+        const overlayRendererActive = typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.activeRenderer &&
+            (rendererFacade.activeRenderer.constructor.name === "CanvasRenderer" || rendererFacade.activeRenderer.constructor.name === "WebGLRenderer");
+        if (overlayRendererActive) {
+            this.polypiece_canvas = null;
+            this.polypiece_ctx = null;
+        } else {
+            this.polypiece_canvas = document.createElement('CANVAS');
+            puzzle.container.appendChild(this.polypiece_canvas);
+            this.polypiece_canvas.classList.add('polypiece');
+            this.polypiece_canvas.style.display = "none";
+            this.polypiece_ctx = this.polypiece_canvas.getContext("2d");
+        }
     } // PolyPiece
 
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
@@ -702,7 +716,7 @@ class PolyPiece {
 
         queuePolyPieceSetup(this, !forceRedraw, true, () => {
             this.moveTo(targetX, targetY);
-            if (this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
+            if (otherPoly.polypiece_canvas && this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
                 this.puzzle.container.removeChild(otherPoly.polypiece_canvas);
             }
             this.puzzle.evaluateZIndex();
@@ -1022,11 +1036,11 @@ class PolyPiece {
         this.nx = this.pckxmax - this.pckxmin + 1;
         this.ny = this.pckymax - this.pckymin + 1;
 
-        if(!ignoreRedraw){
+        if (this.polypiece_canvas && !ignoreRedraw) {
             this.polypiece_canvas.width = this.nx * puzzle.scalex;  // make canvas big enough to fit all pieces
             this.polypiece_canvas.height = this.ny * puzzle.scaley;
         }
-        
+
 
         // difference between position in this canvas and position in gameImage
 
@@ -1090,19 +1104,21 @@ class PolyPiece {
 
         // In single-canvas 2D mode, keep per-piece canvases as overlay/path data only.
         // Other paths still draw media pixels into each piece canvas.
-        if (!canvas2dActive && !webglActive) {
+        if (!canvas2dActive && !webglActive && this.polypiece_ctx) {
             this._drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty);
         }
 
-        // Keep only overlay/hit-test data on piece canvases for renderer-backed modes.
-        this.polypiece_canvas.style.backgroundImage = "none";
-        this.polypiece_canvas.style.maskImage = "none";
-        this.polypiece_canvas.style.webkitMaskImage = "none";
-        this._drawOverlayOnly(puzzle, canvas2dActive || webglActive);
         this._overlayVersion = (this._overlayVersion || 0) + 1;
-        if (webglActive) this._ensureWebGLMaskCanvas();
+        if (this.polypiece_canvas) {
+            // Keep only overlay/hit-test data on piece canvases for renderer-backed modes.
+            this.polypiece_canvas.style.backgroundImage = "none";
+            this.polypiece_canvas.style.maskImage = "none";
+            this.polypiece_canvas.style.webkitMaskImage = "none";
+            this._drawOverlayOnly(puzzle, canvas2dActive || webglActive);
+            if (webglActive) this._ensureWebGLMaskCanvas();
+            this.polypiece_canvas.style.display = rendererReady ? "none" : "block";
+        }
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
-        this.polypiece_canvas.style.display = rendererReady ? "none" : "block";
         return;
 
     } // PolyPiece.polypiece_drawImage
@@ -1127,6 +1143,7 @@ class PolyPiece {
     }
 
     _drawOverlayOnly(puz, clearCanvas = true) {
+        if (!this.polypiece_ctx || !this.polypiece_canvas) return;
         this.polypiece_ctx.setTransform(1, 0, 0, 1, 0, 0);
         if (clearCanvas) {
             this.polypiece_ctx.clearRect(0, 0, this.polypiece_canvas.width, this.polypiece_canvas.height);
@@ -1172,6 +1189,49 @@ class PolyPiece {
         }
     }
 
+    /** Draw overlay (borders + hint) to an arbitrary 2D context. ctx must already be in piece-local space (0,0) to (w,h); do not reset transform. Caller may clear first if needed. */
+    drawOverlayToContext(ctx, w, h, puz) {
+        if (!ctx || !this.path) return;
+        const borders = apnx * apny < 150 && bevel_size > 0;
+        const embth = puz.scalex * 0.01 * bevel_size;
+        const worldLight = this._worldToPieceLocal(embth / 2, -embth / 2);
+
+        if (borders) {
+            this.pieces.forEach((pp, kk) => {
+                ctx.save();
+
+                const path = new Path2D();
+                const shiftx = -this.offsx;
+                const shifty = -this.offsy;
+                pp.sides.forEach((side, i) => {
+                    if (i === 0) {
+                        side.drawPath(path, shiftx, shifty, false);
+                    } else {
+                        side.drawPath(path, shiftx, shifty, true);
+                    }
+                });
+                path.closePath();
+
+                ctx.clip(path);
+                ctx.translate(worldLight.x, worldLight.y);
+                ctx.lineWidth = embth;
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+                ctx.stroke(path);
+                ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+                ctx.stroke(path);
+
+                ctx.restore();
+            });
+        }
+
+        if (this.hinted) {
+            ctx.strokeStyle = hint_color;
+            ctx.lineWidth = Math.max(0.03 * puz.scalex, 7);
+            ctx.stroke(this.path);
+        }
+    }
+
     _worldToPieceLocal(worldDx, worldDy) {
         const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
         const angle = (this.rot || 0) * deg * Math.PI / 180;
@@ -1184,6 +1244,7 @@ class PolyPiece {
     }
 
     _ensureWebGLMaskCanvas() {
+        if (!this.polypiece_canvas) return;
         const w = this.polypiece_canvas.width | 0;
         const h = this.polypiece_canvas.height | 0;
         if (w <= 0 || h <= 0 || !this.path) return;
@@ -1201,6 +1262,7 @@ class PolyPiece {
     }
 
     _applyPieceTransform() {
+        if (!this.polypiece_canvas) return;
         const el = this.polypiece_canvas;
         el.style.left = "0";
         el.style.top = "0";
@@ -1262,8 +1324,10 @@ class PolyPiece {
 
         if(moving){
             // Adjust position to ensure the piece stays under the cursor
-            const centerX = this.x + (this.polypiece_canvas.width / 2);
-            const centerY = this.y + (this.polypiece_canvas.height / 2);
+            const pw = this.polypiece_canvas ? this.polypiece_canvas.width : (this.nx * this.puzzle.scalex);
+            const ph = this.polypiece_canvas ? this.polypiece_canvas.height : (this.ny * this.puzzle.scaley);
+            const centerX = this.x + (pw / 2);
+            const centerY = this.y + (ph / 2);
 
             const offsetX = moving.xMouse - centerX;
             const offsetY = moving.yMouse - centerY;
@@ -2004,11 +2068,11 @@ class Puzzle {
             if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
             return;
         }
-        // re-assign zIndex (numeric on piece for sort cache, style for DOM)
+        // re-assign zIndex
         this.polyPieces.forEach((pp, k) => {
             const z = -pp.pieces.length * 10000 + k + 100000000;
             pp._zIndex = z;
-            pp.polypiece_canvas.style.zIndex = z;
+            if (pp.polypiece_canvas) pp.polypiece_canvas.style.zIndex = z;
         });
         this._zOrderVersion = (this._zOrderVersion || 0) + 1;
         this._sortedPolyPiecesByZ = this.polyPieces.slice();
@@ -2028,11 +2092,16 @@ class Puzzle {
 
       applyMediaFrame(frameSource, nowMs) {
         if (!frameSource || !this.polyPieces || !this.polyPieces.length) return false;
-        this.renderSourceToGameCanvas(frameSource);
-        if (viewState.showGrayscaleReference && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
         const activeRendererName = (rendererFacade && rendererFacade.activeRenderer && rendererFacade.activeRenderer.constructor)
             ? rendererFacade.activeRenderer.constructor.name
             : "";
+        const isVideo = !!(frameSource && typeof frameSource.videoWidth === "number");
+        const canvas2dWithVideo = activeRendererName === "CanvasRenderer" && isVideo;
+        const webglWithVideo = activeRendererName === "WebGLRenderer" && isVideo;
+        if (!canvas2dWithVideo && !webglWithVideo) {
+            this.renderSourceToGameCanvas(frameSource);
+        }
+        if (viewState.showGrayscaleReference && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
         if (activeRendererName !== "CanvasRenderer" && activeRendererName !== "WebGLRenderer") {
             for (const pp of this.polyPieces) pp.polypiece_drawImage(true);
         }
@@ -2116,8 +2185,11 @@ let tmpImage;
 let tmpPreviewCtx = null;
 let syncedPreviewCanvas = null;
 let syncedPreviewCtx = null;
+let lastSyncedPreviewAt = 0;
 let grayscaleReferenceCanvas = null;
 let grayscaleReferenceCtx = null;
+let lastGrayscaleUpdateMs = 0;
+const GRAYSCALE_VIDEO_INTERVAL_MS = 120;
 
 function updateGrayscaleReferenceCanvas() {
     if (!puzzle || !puzzle.container) return;
@@ -2132,6 +2204,19 @@ function updateGrayscaleReferenceCanvas() {
     if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
     const w = Math.max(1, Math.round(puzzle.gameWidth));
     const h = Math.max(1, Math.round(puzzle.gameHeight));
+    const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+    const frameSource = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getFrameSource === "function") ? rendererFacade.media.getFrameSource() : null;
+    const mediaStatus = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getStatus === "function") ? rendererFacade.media.getStatus() : null;
+    const kind = mediaStatus && mediaStatus.kind ? mediaStatus.kind : "image";
+    const isVideoSource = !!(frameSource && typeof frameSource.videoWidth === "number" && typeof frameSource.videoHeight === "number");
+    const isAnimated = isVideoSource || kind === "gif-decoded";
+    if (isAnimated && (nowMs - lastGrayscaleUpdateMs) < GRAYSCALE_VIDEO_INTERVAL_MS) {
+        return;
+    }
+    if (isAnimated) lastGrayscaleUpdateMs = nowMs;
+    const halfRes = 2;
+    const bufW = Math.max(1, Math.floor(w / halfRes));
+    const bufH = Math.max(1, Math.floor(h / halfRes));
     if (!grayscaleReferenceCanvas) {
         grayscaleReferenceCanvas = document.createElement("canvas");
         grayscaleReferenceCtx = grayscaleReferenceCanvas.getContext("2d");
@@ -2140,15 +2225,28 @@ function updateGrayscaleReferenceCanvas() {
         grayscaleReferenceCanvas.style.pointerEvents = "none";
         grayscaleReferenceCanvas.style.zIndex = "99999997";
     }
-    grayscaleReferenceCanvas.width = w;
-    grayscaleReferenceCanvas.height = h;
+    grayscaleReferenceCanvas.width = bufW;
+    grayscaleReferenceCanvas.height = bufH;
     grayscaleReferenceCanvas.style.width = w + "px";
     grayscaleReferenceCanvas.style.height = h + "px";
     grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
     grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
     if (!grayscaleReferenceCtx) return;
     grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
-    grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, w, h);
+    if (isVideoSource && frameSource && puzzle._gifDraw) {
+        const g = puzzle._gifDraw;
+        const vw = Math.max(1, frameSource.videoWidth || 1);
+        const vh = Math.max(1, frameSource.videoHeight || 1);
+        const dx = g.dx / halfRes;
+        const dy = g.dy / halfRes;
+        const dw = g.dw / halfRes;
+        const dh = g.dh / halfRes;
+        grayscaleReferenceCtx.drawImage(frameSource, 0, 0, vw, vh, dx, dy, dw, dh);
+    } else if (kind === "gif-decoded" && frameSource && typeof frameSource.width === "number" && typeof frameSource.height === "number") {
+        grayscaleReferenceCtx.drawImage(frameSource, 0, 0, frameSource.width, frameSource.height, 0, 0, bufW, bufH);
+    } else {
+        grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, bufW, bufH);
+    }
     grayscaleReferenceCtx.filter = "none";
     if (!grayscaleReferenceCanvas.parentNode) {
         puzzle.container.insertBefore(grayscaleReferenceCanvas, puzzle.container.firstChild);
@@ -2378,12 +2476,14 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
     const HELD_Z_INDEX = 2147483647;
 
     function setHeldPieceState(pp, held) {
-        if (!pp || !pp.polypiece_canvas) return;
+        if (!pp) return;
         pp._isHeld = !!held;
-        pp.polypiece_canvas.classList.toggle("moving", !!held);
+        if (pp.polypiece_canvas) {
+            pp.polypiece_canvas.classList.toggle("moving", !!held);
+            if (held) pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
+        }
         if (held) {
             pp._zIndex = HELD_Z_INDEX;
-            pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
             puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
         }
         queuePolyPieceSetup(pp, true, true);
@@ -2395,7 +2495,13 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
         if (rendererFacade) rendererFacade.renderFrame(nowMs);
         if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
-        if (!(window.rendererConfig && window.rendererConfig.legacyMode)) drawSyncedPreviewWindowFrame();
+        if (!(window.rendererConfig && window.rendererConfig.legacyMode)) {
+            const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+            if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
+                drawSyncedPreviewWindowFrame();
+                lastSyncedPreviewAt = nowMs;
+            }
+        }
         if (state === 15) drawPrestartPreviewFrame();
         if (state >= 50 && puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
 
@@ -3312,6 +3418,9 @@ if (window.JigsawRendererFacade) {
         getPuzzleResolution: getPuzzleResolution
     });
     rendererFacade.init(puzzle);
+    if (rendererFacade.media && typeof viewState.videoFrameIntervalMs === "number") {
+        rendererFacade.media.frameIntervalMs = viewState.videoFrameIntervalMs;
+    }
     hitTestService = rendererFacade.hitTest || null;
 } else if (window.JigsawHitTestService) {
     hitTestService = new window.JigsawHitTestService();
