@@ -64,6 +64,7 @@ const viewState = {
     puzzleResolution: "1080p",
     videoFrameIntervalMs: 33,
     showGrayscaleReference: false,
+    showPreviewOutline: false,
     useCustomDropLocation: false,
     customDropNormX: 0.1,
     customDropNormY: 0.1,
@@ -76,6 +77,10 @@ try {
 try {
     const storedRef = localStorage.getItem("showGrayscaleReference");
     if (storedRef === "true") viewState.showGrayscaleReference = true;
+} catch (_e) {}
+try {
+    const storedOutline = localStorage.getItem("showPreviewOutline");
+    if (storedOutline === "true") viewState.showPreviewOutline = true;
 } catch (_e) {}
 try {
     const stored = localStorage.getItem("puzzleResolution");
@@ -2101,7 +2106,7 @@ class Puzzle {
         if (!canvas2dWithVideo && !webglWithVideo) {
             this.renderSourceToGameCanvas(frameSource);
         }
-        if (viewState.showGrayscaleReference && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
+        if ((viewState.showGrayscaleReference || viewState.showPreviewOutline) && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
         if (activeRendererName !== "CanvasRenderer" && activeRendererName !== "WebGLRenderer") {
             for (const pp of this.polyPieces) pp.polypiece_drawImage(true);
         }
@@ -2191,9 +2196,13 @@ let grayscaleReferenceCtx = null;
 let lastGrayscaleUpdateMs = 0;
 const GRAYSCALE_VIDEO_INTERVAL_MS = 120;
 
+const PREVIEW_OUTLINE_STROKE_PX = 3;
+
 function updateGrayscaleReferenceCanvas() {
     if (!puzzle || !puzzle.container) return;
-    if (!viewState.showGrayscaleReference) {
+    const showGrayscale = !!viewState.showGrayscaleReference;
+    const showOutline = !!viewState.showPreviewOutline;
+    if (!showGrayscale && !showOutline) {
         if (grayscaleReferenceCanvas && grayscaleReferenceCanvas.parentNode) {
             grayscaleReferenceCanvas.parentNode.removeChild(grayscaleReferenceCanvas);
         }
@@ -2204,16 +2213,6 @@ function updateGrayscaleReferenceCanvas() {
     if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
     const w = Math.max(1, Math.round(puzzle.gameWidth));
     const h = Math.max(1, Math.round(puzzle.gameHeight));
-    const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-    const frameSource = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getFrameSource === "function") ? rendererFacade.media.getFrameSource() : null;
-    const mediaStatus = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getStatus === "function") ? rendererFacade.media.getStatus() : null;
-    const kind = mediaStatus && mediaStatus.kind ? mediaStatus.kind : "image";
-    const isVideoSource = !!(frameSource && typeof frameSource.videoWidth === "number" && typeof frameSource.videoHeight === "number");
-    const isAnimated = isVideoSource || kind === "gif-decoded";
-    if (isAnimated && (nowMs - lastGrayscaleUpdateMs) < GRAYSCALE_VIDEO_INTERVAL_MS) {
-        return;
-    }
-    if (isAnimated) lastGrayscaleUpdateMs = nowMs;
     const halfRes = 2;
     const bufW = Math.max(1, Math.floor(w / halfRes));
     const bufH = Math.max(1, Math.floor(h / halfRes));
@@ -2232,22 +2231,57 @@ function updateGrayscaleReferenceCanvas() {
     grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
     grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
     if (!grayscaleReferenceCtx) return;
-    grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
-    if (isVideoSource && frameSource && puzzle._gifDraw) {
-        const g = puzzle._gifDraw;
-        const vw = Math.max(1, frameSource.videoWidth || 1);
-        const vh = Math.max(1, frameSource.videoHeight || 1);
-        const dx = g.dx / halfRes;
-        const dy = g.dy / halfRes;
-        const dw = g.dw / halfRes;
-        const dh = g.dh / halfRes;
-        grayscaleReferenceCtx.drawImage(frameSource, 0, 0, vw, vh, dx, dy, dw, dh);
-    } else if (kind === "gif-decoded" && frameSource && typeof frameSource.width === "number" && typeof frameSource.height === "number") {
-        grayscaleReferenceCtx.drawImage(frameSource, 0, 0, frameSource.width, frameSource.height, 0, 0, bufW, bufH);
+
+    if (showGrayscale) {
+        const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+        const frameSource = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getFrameSource === "function") ? rendererFacade.media.getFrameSource() : null;
+        const mediaStatus = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getStatus === "function") ? rendererFacade.media.getStatus() : null;
+        const kind = mediaStatus && mediaStatus.kind ? mediaStatus.kind : "image";
+        const isVideoSource = !!(frameSource && typeof frameSource.videoWidth === "number" && typeof frameSource.videoHeight === "number");
+        const isAnimated = isVideoSource || kind === "gif-decoded";
+        if (!isAnimated || (nowMs - lastGrayscaleUpdateMs) >= GRAYSCALE_VIDEO_INTERVAL_MS) {
+            if (isAnimated) lastGrayscaleUpdateMs = nowMs;
+            grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
+            if (isVideoSource && frameSource && puzzle._gifDraw) {
+                const g = puzzle._gifDraw;
+                const vw = Math.max(1, frameSource.videoWidth || 1);
+                const vh = Math.max(1, frameSource.videoHeight || 1);
+                const dx = g.dx / halfRes;
+                const dy = g.dy / halfRes;
+                const dw = g.dw / halfRes;
+                const dh = g.dh / halfRes;
+                grayscaleReferenceCtx.drawImage(frameSource, 0, 0, vw, vh, dx, dy, dw, dh);
+            } else if (kind === "gif-decoded" && frameSource && typeof frameSource.width === "number" && typeof frameSource.height === "number") {
+                grayscaleReferenceCtx.drawImage(frameSource, 0, 0, frameSource.width, frameSource.height, 0, 0, bufW, bufH);
+            } else {
+                grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, bufW, bufH);
+            }
+            grayscaleReferenceCtx.filter = "none";
+        }
     } else {
-        grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, bufW, bufH);
+        grayscaleReferenceCtx.clearRect(0, 0, bufW, bufH);
     }
-    grayscaleReferenceCtx.filter = "none";
+
+    if (showOutline) {
+        const L = PREVIEW_OUTLINE_STROKE_PX;
+        grayscaleReferenceCtx.strokeStyle = "rgba(0,0,0,0.45)";
+        grayscaleReferenceCtx.lineWidth = L;
+        let ox, oy, ow, oh;
+        if (puzzle._gifDraw && typeof puzzle._gifDraw.dx === "number" && typeof puzzle._gifDraw.dw === "number") {
+            const g = puzzle._gifDraw;
+            ox = (g.dx || 0) / halfRes;
+            oy = (g.dy || 0) / halfRes;
+            ow = Math.min(g.dw, w) / halfRes;
+            oh = Math.min(g.dh, h) / halfRes;
+        } else {
+            ox = 0;
+            oy = 0;
+            ow = bufW;
+            oh = bufH;
+        }
+        grayscaleReferenceCtx.strokeRect(ox + L / 2, oy + L / 2, Math.max(0, ow - L), Math.max(0, oh - L));
+    }
+
     if (!grayscaleReferenceCanvas.parentNode) {
         puzzle.container.insertBefore(grayscaleReferenceCanvas, puzzle.container.firstChild);
     }

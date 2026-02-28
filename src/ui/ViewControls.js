@@ -153,6 +153,15 @@
                     if (typeof globalScope.updateGrayscaleReferenceCanvas === "function") globalScope.updateGrayscaleReferenceCanvas();
                 });
             }
+            const previewOutlineCheckbox = document.getElementById("showPreviewOutline");
+            if (previewOutlineCheckbox) {
+                previewOutlineCheckbox.checked = !!viewState.showPreviewOutline;
+                previewOutlineCheckbox.addEventListener("change", function () {
+                    viewState.showPreviewOutline = previewOutlineCheckbox.checked;
+                    try { localStorage.setItem("showPreviewOutline", String(previewOutlineCheckbox.checked)); } catch (_e) {}
+                    if (typeof globalScope.updateGrayscaleReferenceCanvas === "function") globalScope.updateGrayscaleReferenceCanvas();
+                });
+            }
             const customDropCheckbox = document.getElementById("useCustomDropLocation");
             if (customDropCheckbox) {
                 customDropCheckbox.checked = !!viewState.useCustomDropLocation;
