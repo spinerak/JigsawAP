@@ -378,10 +378,12 @@
                 if (perf) perf.skippedFrames += 1;
                 return;
             }
-            if (this.sceneState && this.sceneState.consumeDirtyPieces) this.sceneState.consumeDirtyPieces();
             if (this.sceneState) this.sceneState.mediaContentDirty = mediaAdvanced;
             const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
             this.activeRenderer.renderFrame(nowMs, this.sceneState);
+            if (this.activeRenderer === this.canvasRenderer && this.sceneState && typeof this.sceneState.consumeDirtyPieces === "function") {
+                this.sceneState.consumeDirtyPieces();
+            }
 
             // If WebGL failed during this frame, fallback immediately and force redraw.
             if (this._isWebGLRuntimeFailed()) {

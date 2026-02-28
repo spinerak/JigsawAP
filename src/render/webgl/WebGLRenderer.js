@@ -178,7 +178,7 @@
                     if (!this._isPieceVisible(pp, w, h)) continue;
                     activePieces.add(pp);
 
-                    const cache = this._ensurePieceTextures(pp);
+                    const cache = this._ensurePieceTextures(pp, sceneState);
                     if (!cache || !cache.maskTexture || !cache.overlayTexture) continue;
                     const held = !!pp._isHeld;
                     if (held) numHeld++;
@@ -510,7 +510,7 @@
             }
         }
 
-        _ensurePieceTextures(pp) {
+        _ensurePieceTextures(pp, sceneState) {
             const gl = this.gl;
             const puzzle = this.puzzle;
             if (!puzzle) return null;
@@ -594,6 +594,9 @@
                     }
                     entry.overlayVersion = pp._overlayVersion || 0;
                 }
+            }
+            if (entry.maskVersion === maskVersion && entry.overlayVersion === (pp._overlayVersion || 0) && sceneState && typeof sceneState.clearPieceDirty === "function") {
+                sceneState.clearPieceDirty(pp);
             }
             return entry;
         }

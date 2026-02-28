@@ -22,6 +22,12 @@
             this.version++;
         }
 
+        clearPieceDirty(piece) {
+            if (!piece) return;
+            this.dirtyPieces.delete(piece);
+            this.version++;
+        }
+
         markAllDirty() {
             this.dirtyPieces.clear();
             if (this.puzzle && this.puzzle.polyPieces) {
