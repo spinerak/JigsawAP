@@ -58,7 +58,7 @@ const viewState = {
     zoomStep: 1.2,
     zoomSensitivity: 1,
     panSensitivity: 1,
-    panButton: 0,
+    panButton: 2,
     fitScaleLocked: null,
     isScalingLocked: false,
     puzzleResolution: "1080p",
