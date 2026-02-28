@@ -252,7 +252,8 @@ function restoreDiv5() {
     draggable5.style.display = (draggable5.style.display === 'none') ? 'block' : 'none';
     if (draggable5.style.display === 'block' || draggable5.style.display === '') {
         taskbarCosmeticControls.style.backgroundColor = '#909090';
-        setMinSizeToContent(draggable5, { enforceHeight: true, enforceWidth: true });
+        /* Do not enforce height: cosmetic window has fixed height and scrolls; enforcing would set minHeight to full content and make the window full-screen tall */
+        setMinSizeToContent(draggable5, { enforceHeight: false, enforceWidth: true });
     } else {
         taskbarCosmeticControls.style.backgroundColor = '';
     }

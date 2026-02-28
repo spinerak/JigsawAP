@@ -127,6 +127,16 @@
       display: block;
       padding: 8px 14px 14px;
     }
+    .cosmetic-window-body {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
 
     .display-options-row {
       display: flex;
@@ -531,12 +541,12 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
     #draggable5 {
-      display: inline-block;
+      display: block;
       width: min(440px, 94vw);
       max-width: min(520px, 95vw);
-      min-width: 240px;
-      height: auto;
-      min-height: 148px;
+      min-width: 200px;
+      height: 420px;
+      min-height: 200px;
       max-height: calc(100vh - 120px);
       background: #2d3748;
       position: absolute;
@@ -549,6 +559,18 @@
       z-index: 99;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Cosmetic options panel – same pattern as Load custom media: panel fills draggable, header fixed, body fills remainder and scrolls */
+    #draggable5 > .cosmetic-window-panel.drawer-panel {
+      position: absolute;
+      inset: 0;
+      padding: 0 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      box-sizing: border-box;
+      overflow: hidden;
     }
     #draggable6 {
       position: absolute;
@@ -605,8 +627,6 @@
     }
     .cosmetic-window-panel.drawer-panel {
       gap: 10px;
-      max-height: calc(100vh - 150px);
-      overflow: auto;
       padding: 0 10px 8px;
     }
     .cosmetic-window-panel .drawer-header {
@@ -614,6 +634,7 @@
       justify-content: space-between;
       margin: 0 -10px 0;
       padding: 4px 10px 6px;
+      flex-shrink: 0;
     }
     #draggable3 .drawer-panel {
       padding: 0 10px 8px;
@@ -657,6 +678,25 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
     .media-window-title {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .cosmetic-window-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .cosmetic-window-card .display-options-row,
+    .cosmetic-window-card .display-options-slider {
+      margin-bottom: 0;
+    }
+    .cosmetic-window-title {
       margin: 0;
       font-size: 0.9rem;
       font-weight: 600;
