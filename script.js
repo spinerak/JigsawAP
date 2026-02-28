@@ -724,7 +724,13 @@ class PolyPiece {
             if (otherPoly.polypiece_canvas && this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
                 this.puzzle.container.removeChild(otherPoly.polypiece_canvas);
             }
-            this.puzzle.evaluateZIndex();
+            // Merged piece gets the furthest-back z of the two (no full evaluateZIndex)
+            const za = (this._zIndex != null) ? this._zIndex : (Number(this.polypiece_canvas && this.polypiece_canvas.style.zIndex) || 0);
+            const zb = (otherPoly._zIndex != null) ? otherPoly._zIndex : (Number(otherPoly.polypiece_canvas && otherPoly.polypiece_canvas.style.zIndex) || 0);
+            const minZ = Math.min(za, zb);
+            this._zIndex = minZ;
+            if (this.polypiece_canvas) this.polypiece_canvas.style.zIndex = minZ;
+            this.puzzle._zOrderVersion = (this.puzzle._zOrderVersion || 0) + 1;
         });
 
         newMerge(changingIndex);
@@ -2073,9 +2079,9 @@ class Puzzle {
             if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
             return;
         }
-        // re-assign zIndex
+        // re-assign zIndex (0-based piece index so no ties when sorting)
         this.polyPieces.forEach((pp, k) => {
-            const z = -pp.pieces.length * 10000 + k + 100000000;
+            const z = k;
             pp._zIndex = z;
             if (pp.polypiece_canvas) pp.polypiece_canvas.style.zIndex = z;
         });
@@ -2523,6 +2529,19 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         }
         if (held) {
             pp._zIndex = HELD_Z_INDEX;
+            puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
+        } else {
+            // Released: set this piece's z to front (max of others + 1) without touching other pieces
+            let maxZ = -1;
+            if (puzzle.polyPieces) {
+                for (const p of puzzle.polyPieces) {
+                    const z = (p._zIndex != null && p._zIndex !== HELD_Z_INDEX) ? p._zIndex : (Number(p.polypiece_canvas && p.polypiece_canvas.style.zIndex) || 0);
+                    if (z !== HELD_Z_INDEX && z > maxZ) maxZ = z;
+                }
+            }
+            const newZ = maxZ + 1;
+            pp._zIndex = newZ;
+            if (pp.polypiece_canvas) pp.polypiece_canvas.style.zIndex = newZ;
             puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
         }
         queuePolyPieceSetup(pp, true, true);
@@ -2993,7 +3012,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 if (event.event == "leave") {
                     if (moving && moving.pp) setHeldPieceState(moving.pp, false);
                     setMovingState(null);
-                    puzzle.evaluateZIndex();
                 }
                 
                 if (event.event != "touch") return;
@@ -3015,13 +3033,9 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                         ? rendererFacade.findTopPieceAt(puzzle, event_x, event_y)
                         : (hitTestService && hitTestService.findTopPieceAt(puzzle, event_x, event_y));
                     if (hitPiece) {
-                        const hitIndex = puzzle.polyPieces.indexOf(hitPiece);
                         moving.pp = hitPiece;
                         moving.ppXInit = hitPiece.x;
                         moving.ppYInit = hitPiece.y;
-                        // move selected piece to top of polypieces stack
-                        if (hitIndex !== -1) puzzle.polyPieces.splice(hitIndex, 1);
-                        puzzle.polyPieces.push(hitPiece);
                         setHeldPieceState(hitPiece, true);
                         
                         puzzle._releaseHandled = true;
@@ -3068,7 +3082,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     case "leave":
                         if (moving && moving.pp) setHeldPieceState(moving.pp, false);
                         setMovingState(null);
-                        puzzle.evaluateZIndex();
                         state = stateAfterPan;
                         break;
                 }
@@ -3150,7 +3163,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                         setMovingState(null);
 
                         // not at its right place
-                        puzzle.evaluateZIndex();
                         state = 50;
                         
                         return;
