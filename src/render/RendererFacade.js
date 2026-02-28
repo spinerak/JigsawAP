@@ -9,7 +9,10 @@
             this.canvasRenderer = null;
             this.webglRenderer = null;
             this.activeRenderer = null;
-            this.scheduler = new globalScope.JigsawRenderScheduler();
+            const legacyMode = !!(config && config.legacyMode);
+            this.scheduler = new globalScope.JigsawRenderScheduler({
+                targetFrameMs: legacyMode ? 33 : 16
+            });
             this.sceneState = new globalScope.JigsawPuzzleSceneState();
             this.media = new globalScope.JigsawMediaSourceAdapter();
             this.hitTest = new globalScope.JigsawHitTestService();
@@ -63,12 +66,14 @@
         }
 
         selectMode(requestedMode, puzzle) {
+            const legacyMode = !!(this.config && this.config.legacyMode);
+            if (this.scheduler) this.scheduler.targetFrameMs = legacyMode ? 33 : 16;
             const normalizedMode = (requestedMode === "webgl" || requestedMode === "auto" || requestedMode === "canvas2d")
                 ? requestedMode
                 : "canvas2d";
-            this.requestedMode = normalizedMode;
-            this.mode = normalizedMode;
-            this.modeNote = "";
+            this.requestedMode = legacyMode ? "canvas2d" : normalizedMode;
+            this.mode = this.requestedMode;
+            this.modeNote = legacyMode ? "legacy mode" : "";
             if (this.activeRenderer) this.activeRenderer.setVisible(false);
             this.activeRenderer = null;
             this.activeMode = "none";
@@ -101,12 +106,12 @@
             };
 
             const webglBlockedThisSession = this.webglDowngraded === true;
-            if (webglBlockedThisSession && normalizedMode !== "canvas2d") {
-                this.modeNote = this.webglDowngradeReason || "webgl disabled for this session after downgrade";
+            if (legacyMode || (webglBlockedThisSession && normalizedMode !== "canvas2d")) {
+                if (webglBlockedThisSession) this.modeNote = this.webglDowngradeReason || "webgl disabled for this session after downgrade";
                 useCanvas();
-            } else if (normalizedMode === "webgl") {
+            } else if (this.requestedMode === "webgl") {
                 if (!tryWebGL() && this.config.autoFallback !== false) useCanvas();
-            } else if (normalizedMode === "auto") {
+            } else if (this.requestedMode === "auto") {
                 if (!tryWebGL()) useCanvas();
             } else {
                 useCanvas();
@@ -281,7 +286,11 @@
                 return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };
             }
             let maxW = 1920, maxH = 1080;
-            if (preset === "1080p") { maxW = 1920; maxH = 1080; }
+            if (preset === "16k") { maxW = 15360; maxH = 8640; }
+            else if (preset === "8k") { maxW = 7680; maxH = 4320; }
+            else if (preset === "4k") { maxW = 3840; maxH = 2160; }
+            else if (preset === "1440p") { maxW = 2560; maxH = 1440; }
+            else if (preset === "1080p") { maxW = 1920; maxH = 1080; }
             else if (preset === "720p") { maxW = 1280; maxH = 720; }
             else if (preset === "540p") { maxW = 960; maxH = 540; }
             else {
@@ -333,7 +342,7 @@
                     this.modeNote = mediaStatus.failureReason;
                     this._emitStatusChange();
                 }
-                if (advanced) {
+                if (advanced && this.scheduler.shouldRender(nowMs)) {
                     const frameSource = this.media.getFrameSource();
                     if (frameSource && puzzle.applyMediaFrame && puzzle.applyMediaFrame(frameSource, nowMs)) {
                         this.sceneState.markAllDirty();
@@ -342,6 +351,19 @@
                 }
             }
             if (!this.scheduler.shouldRender(nowMs)) return;
+
+            if (this.media && puzzle && !mediaAdvanced) {
+                const status = this.media.getStatus ? this.media.getStatus() : null;
+                const kind = status && status.kind ? status.kind : "image";
+                const animated = kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded";
+                if (animated) {
+                    const frameSource = this.media.getFrameSource();
+                    if (frameSource && puzzle.applyMediaFrame && puzzle.applyMediaFrame(frameSource, nowMs)) {
+                        this.sceneState.markAllDirty();
+                        mediaAdvanced = true;
+                    }
+                }
+            }
 
             // Catch WebGL failures before dirty-skip can short-circuit fallback.
             if (this._isWebGLRuntimeFailed()) {

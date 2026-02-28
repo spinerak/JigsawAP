@@ -205,13 +205,15 @@
                     return false;
                 }
                 const changed = this.lastVideoTime < 0 || v.currentTime !== this.lastVideoTime;
-                if (changed) {
-                    this.lastVideoTime = v.currentTime;
-                    this.lastFrameAt = nowMs;
-                    this.failureReason = "";
-                    return true;
+                if (!changed) return false;
+                const interval = this.frameIntervalMs || 0;
+                if (interval > 0 && this.lastFrameAt > 0 && (nowMs - this.lastFrameAt) < interval) {
+                    return false;
                 }
-                return false;
+                this.lastVideoTime = v.currentTime;
+                this.lastFrameAt = nowMs;
+                this.failureReason = "";
+                return true;
             }
 
             return false;

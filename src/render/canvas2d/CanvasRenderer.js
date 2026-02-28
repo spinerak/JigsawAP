@@ -58,9 +58,17 @@
             const puzzle = this.puzzle;
             if (!puzzle) return [];
             const version = puzzle._zOrderVersion || 0;
-            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== (puzzle.polyPieces || []).length) {
-                this._sortedPieces = (puzzle.polyPieces || []).slice();
-                this._sortedPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
+            const pieces = puzzle.polyPieces || [];
+            if (puzzle._sortedPolyPiecesByZ && puzzle._sortedPolyPiecesVersion === version && puzzle._sortedPolyPiecesByZ.length === pieces.length) {
+                return puzzle._sortedPolyPiecesByZ;
+            }
+            if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== pieces.length) {
+                this._sortedPieces = pieces.slice();
+                this._sortedPieces.sort((a, b) => {
+                    const za = (a._zIndex != null) ? a._zIndex : (Number(a.polypiece_canvas && a.polypiece_canvas.style.zIndex) || 0);
+                    const zb = (b._zIndex != null) ? b._zIndex : (Number(b.polypiece_canvas && b.polypiece_canvas.style.zIndex) || 0);
+                    return za - zb;
+                });
                 this._sortedPiecesVersion = version;
             }
             return this._sortedPieces;
@@ -99,9 +107,11 @@
             };
         }
 
-        _drawHeldShadow(pp, w, h) {
+        _drawHeldShadow(pp, w, h, cachedDarkness) {
             if (!pp.path) return;
-            const darkness = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
+            const darkness = typeof cachedDarkness === "number" && !isNaN(cachedDarkness)
+                ? Math.max(0, Math.min(1, cachedDarkness))
+                : Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
             const localShadow = this._worldToPieceLocal(pp, Math.max(6, w * 0.05), Math.max(6, h * 0.06));
             const blur = Math.max(18, Math.min(w, h) * 0.24);
             this.ctx.save();
@@ -125,14 +135,26 @@
             const scaleX = this.canvas.width / dw;
             const scaleY = this.canvas.height / dh;
             this.ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+            this.ctx.imageSmoothingEnabled = true;
+            if (scaleX < 1 || scaleY < 1) {
+                if (typeof this.ctx.imageSmoothingQuality !== "undefined") {
+                    this.ctx.imageSmoothingQuality = "high";
+                }
+            }
             const pieces = this._getSortedPieces();
-            const sourceCanvas = this.puzzle.gameCanvas || null;
+            const puzzle = this.puzzle;
+            const sourceCanvas = puzzle.gameCanvas || null;
+            const videoSource = (this.mediaSource && typeof this.mediaSource.videoWidth === "number" && typeof this.mediaSource.videoHeight === "number") ? this.mediaSource : null;
+            const gifDraw = puzzle._gifDraw || null;
+            const useVideoDirect = !!(videoSource && gifDraw && gifDraw.dw > 0 && gifDraw.dh > 0);
+            const sourceW = useVideoDirect ? (this.mediaSource.videoWidth || 1) : (sourceCanvas ? sourceCanvas.width : 0);
+            const sourceH = useVideoDirect ? (this.mediaSource.videoHeight || 1) : (sourceCanvas ? sourceCanvas.height : 0);
+            const heldShadowDarkness = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
             let drawn = 0;
             for (const pp of pieces) {
-                if (!pp.polypiece_canvas) continue;
-                const w = pp.polypiece_canvas.width;
-                const h = pp.polypiece_canvas.height;
-                if (w <= 0 || h <= 0) continue;
+                const w = pp.polypiece_canvas ? pp.polypiece_canvas.width : (pp.nx * puzzle.scalex);
+                const h = pp.polypiece_canvas ? pp.polypiece_canvas.height : (pp.ny * puzzle.scaley);
+                if (w <= 0 || h <= 0 || !pp.path) continue;
                 if (!this._isPieceVisible(pp, w, h)) continue;
                 const cx = pp.x + w / 2;
                 const cy = pp.y + h / 2;
@@ -141,19 +163,35 @@
                 const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
                 this.ctx.rotate((pp.rot || 0) * deg * Math.PI / 180);
                 this.ctx.translate(-w / 2, -h / 2);
-                if (pp._isHeld) this._drawHeldShadow(pp, w, h);
-                if (sourceCanvas && pp.path && pp._mediaSample) {
+                if (pp._isHeld && !(typeof window !== "undefined" && window.rendererConfig && window.rendererConfig.legacyMode)) {
+                    this._drawHeldShadow(pp, w, h, heldShadowDarkness);
+                }
+                if (pp._mediaSample) {
                     const ms = pp._mediaSample;
                     this.ctx.save();
                     this.ctx.clip(pp.path);
-                    this.ctx.drawImage(
-                        sourceCanvas,
-                        ms.sx, ms.sy, ms.w, ms.h,
-                        ms.destx, ms.desty, ms.w, ms.h
-                    );
+                    if (useVideoDirect) {
+                        const dw = gifDraw.dw;
+                        const dh = gifDraw.dh;
+                        const vx = ((ms.sx - gifDraw.dx) / dw) * sourceW;
+                        const vy = ((ms.sy - gifDraw.dy) / dh) * sourceH;
+                        const vw = (ms.w / dw) * sourceW;
+                        const vh = (ms.h / dh) * sourceH;
+                        this.ctx.drawImage(this.mediaSource, vx, vy, vw, vh, ms.destx, ms.desty, ms.w, ms.h);
+                    } else if (sourceCanvas) {
+                        this.ctx.drawImage(
+                            sourceCanvas,
+                            ms.sx, ms.sy, ms.w, ms.h,
+                            ms.destx, ms.desty, ms.w, ms.h
+                        );
+                    }
                     this.ctx.restore();
                 }
-                this.ctx.drawImage(pp.polypiece_canvas, 0, 0);
+                if (typeof pp.drawOverlayToContext === "function") {
+                    pp.drawOverlayToContext(this.ctx, w, h, puzzle);
+                } else if (pp.polypiece_canvas) {
+                    this.ctx.drawImage(pp.polypiece_canvas, 0, 0);
+                }
                 this.ctx.restore();
                 drawn++;
             }

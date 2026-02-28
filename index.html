@@ -129,12 +129,27 @@
   <div class="changelog-modal-card">
     <div class="changelog-modal-title">Changelog</div>
     <div class="changelog-modal-subtitle">
-      Current changelog version: <span class="changelog-current-version">0.10.0</span>
+      Current changelog version: <span class="changelog-current-version">0.10.1</span>
     </div>
     <div class="changelog-modal-scroll">
       <div class="changelog-modal-intro">
         This changelog appears automatically when a new changelog version is detected and can always be reopened from the login page.
       </div>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Version 0.10.1</div>
+        <div class="changelog-entry-body">
+          <ul>
+            <li><strong>Resolution & display:</strong> Puzzle resolution now supports 1440p, 4K, 8K, and 16K (default stays 1080p). Higher resolutions can affect performance—a tooltip on the dropdown reminds you. The puzzle image uses more of the play area (90% instead of 85%) so pieces look a bit sharper. Scaling looks better when resolution is capped, and piece edges are crisper.</li>
+            <li><strong>Cleaner, consistent windows:</strong> Chat/Log, View controls, Cosmetic options, Piece drawer, and Load custom media all use the same compact header and layout. Less padding, smaller titles, and the same look everywhere. Chat can be resized shorter; only the content area scrolls. Load custom media opens in the right place and stays on top of other UI.</li>
+            <li><strong>Legacy mode for slower devices:</strong> A new “Legacy mode (low‑performance devices)” option in display settings uses a lighter rendering path (Canvas2D only, lower frame rate, no held‑piece shadow) so the game runs better on older tablets and slower PCs. When Legacy mode is on, WebGL is disabled until you turn it off; a short message explains this.</li>
+            <li><strong>Performance:</strong> Piece movement is smoother, piece picking is faster, and the piece you’re holding stays on top. Dropping a piece checks only nearby pieces for merges, so drops feel snappier. Resizing the window spreads redraws over several frames so the game stays responsive. The preview/sync window only redraws when it’s open. One animation loop instead of two and fewer things drawn each frame help on slower devices. Several console logs that could slow things down were removed.</li>
+            <li><strong>Video and animation:</strong> A new “Video / animation framerate” option (Cosmetics) lets you cap video/GIF updates at 60, 30, 24, 20, or 15 fps (default 30). Lower values reduce load on weaker devices. Video and GIF no longer push at full decode rate, so the game stays responsive. The grayscale reference behind pieces updates less often with video/GIF (about 8 times per second) to save work. Video and GIF now work correctly and more efficiently with both Canvas2D and WebGL.</li>
+            <li><strong>Cosmetic options:</strong> “Preview outline only” draws an outline around the puzzle preview so you can see the puzzle size without showing the full grayscale image. The outline follows the actual image area (including square pieces and other layouts).</li>
+            <li><strong>View controls:</strong> The default pan button is now right mouse instead of left, so left-click drag is reserved for selecting pieces. You can still cycle the pan button (Left / Middle / Right) from the View Controls window.</li>
+          </ul>
+        </div>
+      </article>
 
       <article class="changelog-entry">
         <div class="changelog-entry-title">Version 0.10.0</div>
@@ -238,7 +253,7 @@
         <button id="viewResetButton" class="view-toggle-btn" type="button" title="Reset zoom and pan to the default view (puzzle centered and fitted).">Reset View</button>
       </div>
       <div class="view-controls-row view-controls-row--full">
-        <button id="viewPanButtonToggle" class="view-toggle-btn view-pan-with-btn" type="button" title="Choose which mouse button starts panning (Left / Middle / Right).">Pan with: Left</button>
+        <button id="viewPanButtonToggle" class="view-toggle-btn view-pan-with-btn" type="button" title="Choose which mouse button starts panning (Left / Middle / Right).">Pan with: Right</button>
       </div>
       <div class="view-controls-slider" title="Adjust how fast zooming responds to scroll or pinch.">
         <label for="viewZoomSensitivity">Zoom speed</label>
@@ -301,17 +316,40 @@
           <option value="canvas2d">canvas2d</option>
         </select>
       </div>
-      <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited.">
-        <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen.">Puzzle resolution</label>
+      <div class="display-options-row display-options-row--label-wide" title="Legacy mode: forces Canvas2D, reduces effects and frame rate to improve responsiveness on slow devices (e.g. old tablets).">
+        <label for="rendererLegacyMode" class="display-options-label-inline">Legacy mode (low‑performance devices)</label>
+        <input type="checkbox" id="rendererLegacyMode" class="display-options-checkbox" aria-label="Legacy mode for slow devices">
+      </div>
+      <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited. Resolutions above 1080p can severely hinder performance, especially with animations.">
+        <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen. Resolutions above 1080p can severely hinder performance, especially with animations.">Puzzle resolution</label>
         <select id="puzzleResolutionSelect" class="display-options-select" aria-label="Puzzle render resolution cap">
-          <option value="1080p">1080p</option>
+          <option value="16k">16K</option>
+          <option value="8k">8K</option>
+          <option value="4k">4K</option>
+          <option value="1440p">1440p</option>
+          <option value="1080p" selected>1080p</option>
           <option value="720p">720p</option>
           <option value="540p">540p</option>
+        </select>
+      </div>
+      <div class="display-options-slider renderer-mode-slider" title="Cap how often video or animated media frames are applied. Lower framerates reduce CPU/GPU load; Uncapped uses the source&#39;s native rate.">
+        <label for="videoFrameRateSelect" title="Video / animation framerate cap. Lower values improve performance on slow devices.">Video / animation framerate</label>
+        <select id="videoFrameRateSelect" class="display-options-select" aria-label="Video animation framerate cap">
+          <option value="0">Uncapped</option>
+          <option value="16">60 fps</option>
+          <option value="33" selected>30 fps</option>
+          <option value="42">24 fps</option>
+          <option value="50">20 fps</option>
+          <option value="66">15 fps</option>
         </select>
       </div>
       <div class="display-options-row display-options-row--label-wide" title="Show the puzzle image in grayscale behind the pieces as a reference while solving.">
         <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
         <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">
+      </div>
+      <div class="display-options-row display-options-row--label-wide" title="Show an outline around the puzzle preview area (size only, no image). Useful when you want to see the puzzle bounds without the grayscale reference.">
+        <label for="showPreviewOutline" class="display-options-label-inline">Preview outline only</label>
+        <input type="checkbox" id="showPreviewOutline" class="display-options-checkbox" aria-label="Show outline around preview area">
       </div>
       <div class="display-options-row display-options-row--label-wide" title="Show a draggable handle for where new pieces will appear; drag to move it. The drop location is reset when you start a new puzzle.">
         <label for="useCustomDropLocation" class="display-options-label-inline">Show drop location handle</label>

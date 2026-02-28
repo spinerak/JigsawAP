@@ -3,7 +3,7 @@
 window.pieceSides = 4;
 const corner_to_shape_dist = 1/3; // distance from corner to shape in hexagonal piece
 
-window.downsize_to_fit = 0.85;
+window.downsize_to_fit = 0.9;
 window.PUZZLE_AREA_SURFACE_MULTIPLIER = 2;
 window.show_clue = true;
 window.rotations = 0;
@@ -12,8 +12,12 @@ window.rendererConfig = {
     mode: "auto", // canvas2d | webgl | auto
     media: "image", // image | gif | video | camera
     autoFallback: true,
-    perfBudgetMs: 8
+    perfBudgetMs: 8,
+    legacyMode: false // true = canvas2d, lower FPS, no/simple shadow, no preview sync
 };
+try {
+    if (typeof localStorage !== "undefined" && localStorage.getItem("rendererLegacyMode") === "true") window.rendererConfig.legacyMode = true;
+} catch (_e) {}
 
 var accept_pending_actions = false;
 var process_pending_actions = false;
@@ -30,6 +34,16 @@ Object.defineProperty(window.jigsawRuntime, "processPendingActions", {
 var bevel_size = localStorage.getItem("option_bevel_2");
 if (bevel_size === null) bevel_size = 0.1;
 
+/** Fisher-Yates in-place shuffle for uniform random order. */
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = arr[i];
+        arr[i] = arr[j];
+        arr[j] = t;
+    }
+}
+
 // View/cosmetic control wiring is initialized later by src/ui/ViewControls.js.
 
 const viewState = {
@@ -44,11 +58,13 @@ const viewState = {
     zoomStep: 1.2,
     zoomSensitivity: 1,
     panSensitivity: 1,
-    panButton: 0,
+    panButton: 2,
     fitScaleLocked: null,
     isScalingLocked: false,
     puzzleResolution: "1080p",
+    videoFrameIntervalMs: 33,
     showGrayscaleReference: false,
+    showPreviewOutline: false,
     useCustomDropLocation: false,
     customDropNormX: 0.1,
     customDropNormY: 0.1,
@@ -63,9 +79,20 @@ try {
     if (storedRef === "true") viewState.showGrayscaleReference = true;
 } catch (_e) {}
 try {
+    const storedOutline = localStorage.getItem("showPreviewOutline");
+    if (storedOutline === "true") viewState.showPreviewOutline = true;
+} catch (_e) {}
+try {
     const stored = localStorage.getItem("puzzleResolution");
-    if (stored === "1080p" || stored === "720p" || stored === "540p") {
+    if (stored === "16k" || stored === "8k" || stored === "4k" || stored === "1440p" || stored === "1080p" || stored === "720p" || stored === "540p") {
         viewState.puzzleResolution = stored;
+    }
+} catch (_e) {}
+try {
+    const storedVideoFps = localStorage.getItem("videoFrameIntervalMs");
+    if (storedVideoFps !== null && storedVideoFps !== "") {
+        const ms = parseInt(storedVideoFps, 10);
+        if (!isNaN(ms) && ms >= 0) viewState.videoFrameIntervalMs = ms;
     }
 } catch (_e) {}
 try {
@@ -573,12 +600,18 @@ class PolyPiece {
         this.withdrawn = false;
         this.rot = 0;
 
-        this.polypiece_canvas = document.createElement('CANVAS');
-        // size and z-index will be defined later
-        puzzle.container.appendChild(this.polypiece_canvas);
-        this.polypiece_canvas.classList.add('polypiece');
-        this.polypiece_canvas.style.display = "none";
-        this.polypiece_ctx = this.polypiece_canvas.getContext("2d");
+        const overlayRendererActive = typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.activeRenderer &&
+            (rendererFacade.activeRenderer.constructor.name === "CanvasRenderer" || rendererFacade.activeRenderer.constructor.name === "WebGLRenderer");
+        if (overlayRendererActive) {
+            this.polypiece_canvas = null;
+            this.polypiece_ctx = null;
+        } else {
+            this.polypiece_canvas = document.createElement('CANVAS');
+            puzzle.container.appendChild(this.polypiece_canvas);
+            this.polypiece_canvas.classList.add('polypiece');
+            this.polypiece_canvas.style.display = "none";
+            this.polypiece_ctx = this.polypiece_canvas.getContext("2d");
+        }
     } // PolyPiece
 
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
@@ -688,7 +721,7 @@ class PolyPiece {
 
         queuePolyPieceSetup(this, !forceRedraw, true, () => {
             this.moveTo(targetX, targetY);
-            if (this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
+            if (otherPoly.polypiece_canvas && this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
                 this.puzzle.container.removeChild(otherPoly.polypiece_canvas);
             }
             this.puzzle.evaluateZIndex();
@@ -1008,11 +1041,11 @@ class PolyPiece {
         this.nx = this.pckxmax - this.pckxmin + 1;
         this.ny = this.pckymax - this.pckymin + 1;
 
-        if(!ignoreRedraw){
+        if (this.polypiece_canvas && !ignoreRedraw) {
             this.polypiece_canvas.width = this.nx * puzzle.scalex;  // make canvas big enough to fit all pieces
             this.polypiece_canvas.height = this.ny * puzzle.scaley;
         }
-        
+
 
         // difference between position in this canvas and position in gameImage
 
@@ -1076,19 +1109,21 @@ class PolyPiece {
 
         // In single-canvas 2D mode, keep per-piece canvases as overlay/path data only.
         // Other paths still draw media pixels into each piece canvas.
-        if (!canvas2dActive && !webglActive) {
+        if (!canvas2dActive && !webglActive && this.polypiece_ctx) {
             this._drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty);
         }
 
-        // Keep only overlay/hit-test data on piece canvases for renderer-backed modes.
-        this.polypiece_canvas.style.backgroundImage = "none";
-        this.polypiece_canvas.style.maskImage = "none";
-        this.polypiece_canvas.style.webkitMaskImage = "none";
-        this._drawOverlayOnly(puzzle, canvas2dActive || webglActive);
         this._overlayVersion = (this._overlayVersion || 0) + 1;
-        if (webglActive) this._ensureWebGLMaskCanvas();
+        if (this.polypiece_canvas) {
+            // Keep only overlay/hit-test data on piece canvases for renderer-backed modes.
+            this.polypiece_canvas.style.backgroundImage = "none";
+            this.polypiece_canvas.style.maskImage = "none";
+            this.polypiece_canvas.style.webkitMaskImage = "none";
+            this._drawOverlayOnly(puzzle, canvas2dActive || webglActive);
+            if (webglActive) this._ensureWebGLMaskCanvas();
+            this.polypiece_canvas.style.display = rendererReady ? "none" : "block";
+        }
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
-        this.polypiece_canvas.style.display = rendererReady ? "none" : "block";
         return;
 
     } // PolyPiece.polypiece_drawImage
@@ -1113,6 +1148,7 @@ class PolyPiece {
     }
 
     _drawOverlayOnly(puz, clearCanvas = true) {
+        if (!this.polypiece_ctx || !this.polypiece_canvas) return;
         this.polypiece_ctx.setTransform(1, 0, 0, 1, 0, 0);
         if (clearCanvas) {
             this.polypiece_ctx.clearRect(0, 0, this.polypiece_canvas.width, this.polypiece_canvas.height);
@@ -1158,6 +1194,49 @@ class PolyPiece {
         }
     }
 
+    /** Draw overlay (borders + hint) to an arbitrary 2D context. ctx must already be in piece-local space (0,0) to (w,h); do not reset transform. Caller may clear first if needed. */
+    drawOverlayToContext(ctx, w, h, puz) {
+        if (!ctx || !this.path) return;
+        const borders = apnx * apny < 150 && bevel_size > 0;
+        const embth = puz.scalex * 0.01 * bevel_size;
+        const worldLight = this._worldToPieceLocal(embth / 2, -embth / 2);
+
+        if (borders) {
+            this.pieces.forEach((pp, kk) => {
+                ctx.save();
+
+                const path = new Path2D();
+                const shiftx = -this.offsx;
+                const shifty = -this.offsy;
+                pp.sides.forEach((side, i) => {
+                    if (i === 0) {
+                        side.drawPath(path, shiftx, shifty, false);
+                    } else {
+                        side.drawPath(path, shiftx, shifty, true);
+                    }
+                });
+                path.closePath();
+
+                ctx.clip(path);
+                ctx.translate(worldLight.x, worldLight.y);
+                ctx.lineWidth = embth;
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+                ctx.stroke(path);
+                ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+                ctx.stroke(path);
+
+                ctx.restore();
+            });
+        }
+
+        if (this.hinted) {
+            ctx.strokeStyle = hint_color;
+            ctx.lineWidth = Math.max(0.03 * puz.scalex, 7);
+            ctx.stroke(this.path);
+        }
+    }
+
     _worldToPieceLocal(worldDx, worldDy) {
         const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
         const angle = (this.rot || 0) * deg * Math.PI / 180;
@@ -1170,6 +1249,7 @@ class PolyPiece {
     }
 
     _ensureWebGLMaskCanvas() {
+        if (!this.polypiece_canvas) return;
         const w = this.polypiece_canvas.width | 0;
         const h = this.polypiece_canvas.height | 0;
         if (w <= 0 || h <= 0 || !this.path) return;
@@ -1186,12 +1266,19 @@ class PolyPiece {
         this._maskVersion = (this._maskVersion || 0) + 1;
     }
 
+    _applyPieceTransform() {
+        if (!this.polypiece_canvas) return;
+        const el = this.polypiece_canvas;
+        el.style.left = "0";
+        el.style.top = "0";
+        const rotamount = (window.rotations === 180) ? 90 : (window.rotations || 0);
+        el.style.transform = `translate(${this.x}px, ${this.y}px) rotate(${(this.rot || 0) * rotamount}deg)`;
+    }
+
     moveTo(x, y) {
-        // sets the left, top properties (relative to container) of this.canvas
         this.x = x;
         this.y = y;
-        this.polypiece_canvas.style.left = (this.x) + 'px';
-        this.polypiece_canvas.style.top = (this.y) + 'px';
+        this._applyPieceTransform();
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
     } //
 
@@ -1237,18 +1324,15 @@ class PolyPiece {
             num_rots = 4;
         }
         this.rot = ((this.rot + increase + num_rots) % num_rots) | 0;
-        const currentTransform = this.polypiece_canvas.style.transform.replace(/rotate\([-\d.]+deg\)/, '');
-        let rotamount = window.rotations;
-        if(window.rotations == 180){
-            rotamount = 90;
-        }
-        this.polypiece_canvas.style.transform = `${currentTransform} rotate(${this.rot * rotamount}deg)`;
+        this._applyPieceTransform();
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
 
         if(moving){
             // Adjust position to ensure the piece stays under the cursor
-            const centerX = this.x + (this.polypiece_canvas.width / 2);
-            const centerY = this.y + (this.polypiece_canvas.height / 2);
+            const pw = this.polypiece_canvas ? this.polypiece_canvas.width : (this.nx * this.puzzle.scalex);
+            const ph = this.polypiece_canvas ? this.polypiece_canvas.height : (this.ny * this.puzzle.scaley);
+            const centerX = this.x + (pw / 2);
+            const centerY = this.y + (ph / 2);
 
             const offsetX = moving.xMouse - centerX;
             const offsetY = moving.yMouse - centerY;
@@ -1411,7 +1495,7 @@ class Puzzle {
         /* dimensions of container */
         this.contWidth = parseFloat(styl.width);
         this.contHeight = parseFloat(styl.height);
-        
+        if (this._invalidateViewMetricsCache) this._invalidateViewMetricsCache();
     }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1940,10 +2024,16 @@ class Puzzle {
     } // Puzzle.refreshConnectionDistance
 
     getViewMetrics() {
+        if (this._viewMetricsCache) return this._viewMetricsCache;
         const br = this.container.getBoundingClientRect();
         const baseScale = getActiveBaseScale();
         const effectiveScale = baseScale * viewState.zoom;
-        return { br, baseScale, effectiveScale };
+        this._viewMetricsCache = { br, baseScale, effectiveScale };
+        return this._viewMetricsCache;
+    }
+
+    _invalidateViewMetricsCache() {
+        this._viewMetricsCache = null;
     }
 
     screenToPuzzle(clientX, clientY) {
@@ -1979,15 +2069,20 @@ class Puzzle {
     evaluateZIndex() {
         if (!Array.isArray(this.polyPieces) || this.polyPieces.length === 0) {
             this._zOrderVersion = (this._zOrderVersion || 0) + 1;
-            if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
+            this._sortedPolyPiecesByZ = [];
+            if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
             return;
         }
         // re-assign zIndex
         this.polyPieces.forEach((pp, k) => {
-            pp.polypiece_canvas.style.zIndex = -pp.pieces.length * 10000 + k + 100000000;
+            const z = -pp.pieces.length * 10000 + k + 100000000;
+            pp._zIndex = z;
+            if (pp.polypiece_canvas) pp.polypiece_canvas.style.zIndex = z;
         });
         this._zOrderVersion = (this._zOrderVersion || 0) + 1;
-        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
+        this._sortedPolyPiecesByZ = this.polyPieces.slice();
+        this._sortedPolyPiecesVersion = this._zOrderVersion;
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
     } // Puzzle.evaluateZIndex
 
     renderSourceToGameCanvas(sourceOverride = null) {
@@ -2002,11 +2097,16 @@ class Puzzle {
 
       applyMediaFrame(frameSource, nowMs) {
         if (!frameSource || !this.polyPieces || !this.polyPieces.length) return false;
-        this.renderSourceToGameCanvas(frameSource);
-        if (viewState.showGrayscaleReference && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
         const activeRendererName = (rendererFacade && rendererFacade.activeRenderer && rendererFacade.activeRenderer.constructor)
             ? rendererFacade.activeRenderer.constructor.name
             : "";
+        const isVideo = !!(frameSource && typeof frameSource.videoWidth === "number");
+        const canvas2dWithVideo = activeRendererName === "CanvasRenderer" && isVideo;
+        const webglWithVideo = activeRendererName === "WebGLRenderer" && isVideo;
+        if (!canvas2dWithVideo && !webglWithVideo) {
+            this.renderSourceToGameCanvas(frameSource);
+        }
+        if ((viewState.showGrayscaleReference || viewState.showPreviewOutline) && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
         if (activeRendererName !== "CanvasRenderer" && activeRendererName !== "WebGLRenderer") {
             for (const pp of this.polyPieces) pp.polypiece_drawImage(true);
         }
@@ -2090,12 +2190,19 @@ let tmpImage;
 let tmpPreviewCtx = null;
 let syncedPreviewCanvas = null;
 let syncedPreviewCtx = null;
+let lastSyncedPreviewAt = 0;
 let grayscaleReferenceCanvas = null;
 let grayscaleReferenceCtx = null;
+let lastGrayscaleUpdateMs = 0;
+const GRAYSCALE_VIDEO_INTERVAL_MS = 120;
+
+const PREVIEW_OUTLINE_STROKE_PX = 3;
 
 function updateGrayscaleReferenceCanvas() {
     if (!puzzle || !puzzle.container) return;
-    if (!viewState.showGrayscaleReference) {
+    const showGrayscale = !!viewState.showGrayscaleReference;
+    const showOutline = !!viewState.showPreviewOutline;
+    if (!showGrayscale && !showOutline) {
         if (grayscaleReferenceCanvas && grayscaleReferenceCanvas.parentNode) {
             grayscaleReferenceCanvas.parentNode.removeChild(grayscaleReferenceCanvas);
         }
@@ -2106,6 +2213,9 @@ function updateGrayscaleReferenceCanvas() {
     if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
     const w = Math.max(1, Math.round(puzzle.gameWidth));
     const h = Math.max(1, Math.round(puzzle.gameHeight));
+    const halfRes = 2;
+    const bufW = Math.max(1, Math.floor(w / halfRes));
+    const bufH = Math.max(1, Math.floor(h / halfRes));
     if (!grayscaleReferenceCanvas) {
         grayscaleReferenceCanvas = document.createElement("canvas");
         grayscaleReferenceCtx = grayscaleReferenceCanvas.getContext("2d");
@@ -2114,16 +2224,68 @@ function updateGrayscaleReferenceCanvas() {
         grayscaleReferenceCanvas.style.pointerEvents = "none";
         grayscaleReferenceCanvas.style.zIndex = "99999997";
     }
-    grayscaleReferenceCanvas.width = w;
-    grayscaleReferenceCanvas.height = h;
+    // Only resize when dimensions change; setting width/height clears the canvas and causes
+    // flicker when grayscale is throttled (video/camera) because we clear every frame but draw only every 120ms.
+    if (grayscaleReferenceCanvas.width !== bufW || grayscaleReferenceCanvas.height !== bufH) {
+        grayscaleReferenceCanvas.width = bufW;
+        grayscaleReferenceCanvas.height = bufH;
+    }
     grayscaleReferenceCanvas.style.width = w + "px";
     grayscaleReferenceCanvas.style.height = h + "px";
     grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
     grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
     if (!grayscaleReferenceCtx) return;
-    grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
-    grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, w, h);
-    grayscaleReferenceCtx.filter = "none";
+
+    if (showGrayscale) {
+        const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+        const frameSource = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getFrameSource === "function") ? rendererFacade.media.getFrameSource() : null;
+        const mediaStatus = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getStatus === "function") ? rendererFacade.media.getStatus() : null;
+        const kind = mediaStatus && mediaStatus.kind ? mediaStatus.kind : "image";
+        const isVideoSource = !!(frameSource && typeof frameSource.videoWidth === "number" && typeof frameSource.videoHeight === "number");
+        const isAnimated = isVideoSource || kind === "gif-decoded";
+        if (!isAnimated || (nowMs - lastGrayscaleUpdateMs) >= GRAYSCALE_VIDEO_INTERVAL_MS) {
+            if (isAnimated) lastGrayscaleUpdateMs = nowMs;
+            grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
+            if (isVideoSource && frameSource && puzzle._gifDraw) {
+                const g = puzzle._gifDraw;
+                const vw = Math.max(1, frameSource.videoWidth || 1);
+                const vh = Math.max(1, frameSource.videoHeight || 1);
+                const dx = g.dx / halfRes;
+                const dy = g.dy / halfRes;
+                const dw = g.dw / halfRes;
+                const dh = g.dh / halfRes;
+                grayscaleReferenceCtx.drawImage(frameSource, 0, 0, vw, vh, dx, dy, dw, dh);
+            } else if (kind === "gif-decoded" && frameSource && typeof frameSource.width === "number" && typeof frameSource.height === "number") {
+                grayscaleReferenceCtx.drawImage(frameSource, 0, 0, frameSource.width, frameSource.height, 0, 0, bufW, bufH);
+            } else {
+                grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, bufW, bufH);
+            }
+            grayscaleReferenceCtx.filter = "none";
+        }
+    } else {
+        grayscaleReferenceCtx.clearRect(0, 0, bufW, bufH);
+    }
+
+    if (showOutline) {
+        const L = PREVIEW_OUTLINE_STROKE_PX;
+        grayscaleReferenceCtx.strokeStyle = "rgba(0,0,0,0.45)";
+        grayscaleReferenceCtx.lineWidth = L;
+        let ox, oy, ow, oh;
+        if (puzzle._gifDraw && typeof puzzle._gifDraw.dx === "number" && typeof puzzle._gifDraw.dw === "number") {
+            const g = puzzle._gifDraw;
+            ox = (g.dx || 0) / halfRes;
+            oy = (g.dy || 0) / halfRes;
+            ow = Math.min(g.dw, w) / halfRes;
+            oh = Math.min(g.dh, h) / halfRes;
+        } else {
+            ox = 0;
+            oy = 0;
+            ow = bufW;
+            oh = bufH;
+        }
+        grayscaleReferenceCtx.strokeRect(ox + L / 2, oy + L / 2, Math.max(0, ow - L), Math.max(0, oh - L));
+    }
+
     if (!grayscaleReferenceCanvas.parentNode) {
         puzzle.container.insertBefore(grayscaleReferenceCanvas, puzzle.container.firstChild);
     }
@@ -2237,6 +2399,8 @@ function drawSyncedPreviewWindowFrame() {
         syncedPreviewCtx = syncedPreviewCanvas.getContext("2d");
     }
     if (!syncedPreviewCtx) return;
+    const parent = syncedPreviewCanvas.parentElement;
+    if (parent && parent.style && parent.style.display === "none") return;
     const source = resolvePrestartPreviewSource();
     if (!source) return;
     if (source.tagName === "VIDEO" && source.readyState < 2) return;
@@ -2350,11 +2514,14 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
     const HELD_Z_INDEX = 2147483647;
 
     function setHeldPieceState(pp, held) {
-        if (!pp || !pp.polypiece_canvas) return;
+        if (!pp) return;
         pp._isHeld = !!held;
-        pp.polypiece_canvas.classList.toggle("moving", !!held);
+        if (pp.polypiece_canvas) {
+            pp.polypiece_canvas.classList.toggle("moving", !!held);
+            if (held) pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
+        }
         if (held) {
-            pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
+            pp._zIndex = HELD_Z_INDEX;
             puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
         }
         queuePolyPieceSetup(pp, true, true);
@@ -2365,7 +2532,14 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         requestAnimationFrame(animate);
         const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
         if (rendererFacade) rendererFacade.renderFrame(nowMs);
-        drawSyncedPreviewWindowFrame();
+        if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
+        if (!(window.rendererConfig && window.rendererConfig.legacyMode)) {
+            const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+            if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
+                drawSyncedPreviewWindowFrame();
+                lastSyncedPreviewAt = nowMs;
+            }
+        }
         if (state === 15) drawPrestartPreviewFrame();
         if (state >= 50 && puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
 
@@ -2412,19 +2586,11 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 const x_change = puzzle.contWidth / puzzle.prevWidth;
                 const y_change = puzzle.contHeight / puzzle.prevHeight;
 
-                console.log("start scaling pieces")
-                puzzle.polyPieces.forEach(pp => {                    
-                    let nnx = pp.x;
-                    let nny = pp.y;
-
-                    pp.moveTo(nnx, nny);
-                    pp.polypiece_drawImage(false);
-
-
+                puzzle.polyPieces.forEach(pp => {
                     pp.moveTo(pp.x * x_change, pp.y * y_change);
-
-                }); // puzzle.polypieces.forEach
-                console.log("end scaling pieces")
+                    queuePolyPieceSetup(pp, false, false);
+                });
+                if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markAllDirty();
             }
             
             puzzle.prevWidth = puzzle.contWidth;
@@ -2802,8 +2968,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 break;
 
             case 40: // evaluate z index
-                
-                puzzle.polyPieces.sort((a, b) => Math.random() - 0.5);
+
+                shuffleArray(puzzle.polyPieces);
                 puzzle.evaluateZIndex();
                 state = 45;
 
@@ -2830,7 +2996,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 
                 if (event.event != "touch") return;
 
-                console.log(event)
                 if(event.button == 0){
                     const event_x = event.position.x;
                     const event_y = event.position.y;
@@ -2844,25 +3009,9 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     });
     
                     /* evaluates if contact inside a PolyPiece, by decreasing z-index */
-                    let hitPiece = null;
-                    if (rendererFacade) {
-                        hitPiece = rendererFacade.findTopPieceAt(puzzle, event_x, event_y);
-                    } else if (hitTestService) {
-                        hitPiece = hitTestService.findTopPieceAt(puzzle, event_x, event_y);
-                    }
-                    if (!hitPiece) {
-                        puzzle.polyPieces.sort((a, b) => a.polypiece_canvas.style.zIndex - b.polypiece_canvas.style.zIndex);
-                        for (let k = puzzle.polyPieces.length-1; k >= 0; k--) {
-                            let pp = puzzle.polyPieces[k];
-                            const cx = pp.x + pp.nx * puzzle.scalex / 2;
-                            const cy = pp.y + pp.ny * puzzle.scaley / 2;
-                            const roxy = rotateVector(event_x - cx, event_y - cy, pp.rot);
-                            if (pp.path && pp.polypiece_ctx.isPointInPath(pp.path, cx + roxy.x - pp.x, cy + roxy.y - pp.y)) {
-                                hitPiece = pp;
-                                break;
-                            }
-                        }
-                    }
+                    const hitPiece = rendererFacade
+                        ? rendererFacade.findTopPieceAt(puzzle, event_x, event_y)
+                        : (hitTestService && hitTestService.findTopPieceAt(puzzle, event_x, event_y));
                     if (hitPiece) {
                         const hitIndex = puzzle.polyPieces.indexOf(hitPiece);
                         moving.pp = hitPiece;
@@ -2959,14 +3108,20 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     case "leave":
                         // check if moved polypiece is close to a matching other polypiece
                         // check repeatedly since polypieces moved by merging may come close to other polypieces
+                        const m = moving.pp;
+                        const mRot = rotateVector(m.x + m.nx * puzzle.scalex / 2, m.y + m.ny * puzzle.scaley / 2, m.rot);
+                        const mx = mRot.x - puzzle.scalex * (m.pckxmax + m.pckxmin) / 2;
+                        const my = mRot.y - puzzle.scaley * (m.pckymax + m.pckymin) / 2;
 
                         for (let k = puzzle.polyPieces.length - 1; k >= 0; --k) {
-                            // console.log(k)
                             let pp = puzzle.polyPieces[k];
-                            if (pp == moving.pp || pp.pieces[0].index < 0 || moving.pp.pieces[0].index < 0) continue; // don't match with myself
-                            if (moving.pp.ifNear(pp)) { // a match !
+                            if (pp === m || pp.pieces[0].index < 0 || m.pieces[0].index < 0) continue; // don't match with myself
+                            const ppRot = rotateVector(pp.x + pp.nx * puzzle.scalex / 2, pp.y + pp.ny * puzzle.scaley / 2, pp.rot);
+                            const ppx = ppRot.x - puzzle.scalex * (pp.pckxmax + pp.pckxmin) / 2;
+                            const ppy = ppRot.y - puzzle.scaley * (pp.pckymax + pp.pckymin) / 2;
+                            if (((mx - ppx) ** 2 + (my - ppy) ** 2) >= puzzle.dConnect) continue;
+                            if (m.ifNear(pp)) { // a match !
                                 // compare polypieces sizes to move smallest one
-                                console.log("found something!")
                                 if (pp.pieces.length > moving.pp.pieces.length || (pp.pieces.length == moving.pp.pieces.length && pp.pieces[0].index > moving.pp.pieces[0].index)) {
                                     pp.merge(moving.pp);
                                     moving.pp = pp; // memorize piece to follow
@@ -2975,7 +3130,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                                     moving.pp.merge(pp);
                                     setHeldPieceState(moving.pp, true);
                                 }
-                                console.log("done merging")
                             }
                         } // for k
 
@@ -3302,6 +3456,9 @@ if (window.JigsawRendererFacade) {
         getPuzzleResolution: getPuzzleResolution
     });
     rendererFacade.init(puzzle);
+    if (rendererFacade.media && typeof viewState.videoFrameIntervalMs === "number") {
+        rendererFacade.media.frameIntervalMs = viewState.videoFrameIntervalMs;
+    }
     hitTestService = rendererFacade.hitTest || null;
 } else if (window.JigsawHitTestService) {
     hitTestService = new window.JigsawHitTestService();
@@ -3317,7 +3474,7 @@ if (window.JigsawRendererModeControl && typeof window.JigsawRendererModeControl.
         queuePolyPieceSetup: (...args) => queuePolyPieceSetup(...args),
         getPuzzleResolution: getPuzzleResolution,
         setPuzzleResolution: (value) => {
-            if (value === "1080p" || value === "720p" || value === "540p") {
+            if (value === "16k" || value === "8k" || value === "4k" || value === "1440p" || value === "1080p" || value === "720p" || value === "540p") {
                 viewState.puzzleResolution = value;
                 try { localStorage.setItem("puzzleResolution", value); } catch (_e) {}
             }
@@ -3338,7 +3495,7 @@ if (window.JigsawPieceSetupQueue && typeof window.JigsawPieceSetupQueue.create =
         getRendererConfig: () => window.rendererConfig,
         getRendererFacade: () => rendererFacade
     });
-    pieceSetupQueueApi.startLoop();
+    // Queue is driven from animate() to avoid a second requestAnimationFrame loop.
 }
 
 function queuePolyPieceSetup(pp, ignoreRedraw = false, highPriority = false, onDone = null) {

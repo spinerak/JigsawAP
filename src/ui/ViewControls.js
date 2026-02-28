@@ -153,6 +153,15 @@
                     if (typeof globalScope.updateGrayscaleReferenceCanvas === "function") globalScope.updateGrayscaleReferenceCanvas();
                 });
             }
+            const previewOutlineCheckbox = document.getElementById("showPreviewOutline");
+            if (previewOutlineCheckbox) {
+                previewOutlineCheckbox.checked = !!viewState.showPreviewOutline;
+                previewOutlineCheckbox.addEventListener("change", function () {
+                    viewState.showPreviewOutline = previewOutlineCheckbox.checked;
+                    try { localStorage.setItem("showPreviewOutline", String(previewOutlineCheckbox.checked)); } catch (_e) {}
+                    if (typeof globalScope.updateGrayscaleReferenceCanvas === "function") globalScope.updateGrayscaleReferenceCanvas();
+                });
+            }
             const customDropCheckbox = document.getElementById("useCustomDropLocation");
             if (customDropCheckbox) {
                 customDropCheckbox.checked = !!viewState.useCustomDropLocation;
@@ -259,7 +268,10 @@
             syncLegacyViewGlobals();
             globalScope.additional_zoom = viewState.zoom;
             const puzzle = getPuzzle();
-            if (puzzle && Number.isFinite(puzzle.scalex)) puzzle.refreshConnectionDistance();
+            if (puzzle) {
+                if (puzzle._invalidateViewMetricsCache) puzzle._invalidateViewMetricsCache();
+                if (Number.isFinite(puzzle.scalex)) puzzle.refreshConnectionDistance();
+            }
         }
 
         function scheduleViewTransform() {

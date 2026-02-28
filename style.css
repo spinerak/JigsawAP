@@ -466,7 +466,7 @@
       width: 320px;
       min-width: 260px;
       height: 320px;
-      min-height: 200px;
+      min-height: 120px;
       position: absolute;
       top: 50px;
       left: 50px;
@@ -551,14 +551,14 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
     #draggable6 {
-      display: inline-block;
+      position: absolute;
+      display: block;
       width: min(560px, 94vw);
       min-width: 340px;
-      height: fit-content;
-      min-height: 0;
+      height: 420px;
+      min-height: 200px;
       max-height: calc(100vh - 120px);
       background: #2d3748;
-      position: absolute;
       top: 140px;
       left: 140px;
       border-radius: 10px;
@@ -569,6 +569,18 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
+    /* Load custom media panel – same pattern as Chat: panel fills draggable, header fixed, body fills remainder and scrolls */
+    #draggable6 > .media-window-panel.drawer-panel {
+      position: absolute;
+      inset: 0;
+      padding: 0 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
 
     /* Drawer panel layout and styling */
     .drawer-panel {
@@ -578,29 +590,62 @@
       gap: 14px;
     }
     .view-controls-window-panel {
-      padding: 0 14px 14px;
+      padding: 0 10px 8px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       max-height: calc(100vh - 150px);
       overflow: auto;
+    }
+    .view-controls-window-panel .drawer-header {
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 -10px 0;
+      padding: 4px 10px 6px;
     }
     .cosmetic-window-panel.drawer-panel {
       gap: 10px;
       max-height: calc(100vh - 150px);
       overflow: auto;
+      padding: 0 10px 8px;
+    }
+    .cosmetic-window-panel .drawer-header {
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 -10px 0;
+      padding: 4px 10px 6px;
+    }
+    #draggable3 .drawer-panel {
+      padding: 0 10px 8px;
+      gap: 10px;
+    }
+    #draggable3 .drawer-header {
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 -10px 0;
+      padding: 4px 10px 6px;
     }
     .media-window-panel.drawer-panel {
       gap: 10px;
-      max-height: calc(100vh - 150px);
-      overflow: auto;
-      flex: 0 1 auto;
+      padding: 0 10px 8px;
+      display: flex;
+      flex-direction: column;
+    }
+    .media-window-panel .drawer-header {
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 -10px 0;
+      padding: 4px 10px 6px;
+      flex-shrink: 0;
     }
     .media-window-body {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      flex: 0 0 auto;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     .media-window-card {
       display: flex;
@@ -656,11 +701,9 @@
       display: flex;
       align-items: flex-start;
       flex-wrap: wrap;
-      gap: 10px;
-      padding: 10px 0 12px;
+      gap: 6px;
+      padding: 4px 14px 6px;
       margin: 0 -14px 0 -14px;
-      padding-left: 14px;
-      padding-right: 14px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
     .drawer-header .drawer-title {
@@ -676,7 +719,7 @@
     }
     .drawer-title {
       margin: 0;
-      font-size: 1rem;
+      font-size: 0.875rem;
       font-weight: 600;
       color: #e2e8f0;
       letter-spacing: 0.02em;
@@ -912,10 +955,10 @@
     .chat-panel {
       position: absolute;
       inset: 0;
-      padding: 0 14px 14px;
+      padding: 0 10px 8px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 6px;
       min-height: 0;
       box-sizing: border-box;
       overflow: hidden;
@@ -939,6 +982,7 @@
       }
       .view-controls-window-panel,
       .cosmetic-window-panel.drawer-panel,
+      #draggable3 .drawer-panel,
       .media-window-panel.drawer-panel {
         padding: 0 10px 10px;
       }
@@ -981,17 +1025,15 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      padding: 10px 0 12px;
-      margin: 0 -14px 0;
-      padding-left: 14px;
-      padding-right: 14px;
+      gap: 6px;
+      padding: 4px 10px 6px;
+      margin: 0 -10px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       flex-shrink: 0;
     }
     .chat-title {
       margin: 0;
-      font-size: 1rem;
+      font-size: 0.875rem;
       font-weight: 600;
       color: #e2e8f0;
       letter-spacing: 0.02em;
@@ -1002,12 +1044,12 @@
     }
     .chat-log {
       flex: 1 1 0;
-      min-height: 80px;
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 8px 10px;
+      padding: 4px 6px;
       background: rgba(0, 0, 0, 0.25);
-      border-radius: 8px;
+      border-radius: 6px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       font-size: 0.9rem;
       line-height: 1.45;
@@ -1016,7 +1058,7 @@
       text-align: left;
     }
     .chat-log > div {
-      padding: 4px 8px;
+      padding: 2px 6px;
       margin: 1px 0;
       border-radius: 4px;
     }

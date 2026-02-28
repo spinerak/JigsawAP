@@ -8,6 +8,7 @@
             this.dirtyRects = [];
             this.version = 0;
             this.mediaContentDirty = true;
+            this.zOrderDirty = false;
         }
 
         bindPuzzle(puzzle) {
@@ -29,14 +30,19 @@
             this.version++;
         }
 
+        markZOrderDirty() {
+            this.zOrderDirty = true;
+            this.version++;
+        }
+
         consumeDirtyPieces() {
-            const out = Array.from(this.dirtyPieces);
             this.dirtyPieces.clear();
-            return out;
+            this.zOrderDirty = false;
+            this.version++;
         }
 
         hasDirtyPieces() {
-            return this.dirtyPieces.size > 0;
+            return this.dirtyPieces.size > 0 || this.zOrderDirty;
         }
 
         dirtyPieceCount() {
