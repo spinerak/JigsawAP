@@ -135,6 +135,12 @@
             const scaleX = this.canvas.width / dw;
             const scaleY = this.canvas.height / dh;
             this.ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+            this.ctx.imageSmoothingEnabled = true;
+            if (scaleX < 1 || scaleY < 1) {
+                if (typeof this.ctx.imageSmoothingQuality !== "undefined") {
+                    this.ctx.imageSmoothingQuality = "high";
+                }
+            }
             const pieces = this._getSortedPieces();
             const puzzle = this.puzzle;
             const sourceCanvas = puzzle.gameCanvas || null;

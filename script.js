@@ -3,7 +3,7 @@
 window.pieceSides = 4;
 const corner_to_shape_dist = 1/3; // distance from corner to shape in hexagonal piece
 
-window.downsize_to_fit = 0.85;
+window.downsize_to_fit = 0.9;
 window.PUZZLE_AREA_SURFACE_MULTIPLIER = 2;
 window.show_clue = true;
 window.rotations = 0;
