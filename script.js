@@ -2224,8 +2224,12 @@ function updateGrayscaleReferenceCanvas() {
         grayscaleReferenceCanvas.style.pointerEvents = "none";
         grayscaleReferenceCanvas.style.zIndex = "99999997";
     }
-    grayscaleReferenceCanvas.width = bufW;
-    grayscaleReferenceCanvas.height = bufH;
+    // Only resize when dimensions change; setting width/height clears the canvas and causes
+    // flicker when grayscale is throttled (video/camera) because we clear every frame but draw only every 120ms.
+    if (grayscaleReferenceCanvas.width !== bufW || grayscaleReferenceCanvas.height !== bufH) {
+        grayscaleReferenceCanvas.width = bufW;
+        grayscaleReferenceCanvas.height = bufH;
+    }
     grayscaleReferenceCanvas.style.width = w + "px";
     grayscaleReferenceCanvas.style.height = h + "px";
     grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
