@@ -129,12 +129,27 @@
   <div class="changelog-modal-card">
     <div class="changelog-modal-title">Changelog</div>
     <div class="changelog-modal-subtitle">
-      Current changelog version: <span class="changelog-current-version">0.10.1</span>
+      Current changelog version: <span class="changelog-current-version">0.10.2</span>
     </div>
     <div class="changelog-modal-scroll">
       <div class="changelog-modal-intro">
         This changelog appears automatically when a new changelog version is detected and can always be reopened from the login page.
       </div>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Version 0.10.2</div>
+        <div class="changelog-entry-body">
+          <ul>
+            <li>Fix piece merge flicker, for real this time.</li>
+            <li>Revert routing video directly to the canvas as it sometimes caused pieces to get the wrong canvas position.</li>
+            <li>Fix changing renderer didn't refresh puzzle pieces, so issues could linger.</li>
+            <li>Fix black square / faulty initialization when webgl failed part-way through, leaving black squares instead of puzzle pieces.</li>
+            <li>Restore the images page. It got moved when I cleaned up unlinked files. It's not linked from within the repository so I overlooked it. Oops.</li>
+            <li>Fix some quirks with z-index where things could shift while you were holding a piece.</li>
+            <li>Improve (?) the Cosmetic Options menu.</li>
+          </ul>
+        </div>
+      </article>
 
       <article class="changelog-entry">
         <div class="changelog-entry-title">Version 0.10.1</div>
