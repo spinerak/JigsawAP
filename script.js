@@ -2103,6 +2103,7 @@ class Puzzle {
         const isVideo = !!(frameSource && typeof frameSource.videoWidth === "number");
         const canvas2dWithVideo = activeRendererName === "CanvasRenderer" && isVideo;
         const webglWithVideo = activeRendererName === "WebGLRenderer" && isVideo;
+        // For video with WebGL/Canvas2D, the draw is done once per render in the renderer; do not draw here.
         if (!canvas2dWithVideo && !webglWithVideo) {
             this.renderSourceToGameCanvas(frameSource);
         }

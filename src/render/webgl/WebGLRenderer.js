@@ -145,9 +145,13 @@
                 const sourceCanvas = this.puzzle.gameCanvas || null;
                 const videoSource = (this.mediaSource && typeof this.mediaSource.videoWidth === "number" && typeof this.mediaSource.videoHeight === "number") ? this.mediaSource : null;
                 const gifDraw = this.puzzle._gifDraw || null;
-                const useVideoTexture = !!(videoSource && gifDraw && gifDraw.dw > 0 && gifDraw.dh > 0);
-                const mediaSource = useVideoTexture ? videoSource : sourceCanvas;
-                const forceUpload = useVideoTexture || sceneState == null || !!(sceneState && sceneState.mediaContentDirty);
+                // Route video through gameCanvas (once per render) so alignment matches static images; then use gameCanvas as texture.
+                if (videoSource && sourceCanvas && typeof this.puzzle.renderSourceToGameCanvas === "function") {
+                    this.puzzle.renderSourceToGameCanvas(videoSource);
+                }
+                const useVideoTexture = false;
+                const mediaSource = sourceCanvas;
+                const forceUpload = !!videoSource || sceneState == null || !!(sceneState && sceneState.mediaContentDirty);
                 if (!mediaSource || !this._updateMediaTexture(mediaSource, forceUpload)) return;
 
                 const pieces = this._getSortedPieces();

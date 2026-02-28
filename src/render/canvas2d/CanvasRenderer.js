@@ -146,9 +146,13 @@
             const sourceCanvas = puzzle.gameCanvas || null;
             const videoSource = (this.mediaSource && typeof this.mediaSource.videoWidth === "number" && typeof this.mediaSource.videoHeight === "number") ? this.mediaSource : null;
             const gifDraw = puzzle._gifDraw || null;
-            const useVideoDirect = !!(videoSource && gifDraw && gifDraw.dw > 0 && gifDraw.dh > 0);
-            const sourceW = useVideoDirect ? (this.mediaSource.videoWidth || 1) : (sourceCanvas ? sourceCanvas.width : 0);
-            const sourceH = useVideoDirect ? (this.mediaSource.videoHeight || 1) : (sourceCanvas ? sourceCanvas.height : 0);
+            // Route video through gameCanvas (once per render) so alignment matches static images; then use gameCanvas for sampling.
+            if (videoSource && sourceCanvas && typeof puzzle.renderSourceToGameCanvas === "function") {
+                puzzle.renderSourceToGameCanvas(videoSource);
+            }
+            const useVideoDirect = false;
+            const sourceW = sourceCanvas ? sourceCanvas.width : 0;
+            const sourceH = sourceCanvas ? sourceCanvas.height : 0;
             const heldShadowDarkness = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35")));
             let drawn = 0;
             for (const pp of pieces) {
