@@ -142,8 +142,7 @@
             return this._sortedPieces;
         }
 
-        _isPieceVisible(pp, w, h) {
-            const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+        _isPieceVisible(pp, w, h, deg, dw, dh) {
             const angle = (pp.rot || 0) * deg * Math.PI / 180;
             let hw = w / 2;
             let hh = h / 2;
@@ -158,8 +157,6 @@
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             if (cx + hw < 0 || cy + hh < 0) return false;
-            const dw = this._displayWidth || this.canvas.width;
-            const dh = this._displayHeight || this.canvas.height;
             if (cx - hw > dw || cy - hh > dh) return false;
             return true;
         }
@@ -228,11 +225,11 @@
             }
         }
 
-        _drawPieceToContext(ctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, drawHeldShadow) {
+        _drawPieceToContext(ctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, drawHeldShadow, viewportDeg, viewportDw, viewportDh) {
             const w = pp.nx * puzzle.scalex;
             const h = pp.ny * puzzle.scaley;
             if (w <= 0 || h <= 0 || !pp.path) return false;
-            if (!this._isPieceVisible(pp, w, h)) return false;
+            if (!this._isPieceVisible(pp, w, h, viewportDeg, viewportDw, viewportDh)) return false;
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             ctx.save();
@@ -331,6 +328,9 @@
                 this._cachedHeldShadowAt = now;
             }
             const heldShadowDarkness = this._cachedHeldShadowDarkness;
+            const viewportDeg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+            const viewportDw = this._displayWidth || this.canvas.width;
+            const viewportDh = this._displayHeight || this.canvas.height;
 
             if (!this._heldPieces) this._heldPieces = [];
             if (!this._staticPieces) this._staticPieces = [];
@@ -350,7 +350,7 @@
                 this._configureDrawContext(sctx);
                 let staticDrawn = 0;
                 for (const pp of this._staticPieces) {
-                    if (this._drawPieceToContext(sctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, false)) {
+                    if (this._drawPieceToContext(sctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, false, viewportDeg, viewportDw, viewportDh)) {
                         staticDrawn++;
                     }
                 }
@@ -378,7 +378,7 @@
                 this._configureDrawContext(this.ctx);
             }
             for (const pp of this._heldPieces) {
-                if (this._drawPieceToContext(drawHeldTo, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, true)) {
+                if (this._drawPieceToContext(drawHeldTo, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, true, viewportDeg, viewportDw, viewportDh)) {
                     heldDrawn++;
                 }
             }

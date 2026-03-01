@@ -197,12 +197,15 @@
                 const drawItems = [];
                 let numHeld = 0;
                 const puzzle = this.puzzle;
+                const deg = (globalScope.rotations === 180 ? 90 : globalScope.rotations) || 0;
+                const dw = this._displayWidth || this.canvas.width;
+                const dh = this._displayHeight || this.canvas.height;
                 for (const pp of pieces) {
                     const w = pp.nx * puzzle.scalex;
                     const h = pp.ny * puzzle.scaley;
                     if (w <= 0 || h <= 0 || !pp.path) continue;
                     if (!pp._mediaSample) continue;
-                    if (!this._isPieceVisible(pp, w, h)) continue;
+                    if (!this._isPieceVisible(pp, w, h, deg, dw, dh)) continue;
 
                     const cache = this._ensurePieceTextures(pp, sceneState);
                     if (!cache || !cache.maskTexture || !cache.overlayTexture) continue;
@@ -707,8 +710,7 @@
             return this._sortedPieces;
         }
 
-        _isPieceVisible(pp, w, h) {
-            const deg = (globalScope.rotations === 180 ? 90 : globalScope.rotations) || 0;
+        _isPieceVisible(pp, w, h, deg, dw, dh) {
             const angle = (pp.rot || 0) * deg * Math.PI / 180;
             let hw = w / 2;
             let hh = h / 2;
@@ -723,8 +725,6 @@
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             if (cx + hw < 0 || cy + hh < 0) return false;
-            const dw = this._displayWidth || this.canvas.width;
-            const dh = this._displayHeight || this.canvas.height;
             if (cx - hw > dw || cy - hh > dh) return false;
             return true;
         }
