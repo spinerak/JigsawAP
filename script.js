@@ -334,7 +334,7 @@ try {
     const storedVideoFps = localStorage.getItem("videoFrameIntervalMs");
     if (storedVideoFps !== null && storedVideoFps !== "") {
         const ms = parseInt(storedVideoFps, 10);
-        if (!isNaN(ms) && ms >= 0) viewState.videoFrameIntervalMs = ms;
+        if (!isNaN(ms) && ms >= 0) viewState.videoFrameIntervalMs = (ms <= 0 || ms < 33) ? 33 : ms;
     }
 } catch (_e) {}
 try {
@@ -2558,7 +2558,9 @@ let lastSyncedPreviewAt = 0;
 let hasDrawnStaticSyncedPreview = false;
 let prestartPreviewDirty = true; // only redraw prestart when dirty or media animated
 let lastPrestartPreviewAt = 0; // throttle animated prestart by framerate
-const LOOP_CAP_MS = 1000 / 60; // cap loop render phase to 60 fps
+const TARGET_FRAME_MS_ACTIVE = 1000 / 30;
+const TARGET_FRAME_MS_STATIC = 1000 / 15;
+const TARGET_FRAME_MS_HIDDEN = 1000;
 let lastLoopTickMs = 0;
 let grayscaleReferenceCanvas = null;
 let grayscaleReferenceCtx = null;
@@ -3126,9 +3128,12 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             }
             event = null;
         }
-        // Run render phase at most 60 fps so input (move/pan) stays responsive every rAF but GPU work is capped.
+        const isPageHidden = typeof document !== "undefined" && document.visibilityState !== "visible";
+        const isStatic = !(moving && moving.pp) && !(rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated());
+        const currentRenderCapMs = isPageHidden ? TARGET_FRAME_MS_HIDDEN : (isStatic ? TARGET_FRAME_MS_STATIC : TARGET_FRAME_MS_ACTIVE);
+        if (rendererFacade && rendererFacade.scheduler) rendererFacade.scheduler.targetFrameMs = currentRenderCapMs;
         const elapsedSinceLoopTick = nowMs - lastLoopTickMs;
-        const runRenderPhase = lastLoopTickMs === 0 || elapsedSinceLoopTick >= LOOP_CAP_MS;
+        const runRenderPhase = lastLoopTickMs === 0 || elapsedSinceLoopTick >= currentRenderCapMs;
         if (runRenderPhase) {
             lastLoopTickMs = nowMs;
             // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
@@ -3145,7 +3150,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             if (state < 50) hasDrawnStaticSyncedPreview = false;
             const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
             if (animated) {
-                const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+                const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE;
                 if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
                     drawSyncedPreviewWindowFrame();
                     lastSyncedPreviewAt = nowMs;
@@ -3162,7 +3167,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     prestartPreviewDirty = false;
                     lastPrestartPreviewAt = nowMs;
                 } else if (prestartAnimated) {
-                    const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+                    const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE;
                     if (nowMs - lastPrestartPreviewAt >= intervalMs) {
                         drawPrestartPreviewFrame();
                         lastPrestartPreviewAt = nowMs;

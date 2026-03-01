@@ -178,7 +178,7 @@
             <li><strong>Resolution & display:</strong> Puzzle resolution now supports 1440p, 4K, 8K, and 16K (default stays 1080p). Higher resolutions can affect performance—a tooltip on the dropdown reminds you. The puzzle image uses more of the play area (90% instead of 85%) so pieces look a bit sharper. Scaling looks better when resolution is capped, and piece edges are crisper.</li>
             <li><strong>Cleaner, consistent windows:</strong> Chat/Log, View controls, Cosmetic options, Piece drawer, and Load custom media all use the same compact header and layout. Less padding, smaller titles, and the same look everywhere. Chat can be resized shorter; only the content area scrolls. Load custom media opens in the right place and stays on top of other UI.</li>
             <li><strong>Performance:</strong> Piece movement is smoother, piece picking is faster, and the piece you’re holding stays on top. Dropping a piece checks only nearby pieces for merges, so drops feel snappier. Resizing the window spreads redraws over several frames so the game stays responsive. The preview/sync window only redraws when it’s open. One animation loop instead of two and fewer things drawn each frame help on slower devices. Several console logs that could slow things down were removed.</li>
-            <li><strong>Video and animation:</strong> A new “Video / animation framerate” option (Cosmetics) lets you cap video/GIF updates at 60, 30, 24, 20, or 15 fps (default 30). Lower values reduce load on weaker devices. Video and GIF no longer push at full decode rate, so the game stays responsive. The grayscale reference behind pieces updates less often with video/GIF (about 8 times per second) to save work. Video and GIF now work correctly and more efficiently with both Canvas2D and WebGL.</li>
+            <li><strong>Video and animation:</strong> A new “Video / animation framerate” option (Cosmetics) lets you cap video/GIF updates at 30, 24, 20, or 15 fps (default 30). Lower values reduce load on weaker devices. Video and GIF no longer push at full decode rate, so the game stays responsive. The grayscale reference behind pieces updates less often with video/GIF (about 8 times per second) to save work. Video and GIF now work correctly and more efficiently with both Canvas2D and WebGL.</li>
             <li><strong>Cosmetic options:</strong> “Preview outline only” draws an outline around the puzzle preview so you can see the puzzle size without showing the full grayscale image. The outline follows the actual image area (including square pieces and other layouts).</li>
             <li><strong>View controls:</strong> The default pan button is now right mouse instead of left, so left-click drag is reserved for selecting pieces. You can still cycle the pan button (Left / Middle / Right) from the View Controls window.</li>
           </ul>
@@ -400,11 +400,9 @@
             <option value="540p">540p</option>
           </select>
         </div>
-        <div class="display-options-slider renderer-mode-slider" title="Cap how often video or animated media frames are applied. Lower framerates reduce CPU/GPU load; Uncapped uses the source&#39;s native rate.">
+        <div class="display-options-slider renderer-mode-slider" title="Cap how often video or animated media frames are applied. Lower framerates reduce CPU/GPU load.">
           <label for="videoFrameRateSelect" title="Video / animation framerate cap. Lower values improve performance on slow devices.">Video / animation framerate</label>
           <select id="videoFrameRateSelect" class="display-options-select" aria-label="Video animation framerate cap">
-            <option value="0">Uncapped</option>
-            <option value="16">60 fps</option>
             <option value="33" selected>30 fps</option>
             <option value="42">24 fps</option>
             <option value="50">20 fps</option>
