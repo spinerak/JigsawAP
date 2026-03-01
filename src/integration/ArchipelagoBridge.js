@@ -127,6 +127,7 @@
                         pp.moveTo(x * puzzle.contWidth, y * puzzle.contHeight);
                         pp.rotateTo(r);
                         pp.hasMovedEver = true;
+                        if (deps.markPieceDirty) deps.markPieceDirty(pp);
                     }
                 }
             } else {

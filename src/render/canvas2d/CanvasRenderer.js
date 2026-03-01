@@ -27,8 +27,38 @@
             this._staticCtx = null;
             this._staticLayerDirty = true;
             this._lastStaticDrawCount = 0;
+            this._heldOverlayCanvas = null;
+            this._heldOverlayCtx = null;
+            this._heldPiecesCountLastFrame = -1;
             this._cachedHeldShadowDarkness = null;
             this._cachedHeldShadowAt = 0;
+        }
+
+        _ensureHeldOverlay() {
+            if (!this.canvas || !this.container) return;
+            const w = this.canvas.width;
+            const h = this.canvas.height;
+            if (!this._heldOverlayCanvas) {
+                this._heldOverlayCanvas = document.createElement("canvas");
+                this._heldOverlayCanvas.className = "jigsaw-held-overlay-renderer";
+                this._heldOverlayCanvas.style.position = "absolute";
+                this._heldOverlayCanvas.style.left = "0px";
+                this._heldOverlayCanvas.style.top = "0px";
+                this._heldOverlayCanvas.style.width = "100%";
+                this._heldOverlayCanvas.style.height = "100%";
+                this._heldOverlayCanvas.style.zIndex = "100000000";
+                this._heldOverlayCanvas.style.pointerEvents = "none";
+                this._heldOverlayCtx = this._heldOverlayCanvas.getContext("2d");
+                if (this.canvas.nextSibling) {
+                    this.container.insertBefore(this._heldOverlayCanvas, this.canvas.nextSibling);
+                } else {
+                    this.container.appendChild(this._heldOverlayCanvas);
+                }
+            }
+            if (this._heldOverlayCanvas.width !== w || this._heldOverlayCanvas.height !== h) {
+                this._heldOverlayCanvas.width = w;
+                this._heldOverlayCanvas.height = h;
+            }
         }
 
         _isOverlayOversampleEnabled() {
@@ -61,10 +91,12 @@
             this.canvas.style.height = "100%";
             this.enabled = true;
             this._markStaticLayerDirty();
+            this._ensureHeldOverlay();
         }
 
         setVisible(visible) {
             this.canvas.style.display = visible ? "block" : "none";
+            if (this._heldOverlayCanvas) this._heldOverlayCanvas.style.display = visible ? "block" : "none";
         }
 
         setMediaSource(source) {
@@ -78,12 +110,16 @@
             this.canvas.height = Math.max(1, Math.round(bufferH));
             this._displayWidth = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayW)) : this.canvas.width;
             this._displayHeight = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayH)) : this.canvas.height;
+            this._ensureHeldOverlay();
             this._markStaticLayerDirty();
         }
 
         clear() {
             if (!this.enabled) return;
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            if (this._heldOverlayCtx && this._heldOverlayCanvas) {
+                this._heldOverlayCtx.clearRect(0, 0, this._heldOverlayCanvas.width, this._heldOverlayCanvas.height);
+            }
         }
 
         _getSortedPieces() {
@@ -251,11 +287,16 @@
             return true;
         }
 
-        _shouldRebuildStaticLayer(sceneState) {
+        // Rebuild static layer only when something on it actually changed. Do not rebuild when the
+        // only dirty pieces are held (they are drawn on the overlay); do rebuild when any
+        // non-held piece is dirty (e.g. position/rotation from network or merge).
+        // Also rebuild when held count changes (pick up or drop) so static no longer includes the held piece.
+        _shouldRebuildStaticLayer(sceneState, heldCount) {
             if (this._staticLayerDirty) return true;
             if (!sceneState) return true;
             if (sceneState.mediaContentDirty) return true;
             if (sceneState.zOrderDirty) return true;
+            if (typeof heldCount === "number" && heldCount !== this._heldPiecesCountLastFrame) return true;
             if (sceneState.dirtyPieces && sceneState.dirtyPieces.size > 0) {
                 for (const dirtyPiece of sceneState.dirtyPieces) {
                     if (!dirtyPiece || !dirtyPiece._isHeld) return true;
@@ -301,7 +342,8 @@
             }
 
             this._ensureStaticLayer();
-            if (this._shouldRebuildStaticLayer(sceneState)) {
+            const rebuiltStatic = this._shouldRebuildStaticLayer(sceneState, this._heldPieces.length);
+            if (rebuiltStatic) {
                 const sctx = this._staticCtx;
                 sctx.setTransform(1, 0, 0, 1, 0, 0);
                 sctx.clearRect(0, 0, this._staticCanvas.width, this._staticCanvas.height);
@@ -314,20 +356,35 @@
                 }
                 this._lastStaticDrawCount = staticDrawn;
                 this._staticLayerDirty = false;
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this._staticCanvas) this.ctx.drawImage(this._staticCanvas, 0, 0);
             }
 
-            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            if (this._staticCanvas) this.ctx.drawImage(this._staticCanvas, 0, 0);
-            this._configureDrawContext(this.ctx);
+            this._ensureHeldOverlay();
+            const heldCtx = this._heldOverlayCtx;
+            const heldCanvas = this._heldOverlayCanvas;
+            if (heldCtx && heldCanvas) {
+                heldCtx.setTransform(1, 0, 0, 1, 0, 0);
+                heldCtx.clearRect(0, 0, heldCanvas.width, heldCanvas.height);
+                this._configureDrawContext(heldCtx);
+            }
             let heldDrawn = 0;
+            const drawHeldTo = heldCtx || this.ctx;
+            if (!heldCtx && rebuiltStatic === false) {
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this._staticCanvas) this.ctx.drawImage(this._staticCanvas, 0, 0);
+                this._configureDrawContext(this.ctx);
+            }
             for (const pp of this._heldPieces) {
-                if (this._drawPieceToContext(this.ctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, true)) {
+                if (this._drawPieceToContext(drawHeldTo, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, true)) {
                     heldDrawn++;
                 }
             }
             this.lastDrawCount = this._lastStaticDrawCount + heldDrawn;
             this.lastMediaUploads = 0;
+            this._heldPiecesCountLastFrame = this._heldPieces.length;
         }
 
         renderDirtyPieces(sceneState) {
@@ -338,6 +395,11 @@
 
         destroy() {
             this.enabled = false;
+            if (this._heldOverlayCanvas && this._heldOverlayCanvas.parentElement) {
+                this._heldOverlayCanvas.parentElement.removeChild(this._heldOverlayCanvas);
+            }
+            this._heldOverlayCanvas = null;
+            this._heldOverlayCtx = null;
             if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
             this._staticCanvas = null;
             this._staticCtx = null;

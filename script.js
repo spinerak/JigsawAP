@@ -4503,7 +4503,8 @@ if (window.JigsawArchipelagoBridge && typeof window.JigsawArchipelagoBridge.crea
         getPuzzle: () => puzzle,
         findPolyPieceUsingPuzzlePiece: (idx, first) => findPolyPieceUsingPuzzlePiece(idx, first),
         findPolyPieceBySyncId: (syncId) => findPolyPieceBySyncId(syncId),
-        getPolyPieceSyncId: (pp) => getPolyPieceSyncId(pp)
+        getPolyPieceSyncId: (pp) => getPolyPieceSyncId(pp),
+        markPieceDirty: (pp) => { if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(pp); }
     });
 }
 
