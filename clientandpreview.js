@@ -194,6 +194,7 @@ function restoreDiv2() {
         taskbar2.style.backgroundColor = '#909090'; // lighter color
         const sizeKey = window.is_connected ? `draggable2Size_${window.apseed}_${window.slot}` : 'draggable2Size';
         if (!localStorage.getItem(sizeKey)) sizePreviewToImageAspectRatio();
+        drawSyncedPreviewWindowFrame();
     } else {
         taskbar2.style.backgroundColor = ''; // reset to default
     }
