@@ -2946,6 +2946,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
 { // scope for animate
     let stateAfterPan = 50;
     const HELD_Z_INDEX = 2147483647;
+    const DRAG_SYNC_THROTTLE_MS = 100;
+    let lastDragSyncTime = 0;
 
     function setHeldPieceState(pp, held) {
         if (!pp) return;
@@ -3022,11 +3024,15 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         moving.pp.moveAwayFromBorder();
         moving.pp.hasMovedEver = true;
         if (window.gameplayStarted && !window.play_solo) {
-            const movingSyncId = getPolyPieceSyncId(moving.pp);
-            if(window.rotations == 0){
-                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
-            }else{
-                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+            const now = Date.now();
+            if ((now - lastDragSyncTime) >= DRAG_SYNC_THROTTLE_MS) {
+                const movingSyncId = getPolyPieceSyncId(moving.pp);
+                if (window.rotations == 0) {
+                    if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                } else {
+                    if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+                }
+                lastDragSyncTime = now;
             }
         }
         if (perfMonitor && typeof perfMonitor.recordDragMove === "function") {
