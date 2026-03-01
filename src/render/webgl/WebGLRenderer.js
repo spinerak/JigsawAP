@@ -94,7 +94,8 @@
             if (!this.canvas.parentElement) this.container.appendChild(this.canvas);
             this.canvas.style.width = "100%";
             this.canvas.style.height = "100%";
-            this.gl = this.canvas.getContext("webgl2") || this.canvas.getContext("webgl");
+            const glOpts = { powerPreference: "high-performance" };
+            this.gl = this.canvas.getContext("webgl2", glOpts) || this.canvas.getContext("webgl", glOpts);
             if (!this.gl) {
                 this.enabled = false;
                 this.supportsPieceRendering = false;
