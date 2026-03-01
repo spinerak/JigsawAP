@@ -7,8 +7,9 @@ function getUrlParameter(name) {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 };
 
+
 const CHANGELOG_STORAGE_KEY = "jigsawChangelogVersionSeen";
-const CHANGELOG_VERSION = "0.10.2";
+const CHANGELOG_VERSION = "0.10.3";
 
 function showChangelogModal() {
     const overlay = document.getElementById("changelogModal");
@@ -330,9 +331,8 @@ const connectedListener = (packet) => {
     }else{
         window.fake_pieces_mimic = [];
     }
-    if(packet.slot_data.grid_type == 6){
-        window.pieceSides = 6;
-    }
+    const gridType = parseInt(packet.slot_data.grid_type, 10);
+    window.pieceSides = (gridType === 6) ? 6 : 4;
 
     let apworld = packet.slot_data.ap_world_version_2 ? packet.slot_data.ap_world_version_2 : packet.slot_data.ap_world_version;
     window.apworld = apworld;
@@ -432,17 +432,15 @@ const connectedListener = (packet) => {
     }
 
     const shapeParam2 = getUrlParameter("shape");
-    if (!shapeParam2) {
-        if(packet.slot_data.border_type){
-            const shapeSelect = document.getElementById("shape");
-            if (shapeSelect) {
-                const index = parseInt(packet.slot_data.border_type, 10) - 1;
-                if (index >= 0 && index < shapeSelect.options.length) {
-                    shapeSelect.selectedIndex = index;
-                    console.log("SET!s")
-                }
-            }
+    const shapeSelect = document.getElementById("shape");
+    if (shapeSelect) {
+        // URL override (for debugging) still wins; otherwise use AP slot setting.
+        // If AP does not send border_type, reset to classic to avoid leaking prior local state.
+        let shapeValue = shapeParam2 ? parseInt(shapeParam2, 10) : parseInt(packet.slot_data.border_type, 10);
+        if (!Number.isInteger(shapeValue) || shapeValue < 1 || shapeValue > shapeSelect.options.length) {
+            shapeValue = 1;
         }
+        shapeSelect.value = String(shapeValue);
     }
     
     puzzlePieceOrder = packet.slot_data.piece_order;

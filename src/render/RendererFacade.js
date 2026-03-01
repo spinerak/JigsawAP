@@ -1,6 +1,23 @@
 "use strict";
 
 (function initRendererFacade(globalScope) {
+    /** Returns max width/height for a resolution preset. Used by RendererFacade and puzzle_scale(). */
+    function getPuzzleResolutionMaxDimensions(preset) {
+        if (!preset || preset === "native") return null;
+        switch (preset) {
+            case "16k": return { maxW: 15360, maxH: 8640 };
+            case "8k": return { maxW: 7680, maxH: 4320 };
+            case "4k": return { maxW: 3840, maxH: 2160 };
+            case "1440p": return { maxW: 2560, maxH: 1440 };
+            case "1080p": return { maxW: 1920, maxH: 1080 };
+            case "720p": return { maxW: 1280, maxH: 720 };
+            case "540p": return { maxW: 960, maxH: 540 };
+            default: return null;
+        }
+    }
+
+    globalScope.JigsawGetPuzzleResolutionMaxDimensions = getPuzzleResolutionMaxDimensions;
+
     class RendererFacade {
         constructor({ container, config, getPuzzleResolution }) {
             this.container = container;
@@ -9,9 +26,8 @@
             this.canvasRenderer = null;
             this.webglRenderer = null;
             this.activeRenderer = null;
-            const legacyMode = !!(config && config.legacyMode);
             this.scheduler = new globalScope.JigsawRenderScheduler({
-                targetFrameMs: legacyMode ? 33 : 16
+                targetFrameMs: 16
             });
             this.sceneState = new globalScope.JigsawPuzzleSceneState();
             this.media = new globalScope.JigsawMediaSourceAdapter();
@@ -66,14 +82,13 @@
         }
 
         selectMode(requestedMode, puzzle) {
-            const legacyMode = !!(this.config && this.config.legacyMode);
-            if (this.scheduler) this.scheduler.targetFrameMs = legacyMode ? 33 : 16;
+            if (this.scheduler) this.scheduler.targetFrameMs = 16;
             const normalizedMode = (requestedMode === "webgl" || requestedMode === "auto" || requestedMode === "canvas2d")
                 ? requestedMode
                 : "canvas2d";
-            this.requestedMode = legacyMode ? "canvas2d" : normalizedMode;
+            this.requestedMode = normalizedMode;
             this.mode = this.requestedMode;
-            this.modeNote = legacyMode ? "legacy mode" : "";
+            this.modeNote = "";
             if (this.activeRenderer) this.activeRenderer.setVisible(false);
             this.activeRenderer = null;
             this.activeMode = "none";
@@ -106,8 +121,8 @@
             };
 
             const webglBlockedThisSession = this.webglDowngraded === true;
-            if (legacyMode || (webglBlockedThisSession && normalizedMode !== "canvas2d")) {
-                if (webglBlockedThisSession) this.modeNote = this.webglDowngradeReason || "webgl disabled for this session after downgrade";
+            if (webglBlockedThisSession && normalizedMode !== "canvas2d") {
+                this.modeNote = this.webglDowngradeReason || "webgl disabled for this session after downgrade";
                 useCanvas();
             } else if (this.requestedMode === "webgl") {
                 if (!tryWebGL() && this.config.autoFallback !== false) useCanvas();
@@ -289,17 +304,11 @@
             if (!preset || preset === "native" || width <= 0 || height <= 0) {
                 return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };
             }
-            let maxW = 1920, maxH = 1080;
-            if (preset === "16k") { maxW = 15360; maxH = 8640; }
-            else if (preset === "8k") { maxW = 7680; maxH = 4320; }
-            else if (preset === "4k") { maxW = 3840; maxH = 2160; }
-            else if (preset === "1440p") { maxW = 2560; maxH = 1440; }
-            else if (preset === "1080p") { maxW = 1920; maxH = 1080; }
-            else if (preset === "720p") { maxW = 1280; maxH = 720; }
-            else if (preset === "540p") { maxW = 960; maxH = 540; }
-            else {
+            const max = getPuzzleResolutionMaxDimensions(preset);
+            if (!max) {
                 return { cappedW: Math.max(1, Math.round(width)), cappedH: Math.max(1, Math.round(height)) };
             }
+            const { maxW, maxH } = max;
             const scale = Math.min(maxW / width, maxH / height, 1);
             const cappedW = Math.max(1, Math.round(width * scale));
             const cappedH = Math.max(1, Math.round(height * scale));
@@ -333,8 +342,15 @@
             this._emitStatusChange();
         }
 
+        isMediaAnimated() {
+            const status = this.media && this.media.getStatus ? this.media.getStatus() : null;
+            const kind = status && status.kind ? status.kind : "image";
+            return kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded";
+        }
+
         renderFrame(nowMs) {
             if (!this.activeRenderer) return;
+            const shouldRenderThisFrame = this.scheduler.shouldRender(nowMs);
             const perf = globalScope.rendererPerf;
             if (perf) perf.frameCount += 1;
             const puzzle = this.sceneState ? this.sceneState.puzzle : null;
@@ -346,7 +362,7 @@
                     this.modeNote = mediaStatus.failureReason;
                     this._emitStatusChange();
                 }
-                if (advanced && this.scheduler.shouldRender(nowMs)) {
+                if (advanced && shouldRenderThisFrame) {
                     const frameSource = this.media.getFrameSource();
                     if (frameSource && puzzle.applyMediaFrame && puzzle.applyMediaFrame(frameSource, nowMs)) {
                         this.sceneState.markAllDirty();
@@ -354,7 +370,7 @@
                     mediaAdvanced = true;
                 }
             }
-            if (!this.scheduler.shouldRender(nowMs)) return;
+            if (!shouldRenderThisFrame) return;
 
             if (this.media && puzzle && !mediaAdvanced) {
                 const status = this.media.getStatus ? this.media.getStatus() : null;
@@ -383,6 +399,8 @@
             this.activeRenderer.renderFrame(nowMs, this.sceneState);
             if (this.activeRenderer === this.canvasRenderer && this.sceneState && typeof this.sceneState.consumeDirtyPieces === "function") {
                 this.sceneState.consumeDirtyPieces();
+            } else if (this.activeRenderer === this.webglRenderer && this.sceneState && typeof this.sceneState.clearZOrderDirty === "function") {
+                this.sceneState.clearZOrderDirty();
             }
 
             // If WebGL failed during this frame, fallback immediately and force redraw.

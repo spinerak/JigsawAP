@@ -3,8 +3,8 @@
 window.pieceSides = 4;
 const corner_to_shape_dist = 1/3; // distance from corner to shape in hexagonal piece
 
-window.downsize_to_fit = 0.9;
-window.PUZZLE_AREA_SURFACE_MULTIPLIER = 2;
+window.downsize_to_fit = 1;
+window.PUZZLE_AREA_SURFACE_MULTIPLIER = 0.75;
 window.show_clue = true;
 window.rotations = 0;
 window.zero_list = [0,0];
@@ -12,12 +12,8 @@ window.rendererConfig = {
     mode: "auto", // canvas2d | webgl | auto
     media: "image", // image | gif | video | camera
     autoFallback: true,
-    perfBudgetMs: 8,
-    legacyMode: false // true = canvas2d, lower FPS, no/simple shadow, no preview sync
+    perfBudgetMs: 8
 };
-try {
-    if (typeof localStorage !== "undefined" && localStorage.getItem("rendererLegacyMode") === "true") window.rendererConfig.legacyMode = true;
-} catch (_e) {}
 
 var accept_pending_actions = false;
 var process_pending_actions = false;
@@ -30,6 +26,252 @@ Object.defineProperty(window.jigsawRuntime, "processPendingActions", {
     get: () => process_pending_actions,
     set: (value) => { process_pending_actions = !!value; }
 });
+
+window.jigsawPerf = window.jigsawPerf || (function initJigsawPerfMonitor() {
+    let enabled = true;
+    let reporterTimer = null;
+
+    function nowMs() {
+        return (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+    }
+
+    function buildTimingBucket() {
+        return { count: 0, totalMs: 0, maxMs: 0, lastMs: 0 };
+    }
+
+    const stats = {
+        frame: buildTimingBucket(),
+        render: buildTimingBucket(),
+        setupQueue: buildTimingBucket(),
+        eventDispatch: buildTimingBucket(),
+        queueDelay: buildTimingBucket(),
+        dragMove: buildTimingBucket(),
+        hitTest: { count: 0, totalMs: 0, maxMs: 0, hitCount: 0, totalCandidates: 0, maxCandidates: 0 },
+        pickup: {
+            attempts: 0,
+            totalAcquireMs: 0,
+            maxAcquireMs: 0,
+            successful: 0,
+            firstMoveSamples: 0,
+            firstMoveLagTotalMs: 0,
+            firstMoveLagMaxMs: 0,
+            pendingStartMs: 0,
+            awaitingFirstMove: false
+        },
+        queue: {
+            maxDepth: 0,
+            lastDepth: 0
+        }
+    };
+
+    function resetBucket(bucket) {
+        bucket.count = 0;
+        bucket.totalMs = 0;
+        bucket.maxMs = 0;
+        bucket.lastMs = 0;
+    }
+
+    function reset() {
+        resetBucket(stats.frame);
+        resetBucket(stats.render);
+        resetBucket(stats.setupQueue);
+        resetBucket(stats.eventDispatch);
+        resetBucket(stats.queueDelay);
+        resetBucket(stats.dragMove);
+        stats.hitTest = { count: 0, totalMs: 0, maxMs: 0, hitCount: 0, totalCandidates: 0, maxCandidates: 0 };
+        stats.pickup = {
+            attempts: 0,
+            totalAcquireMs: 0,
+            maxAcquireMs: 0,
+            successful: 0,
+            firstMoveSamples: 0,
+            firstMoveLagTotalMs: 0,
+            firstMoveLagMaxMs: 0,
+            pendingStartMs: 0,
+            awaitingFirstMove: false
+        };
+        stats.queue = { maxDepth: 0, lastDepth: 0 };
+    }
+
+    function recordBucket(bucket, ms) {
+        if (!enabled) return;
+        if (!Number.isFinite(ms) || ms < 0) return;
+        bucket.count += 1;
+        bucket.totalMs += ms;
+        bucket.lastMs = ms;
+        if (ms > bucket.maxMs) bucket.maxMs = ms;
+    }
+
+    function avg(total, count) {
+        return count > 0 ? total / count : 0;
+    }
+
+    function snapshot() {
+        const rendererPerf = (typeof window !== "undefined" && window.rendererPerf) ? window.rendererPerf : null;
+        return {
+            enabled,
+            frame: {
+                count: stats.frame.count,
+                avgMs: avg(stats.frame.totalMs, stats.frame.count),
+                maxMs: stats.frame.maxMs,
+                lastMs: stats.frame.lastMs
+            },
+            render: {
+                count: stats.render.count,
+                avgMs: avg(stats.render.totalMs, stats.render.count),
+                maxMs: stats.render.maxMs,
+                lastMs: stats.render.lastMs
+            },
+            setupQueue: {
+                count: stats.setupQueue.count,
+                avgMs: avg(stats.setupQueue.totalMs, stats.setupQueue.count),
+                maxMs: stats.setupQueue.maxMs,
+                lastMs: stats.setupQueue.lastMs
+            },
+            queue: {
+                lastDepth: stats.queue.lastDepth,
+                maxDepth: stats.queue.maxDepth,
+                eventDelayAvgMs: avg(stats.queueDelay.totalMs, stats.queueDelay.count),
+                eventDelayMaxMs: stats.queueDelay.maxMs,
+                eventDelaySamples: stats.queueDelay.count
+            },
+            eventDispatch: {
+                count: stats.eventDispatch.count,
+                avgMs: avg(stats.eventDispatch.totalMs, stats.eventDispatch.count),
+                maxMs: stats.eventDispatch.maxMs,
+                lastMs: stats.eventDispatch.lastMs
+            },
+            hitTest: {
+                count: stats.hitTest.count,
+                avgMs: avg(stats.hitTest.totalMs, stats.hitTest.count),
+                maxMs: stats.hitTest.maxMs,
+                hitCount: stats.hitTest.hitCount,
+                avgCandidates: avg(stats.hitTest.totalCandidates, stats.hitTest.count),
+                maxCandidates: stats.hitTest.maxCandidates
+            },
+            pickup: {
+                attempts: stats.pickup.attempts,
+                successful: stats.pickup.successful,
+                acquireAvgMs: avg(stats.pickup.totalAcquireMs, stats.pickup.attempts),
+                acquireMaxMs: stats.pickup.maxAcquireMs,
+                firstMoveLagAvgMs: avg(stats.pickup.firstMoveLagTotalMs, stats.pickup.firstMoveSamples),
+                firstMoveLagMaxMs: stats.pickup.firstMoveLagMaxMs,
+                firstMoveLagSamples: stats.pickup.firstMoveSamples
+            },
+            dragMove: {
+                count: stats.dragMove.count,
+                avgMs: avg(stats.dragMove.totalMs, stats.dragMove.count),
+                maxMs: stats.dragMove.maxMs,
+                lastMs: stats.dragMove.lastMs
+            },
+            rendererPerf
+        };
+    }
+
+    function printSnapshot() {
+        const snap = snapshot();
+        if (typeof console !== "undefined" && console.log) {
+            console.log("[jigsawPerf] snapshot", snap);
+        }
+        return snap;
+    }
+
+    function stopConsoleReporter() {
+        if (reporterTimer) {
+            clearInterval(reporterTimer);
+            reporterTimer = null;
+        }
+    }
+
+    function startConsoleReporter(intervalMs = 1000) {
+        stopConsoleReporter();
+        reporterTimer = setInterval(() => {
+            printSnapshot();
+        }, Math.max(250, intervalMs | 0));
+    }
+
+    return {
+        nowMs,
+        reset,
+        setEnabled(value) {
+            enabled = !!value;
+            return enabled;
+        },
+        isEnabled() {
+            return enabled;
+        },
+        recordFrame(ms) {
+            recordBucket(stats.frame, ms);
+        },
+        recordRender(ms) {
+            recordBucket(stats.render, ms);
+        },
+        recordSetupQueue(ms) {
+            recordBucket(stats.setupQueue, ms);
+        },
+        recordEventDispatch(ms) {
+            recordBucket(stats.eventDispatch, ms);
+        },
+        recordQueueDelay(ms) {
+            recordBucket(stats.queueDelay, ms);
+        },
+        markQueueDepth(depth) {
+            if (!enabled) return;
+            if (!Number.isFinite(depth)) return;
+            const d = depth | 0;
+            stats.queue.lastDepth = d;
+            if (d > stats.queue.maxDepth) stats.queue.maxDepth = d;
+        },
+        recordDragMove(ms) {
+            recordBucket(stats.dragMove, ms);
+        },
+        recordHitTest(ms, candidates, hit) {
+            if (!enabled) return;
+            if (Number.isFinite(ms) && ms >= 0) {
+                stats.hitTest.count += 1;
+                stats.hitTest.totalMs += ms;
+                if (ms > stats.hitTest.maxMs) stats.hitTest.maxMs = ms;
+            }
+            if (Number.isFinite(candidates) && candidates >= 0) {
+                stats.hitTest.totalCandidates += candidates;
+                if (candidates > stats.hitTest.maxCandidates) stats.hitTest.maxCandidates = candidates;
+            }
+            if (hit) stats.hitTest.hitCount += 1;
+        },
+        recordPickupAcquire(ms, found) {
+            if (!enabled) return;
+            if (!Number.isFinite(ms) || ms < 0) return;
+            stats.pickup.attempts += 1;
+            stats.pickup.totalAcquireMs += ms;
+            if (ms > stats.pickup.maxAcquireMs) stats.pickup.maxAcquireMs = ms;
+            if (found) stats.pickup.successful += 1;
+        },
+        beginPickup(now = nowMs()) {
+            if (!enabled) return;
+            stats.pickup.pendingStartMs = now;
+            stats.pickup.awaitingFirstMove = true;
+        },
+        recordFirstMove(now = nowMs()) {
+            if (!enabled) return;
+            if (!stats.pickup.awaitingFirstMove) return;
+            const lag = Math.max(0, now - (stats.pickup.pendingStartMs || now));
+            stats.pickup.awaitingFirstMove = false;
+            stats.pickup.pendingStartMs = 0;
+            stats.pickup.firstMoveSamples += 1;
+            stats.pickup.firstMoveLagTotalMs += lag;
+            if (lag > stats.pickup.firstMoveLagMaxMs) stats.pickup.firstMoveLagMaxMs = lag;
+        },
+        cancelPendingPickup() {
+            stats.pickup.awaitingFirstMove = false;
+            stats.pickup.pendingStartMs = 0;
+        },
+        snapshot,
+        printSnapshot,
+        startConsoleReporter,
+        stopConsoleReporter
+    };
+})();
+window.jigsawRuntime.perf = window.jigsawPerf;
 
 var bevel_size = localStorage.getItem("option_bevel_2");
 if (bevel_size === null) bevel_size = 0.1;
@@ -99,10 +341,104 @@ try {
     const storedColor = localStorage.getItem("dropLocationColor");
     if (storedColor && /^#[0-9A-Fa-f]{3}$/.test(storedColor)) viewState.dropLocationColor = storedColor;
 } catch (_e) {}
+try {
+    const savedZoom = localStorage.getItem("viewEnableZoom");
+    if (savedZoom !== null) viewState.enableZoom = savedZoom === "true";
+} catch (_e) {}
+try {
+    const savedPan = localStorage.getItem("viewEnablePan");
+    if (savedPan !== null) viewState.enablePan = savedPan === "true";
+} catch (_e) {}
+try {
+    const savedScaling = localStorage.getItem("viewEnableScaling");
+    if (savedScaling !== null) viewState.enableScaling = savedScaling === "true";
+} catch (_e) {}
+try {
+    const savedPanBtn = localStorage.getItem("viewPanButton");
+    if (savedPanBtn !== null) {
+        const pb = parseInt(savedPanBtn, 10);
+        if (!isNaN(pb) && pb >= 0 && pb <= 2) viewState.panButton = pb;
+    }
+} catch (_e) {}
+try {
+    const savedZoomSen = localStorage.getItem("viewZoomSensitivity");
+    if (savedZoomSen !== null) {
+        const zs = parseFloat(savedZoomSen);
+        if (!isNaN(zs)) viewState.zoomSensitivity = Math.max(0.2, Math.min(3, zs));
+    }
+} catch (_e) {}
+try {
+    const savedPanSen = localStorage.getItem("viewPanSensitivity");
+    if (savedPanSen !== null) {
+        const ps = parseFloat(savedPanSen);
+        if (!isNaN(ps)) viewState.panSensitivity = Math.max(0.2, Math.min(3, ps));
+    }
+} catch (_e) {}
 window.viewState = viewState;
+
+const displayPrefs = {
+    backgroundColor: "#DD9",
+    feltOpacity: 0.5,
+    playAreaRadius: 64,
+    heldPieceShadowDarkness: 0.35
+};
+try {
+    const bg = localStorage.getItem("backgroundColor");
+    if (bg !== null && typeof bg === "string" && bg.length >= 4) displayPrefs.backgroundColor = bg;
+} catch (_e) {}
+try {
+    const felt = localStorage.getItem("feltOpacity");
+    if (felt !== null) {
+        const v = parseFloat(felt);
+        if (!isNaN(v)) displayPrefs.feltOpacity = Math.max(0, Math.min(1, v));
+    }
+} catch (_e) {}
+try {
+    const radius = localStorage.getItem("playAreaRadius");
+    if (radius !== null) {
+        const v = parseInt(radius, 10);
+        if (!isNaN(v)) displayPrefs.playAreaRadius = Math.max(8, Math.min(256, v));
+    }
+} catch (_e) {}
+try {
+    const shadow = localStorage.getItem("heldPieceShadowDarkness");
+    if (shadow !== null) {
+        const v = parseFloat(shadow);
+        if (!isNaN(v)) displayPrefs.heldPieceShadowDarkness = Math.max(0, Math.min(1, v));
+    }
+} catch (_e) {}
+window.displayPrefs = displayPrefs;
+
+function applyDisplayPreferences(container) {
+    if (!container) return;
+    container.style.backgroundColor = displayPrefs.backgroundColor;
+    container.style.setProperty("--felt-opacity", String(displayPrefs.feltOpacity));
+    container.style.setProperty("--play-area-radius", displayPrefs.playAreaRadius + "px");
+    container.style.setProperty("--held-piece-shadow-darkness", String(displayPrefs.heldPieceShadowDarkness));
+}
+window.applyDisplayPreferences = applyDisplayPreferences;
 
 function getPuzzleResolution() {
     return viewState.puzzleResolution || "1080p";
+}
+
+const MIN_RESIZE_WIDTH = 100;
+const MIN_RESIZE_HEIGHT = 100;
+const MAX_RESIZE_RETRIES = 20;
+
+function maybeOnResize(puzzle, facade, retryCount) {
+    if (!puzzle || !facade) return;
+    puzzle.getContainerSize();
+    const w = puzzle.contWidth;
+    const h = puzzle.contHeight;
+    if (typeof w === "number" && typeof h === "number" && w >= MIN_RESIZE_WIDTH && h >= MIN_RESIZE_HEIGHT) {
+        facade.onResize(w, h);
+        return;
+    }
+    const count = typeof retryCount === "number" ? retryCount : 0;
+    if (count < MAX_RESIZE_RETRIES) {
+        requestAnimationFrame(() => maybeOnResize(puzzle, facade, count + 1));
+    }
 }
 
 function getDropPositionPixels(puz, scatterFraction) {
@@ -205,21 +541,26 @@ function getBaseScaleMultiplier() {
 }
 
 function getEffectivePuzzleAreaAspectRatio(srcImage) {
-    const mode = window.puzzleAreaScale;
-    if (mode === "Landscape") return 16 / 9;
-    if (mode === "Portrait") return 9 / 16;
-    if (mode === "Square") return 1;
-    if (mode === "Picture") {
+    // Workspace aspect ratio: use puzzle image aspect only when "Picture" is selected;
+    // otherwise use a fixed aspect ratio. This does not change the puzzle's own aspect ratio.
+    const scale = window.puzzleAreaScale || "Landscape";
+    if (scale === "Picture") {
         if (window.useCanonicalAspectForLayout && window.canonicalPictureAspectRatio != null && Number.isFinite(window.canonicalPictureAspectRatio)) {
             return window.canonicalPictureAspectRatio;
         }
         if (srcImage) {
-            const nw = srcImage.naturalWidth | 0;
-            const nh = srcImage.naturalHeight | 0;
+            const nw = (srcImage.naturalWidth | 0) || (srcImage.videoWidth | 0) || (srcImage.width | 0);
+            const nh = (srcImage.naturalHeight | 0) || (srcImage.videoHeight | 0) || (srcImage.height | 0);
             if (nw > 0 && nh > 0) return nw / nh;
         }
+        return 16 / 9;
     }
-    return 16 / 9;
+    switch (scale) {
+        case "Portrait": return 9 / 16;
+        case "Square": return 1;
+        case "Landscape":
+        default: return 16 / 9;
+    }
 }
 
 function getZoomedViewScaleMultiplier() {
@@ -600,18 +941,8 @@ class PolyPiece {
         this.withdrawn = false;
         this.rot = 0;
 
-        const overlayRendererActive = typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.activeRenderer &&
-            (rendererFacade.activeRenderer.constructor.name === "CanvasRenderer" || rendererFacade.activeRenderer.constructor.name === "WebGLRenderer");
-        if (overlayRendererActive) {
-            this.polypiece_canvas = null;
-            this.polypiece_ctx = null;
-        } else {
-            this.polypiece_canvas = document.createElement('CANVAS');
-            puzzle.container.appendChild(this.polypiece_canvas);
-            this.polypiece_canvas.classList.add('polypiece');
-            this.polypiece_canvas.style.display = "none";
-            this.polypiece_ctx = this.polypiece_canvas.getContext("2d");
-        }
+        this.polypiece_canvas = null;
+        this.polypiece_ctx = null;
     } // PolyPiece
 
     // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -   -
@@ -645,11 +976,6 @@ class PolyPiece {
         // remove otherPoly from list of polypieces
         const kOther = this.puzzle.polyPieces.indexOf(otherPoly);
         this.puzzle.polyPieces.splice(kOther, 1);
-
-        // Keep old pieces visible until merged canvas has rendered.
-        if (otherPoly.polypiece_canvas) {
-            otherPoly.polypiece_canvas.style.pointerEvents = "none";
-        }
 
         let forceRedraw = false;
         for (let k = 0; k < otherPoly.pieces.length; ++k) {
@@ -721,15 +1047,10 @@ class PolyPiece {
 
         queuePolyPieceSetup(this, !forceRedraw, true, () => {
             this.moveTo(targetX, targetY);
-            if (otherPoly.polypiece_canvas && this.puzzle.container.contains(otherPoly.polypiece_canvas)) {
-                this.puzzle.container.removeChild(otherPoly.polypiece_canvas);
-            }
-            // Merged piece gets the furthest-back z of the two (no full evaluateZIndex)
-            const za = (this._zIndex != null) ? this._zIndex : (Number(this.polypiece_canvas && this.polypiece_canvas.style.zIndex) || 0);
-            const zb = (otherPoly._zIndex != null) ? otherPoly._zIndex : (Number(otherPoly.polypiece_canvas && otherPoly.polypiece_canvas.style.zIndex) || 0);
+            const za = (this._zIndex != null) ? this._zIndex : 0;
+            const zb = (otherPoly._zIndex != null) ? otherPoly._zIndex : 0;
             const minZ = Math.min(za, zb);
             this._zIndex = minZ;
-            if (this.polypiece_canvas) this.polypiece_canvas.style.zIndex = minZ;
             this.puzzle._zOrderVersion = (this.puzzle._zOrderVersion || 0) + 1;
         });
 
@@ -765,48 +1086,30 @@ class PolyPiece {
         }
 
         // this and otherPoly are in good relative position, have they a common side ?
-        let neighs = [];
+        const otherIndices = new Set(otherPoly.pieces.map(p => p.index));
+        const hasNeighbor = (n) => n >= 0 && otherIndices.has(n);
         if (window.pieceSides == 6) {
             for (let k = this.pieces.length - 1; k >= 0; --k) {
                 let p1 = this.pieces[k].index;
                 let col = (p1 % apnx === 0) ? apnx : (p1 % apnx);
-                neighs.push(p1 + apnx);
-                neighs.push(p1 - apnx);
-                if (col != 1){
-                    if(col % 2 == 1) { // note starts at 1 so not the % you would expect
-                        neighs.push(p1 - 1 - apnx);
-                    }else{
-                        neighs.push(p1 - 1 + apnx);
-                    }
-                    neighs.push(p1 - 1);
+                if (hasNeighbor(p1 + apnx) || hasNeighbor(p1 - apnx)) return true;
+                if (col != 1) {
+                    if (col % 2 == 1) { if (hasNeighbor(p1 - 1 - apnx) || hasNeighbor(p1 - 1)) return true; }
+                    else { if (hasNeighbor(p1 - 1 + apnx) || hasNeighbor(p1 - 1)) return true; }
                 }
-                if (col != apnx){
-                    if( col % 2 == 1) {
-                        neighs.push(p1 + 1 - apnx);
-                    }else{
-                        neighs.push(p1 + 1 + apnx);
-                    }
-                    neighs.push(p1 + 1);
+                if (col != apnx) {
+                    if (col % 2 == 1) { if (hasNeighbor(p1 + 1 - apnx) || hasNeighbor(p1 + 1)) return true; }
+                    else { if (hasNeighbor(p1 + 1 + apnx) || hasNeighbor(p1 + 1)) return true; }
                 }
             }
-        }else{
+        } else {
             for (let k = this.pieces.length - 1; k >= 0; --k) {
                 let p1 = this.pieces[k].index;
-                neighs.push(p1 + apnx);
-                neighs.push(p1 - apnx);
-                if (p1 % apnx != 1) neighs.push(p1 - 1);
-                if (p1 % apnx != 0) neighs.push(p1 + 1);
+                if (hasNeighbor(p1 + apnx) || hasNeighbor(p1 - apnx)) return true;
+                if (p1 % apnx != 1 && hasNeighbor(p1 - 1)) return true;
+                if (p1 % apnx != 0 && hasNeighbor(p1 + 1)) return true;
             }
         }
-
-        neighs = neighs.filter(n => n >= 0);
-        
-        if (neighs.some(neigh => otherPoly.pieces.some(piece => piece.index === neigh))) {
-            return true;
-        }
-
-        // nothing matches
-
         return false;
 
     } // ifNear
@@ -828,12 +1131,11 @@ class PolyPiece {
     */
 
     listLoops() {
-        // internal : checks if an edge given by kx, ky is common with another cell
-        // returns true or false
+        const cellSet = new Set(this.pieces.map(p => `${p.kx},${p.ky}`));
         const that = this;
         function edgeIsCommon(kx, ky, edge) {
-            let ogkx = kx; // original kx
-            let ogky = ky; // original ky
+            let ogkx = kx;
+            let ogky = ky;
             let k;
             if(window.pieceSides == 6) {
                 switch (edge) {
@@ -884,13 +1186,7 @@ class PolyPiece {
                     case 3: kx--; break; // left edge
                 } // switch
             }
-            // console.log("final", kx, ky);
-            for (k = 0; k < that.pieces.length; k++) {
-                if (kx == that.pieces[k].kx && ky == that.pieces[k].ky) {
-                    return true; // we found the neighbor
-                }
-            }
-            return false; // not a common edge
+            return cellSet.has(`${kx},${ky}`);
         } // function edgeIsCommon
 
         // -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -1047,12 +1343,6 @@ class PolyPiece {
         this.nx = this.pckxmax - this.pckxmin + 1;
         this.ny = this.pckymax - this.pckymin + 1;
 
-        if (this.polypiece_canvas && !ignoreRedraw) {
-            this.polypiece_canvas.width = this.nx * puzzle.scalex;  // make canvas big enough to fit all pieces
-            this.polypiece_canvas.height = this.ny * puzzle.scaley;
-        }
-
-
         // difference between position in this canvas and position in gameImage
 
         this.offsx = (this.pckxmin - 0.5) * puzzle.scalex;
@@ -1088,18 +1378,6 @@ class PolyPiece {
             }
         }
 
-        const rendererReady = !!(
-            rendererFacade &&
-            rendererFacade.activeRenderer &&
-            rendererFacade.activeRenderer.enabled &&
-            rendererFacade.activeRenderer.canvas &&
-            rendererFacade.activeRenderer.canvas.parentElement
-        );
-        const activeRendererName = rendererReady && rendererFacade.activeRenderer && rendererFacade.activeRenderer.constructor
-            ? rendererFacade.activeRenderer.constructor.name
-            : "";
-        const canvas2dActive = activeRendererName === "CanvasRenderer";
-        const webglActive = activeRendererName === "WebGLRenderer";
         const w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
         const h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
         // drawParams dx/dy are already applied when source media is rendered into gameCanvas.
@@ -1113,45 +1391,11 @@ class PolyPiece {
             h
         };
 
-        // In single-canvas 2D mode, keep per-piece canvases as overlay/path data only.
-        // Other paths still draw media pixels into each piece canvas.
-        if (!canvas2dActive && !webglActive && this.polypiece_ctx) {
-            this._drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty);
-        }
-
         this._overlayVersion = (this._overlayVersion || 0) + 1;
-        if (this.polypiece_canvas) {
-            // Keep only overlay/hit-test data on piece canvases for renderer-backed modes.
-            this.polypiece_canvas.style.backgroundImage = "none";
-            this.polypiece_canvas.style.maskImage = "none";
-            this.polypiece_canvas.style.webkitMaskImage = "none";
-            this._drawOverlayOnly(puzzle, canvas2dActive || webglActive);
-            if (webglActive) this._ensureWebGLMaskCanvas();
-            this.polypiece_canvas.style.display = rendererReady ? "none" : "block";
-        }
         if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(this);
         return;
 
     } // PolyPiece.polypiece_drawImage
-
-    _drawPiecePixelsFromGameCanvas(puzzle, srcx, srcy, destx, desty) {
-        const w = puzzle.scalex * (1 + this.pckxmax - this.pckxmin);
-        const h = puzzle.scaley * (1 + this.pckymax - this.pckymin);
-        const sx = srcx;
-        const sy = srcy;
-        this._mediaSample = { sx, sy, destx, desty, w, h };
-
-        this.polypiece_ctx.setTransform(1, 0, 0, 1, 0, 0);
-        this.polypiece_ctx.clearRect(0, 0, this.polypiece_canvas.width, this.polypiece_canvas.height);
-        this.polypiece_ctx.save();
-        this.polypiece_ctx.clip(this.path);
-        this.polypiece_ctx.drawImage(
-            puzzle.gameCanvas,
-            sx, sy, w, h,
-            destx, desty, w, h
-        );
-        this.polypiece_ctx.restore();
-    }
 
     _drawOverlayOnly(puz, clearCanvas = true) {
         if (!this.polypiece_ctx || !this.polypiece_canvas) return;
@@ -1160,37 +1404,20 @@ class PolyPiece {
             this.polypiece_ctx.clearRect(0, 0, this.polypiece_canvas.width, this.polypiece_canvas.height);
         }
 
-        const borders = apnx * apny < 150 && bevel_size > 0;
+        const borders = bevel_size > 0;
         const embth = puz.scalex * 0.01 * bevel_size;
         const worldLight = this._worldToPieceLocal(embth / 2, -embth / 2);
 
         if (borders) {
-            this.pieces.forEach((pp, kk) => {
-                this.polypiece_ctx.save();
-
-                const path = new Path2D();
-                const shiftx = -this.offsx;
-                const shifty = -this.offsy;
-                pp.sides.forEach((side, i) => {
-                    if (i === 0) {
-                        side.drawPath(path, shiftx, shifty, false);
-                    } else {
-                        side.drawPath(path, shiftx, shifty, true);
-                    }
-                });
-                path.closePath();
-
-                this.polypiece_ctx.clip(path);
-                this.polypiece_ctx.translate(worldLight.x, worldLight.y);
-                this.polypiece_ctx.lineWidth = embth;
-                this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-                this.polypiece_ctx.stroke(path);
-                this.polypiece_ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
-                this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-                this.polypiece_ctx.stroke(path);
-
-                this.polypiece_ctx.restore();
-            });
+            this.polypiece_ctx.save();
+            this.polypiece_ctx.translate(worldLight.x, worldLight.y);
+            this.polypiece_ctx.lineWidth = embth;
+            this.polypiece_ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+            this.polypiece_ctx.stroke(this.path);
+            this.polypiece_ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
+            this.polypiece_ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+            this.polypiece_ctx.stroke(this.path);
+            this.polypiece_ctx.restore();
         }
 
         if (this.hinted) {
@@ -1203,37 +1430,20 @@ class PolyPiece {
     /** Draw overlay (borders + hint) to an arbitrary 2D context. ctx must already be in piece-local space (0,0) to (w,h); do not reset transform. Caller may clear first if needed. */
     drawOverlayToContext(ctx, w, h, puz) {
         if (!ctx || !this.path) return;
-        const borders = apnx * apny < 150 && bevel_size > 0;
+        const borders = bevel_size > 0;
         const embth = puz.scalex * 0.01 * bevel_size;
         const worldLight = this._worldToPieceLocal(embth / 2, -embth / 2);
 
         if (borders) {
-            this.pieces.forEach((pp, kk) => {
-                ctx.save();
-
-                const path = new Path2D();
-                const shiftx = -this.offsx;
-                const shifty = -this.offsy;
-                pp.sides.forEach((side, i) => {
-                    if (i === 0) {
-                        side.drawPath(path, shiftx, shifty, false);
-                    } else {
-                        side.drawPath(path, shiftx, shifty, true);
-                    }
-                });
-                path.closePath();
-
-                ctx.clip(path);
-                ctx.translate(worldLight.x, worldLight.y);
-                ctx.lineWidth = embth;
-                ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-                ctx.stroke(path);
-                ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-                ctx.stroke(path);
-
-                ctx.restore();
-            });
+            ctx.save();
+            ctx.translate(worldLight.x, worldLight.y);
+            ctx.lineWidth = embth;
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+            ctx.stroke(this.path);
+            ctx.translate(-2 * worldLight.x, -2 * worldLight.y);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+            ctx.stroke(this.path);
+            ctx.restore();
         }
 
         if (this.hinted) {
@@ -1273,12 +1483,7 @@ class PolyPiece {
     }
 
     _applyPieceTransform() {
-        if (!this.polypiece_canvas) return;
-        const el = this.polypiece_canvas;
-        el.style.left = "0";
-        el.style.top = "0";
-        const rotamount = (window.rotations === 180) ? 90 : (window.rotations || 0);
-        el.style.transform = `translate(${this.x}px, ${this.y}px) rotate(${(this.rot || 0) * rotamount}deg)`;
+        // No per-piece canvas; transform is applied by the renderer when drawing.
     }
 
     moveTo(x, y) {
@@ -1385,7 +1590,7 @@ class Puzzle {
         this._releaseHandled = false;
         this.handleLeave = () => {
             this._releaseHandled = false;
-            events.push({ event: 'leave' });
+            queueGameEvent({ event: 'leave' });
         };
 
         /* the following code will add the event Handlers several times if
@@ -1394,7 +1599,7 @@ class Puzzle {
         */
         this.container.addEventListener("mousedown", event => {
             event.preventDefault();
-            events.push({ event: 'touch', button: event.button, position: this.relativeMouseCoordinates(event) });
+            queueGameEvent({ event: 'touch', button: event.button, position: this.relativeMouseCoordinates(event) });
 
         });
         this.container.addEventListener("contextmenu", event => {
@@ -1407,7 +1612,7 @@ class Puzzle {
             }
             if (event.touches.length != 1) return;
             let ev = event.touches[0];
-            events.push({ event: 'touch', button: 0, position: this.relativeMouseCoordinates(ev) });
+            queueGameEvent({ event: 'touch', button: 0, position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
         this._boundMouseUp = (event) => {
@@ -1453,7 +1658,7 @@ class Puzzle {
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
             
-            events.push({ event: 'move', button: event.button, position: this.relativeMouseCoordinates(event) })
+            queueGameEvent({ event: 'move', button: event.button, position: this.relativeMouseCoordinates(event) });
         });
         this.container.addEventListener("touchmove", event => {
             event.preventDefault();
@@ -1462,7 +1667,7 @@ class Puzzle {
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
             // console.log("touch", event.offsetX, event.offsetY, event)
-            events.push({ event: 'move', button: 0, position: this.relativeMouseCoordinates(ev) });
+            queueGameEvent({ event: 'move', button: 0, position: this.relativeMouseCoordinates(ev) });
         }, { passive: false });
 
         /* create canvas to contain picture - will be styled later */
@@ -1528,6 +1733,63 @@ class Puzzle {
         this.container.style.width = contWidth + 'px';
         this.container.style.height = contHeight + 'px';
         this.getContainerSize();
+    }
+
+    _getSourceDimensions(source) {
+        if (!source) return { w: 0, h: 0 };
+        const w = (source.naturalWidth | 0) || (source.videoWidth | 0) || (source.width | 0) || 0;
+        const h = (source.naturalHeight | 0) || (source.videoHeight | 0) || (source.height | 0) || 0;
+        return { w, h };
+    }
+
+    _getUniformTargetAspect(fallbackAspect) {
+        const safeFallback = (Number.isFinite(fallbackAspect) && fallbackAspect > 0) ? fallbackAspect : (16 / 9);
+        if (!window.make_pieces_square) return safeFallback;
+        if (window.pieceSides === 6) {
+            // Regular hex geometry: scalex/scaley should follow sqrt(3)/2 when uniform size is enabled.
+            const hexExtentX = this.nx + 7 / 6;
+            const hexExtentY = this.ny + 5 / 6;
+            if (hexExtentX > 0 && hexExtentY > 0) return (hexExtentX * (Math.sqrt(3) / 2)) / hexExtentY;
+            return safeFallback;
+        }
+        if (this.nx > 0 && this.ny > 0) return this.nx / this.ny;
+        return safeFallback;
+    }
+
+    _buildDrawParamsForSource(sourceW, sourceH, destW, destH, cropToFit) {
+        const sw = Math.max(1, sourceW | 0);
+        const sh = Math.max(1, sourceH | 0);
+        const dw = Math.max(1, destW | 0);
+        const dh = Math.max(1, destH | 0);
+        const params = {
+            sx: 0,
+            sy: 0,
+            sw,
+            sh,
+            dx: 0,
+            dy: 0,
+            dw,
+            dh,
+            sourceW: sw,
+            sourceH: sh
+        };
+        if (!cropToFit) return params;
+        const srcAspect = sw / sh;
+        const dstAspect = dw / dh;
+        if (!Number.isFinite(srcAspect) || !Number.isFinite(dstAspect) || srcAspect <= 0 || dstAspect <= 0) return params;
+        if (Math.abs(srcAspect - dstAspect) < 1e-6) return params;
+        if (srcAspect > dstAspect) {
+            // Source too wide: crop left/right.
+            const cropW = Math.max(1, Math.round(sh * dstAspect));
+            params.sx = Math.max(0, Math.round((sw - cropW) / 2));
+            params.sw = Math.min(cropW, sw);
+        } else {
+            // Source too tall: crop top/bottom.
+            const cropH = Math.max(1, Math.round(sw / dstAspect));
+            params.sy = Math.max(0, Math.round((sh - cropH) / 2));
+            params.sh = Math.min(cropH, sh);
+        }
+        return params;
     }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1649,6 +1911,7 @@ class Puzzle {
 
     defineShapes(shapeDesc) {
         // define shapes as if the width and height of a piece were 1
+        const shapeVal = parseInt(document.getElementById("shape").value, 10) || 1;
 
         /* first, place the corners of the pieces
             at some distance of their theoretical position, except for edges
@@ -1656,9 +1919,9 @@ class Puzzle {
         let np;
 
         if(window.pieceSides == 6){
-            this.corners_and_sides_6(shapeDesc);
+            this.corners_and_sides_6(shapeDesc, shapeVal);
         }else{
-            this.corners_and_sides_4(shapeDesc);
+            this.corners_and_sides_4(shapeDesc, shapeVal);
         }
 
         if(window.fake_pieces_mimic.length >= 1){
@@ -1679,7 +1942,7 @@ class Puzzle {
 
     } // Puzzle.defineShapes
 
-    corners_and_sides_4(shapeDesc) {
+    corners_and_sides_4(shapeDesc, shapeVal) {
 
         let { coeffDecentr, twistf } = shapeDesc;
         const corners = [];
@@ -1689,11 +1952,10 @@ class Puzzle {
         for (let ky = -1; ky <= ny+1; ++ky) {
             corners[ky] = [];
             for (let kx = -1; kx <= nx+1; ++kx) {
-                // Randomize coeffDecentr between 0 and 0.5 for each piece
-                if(document.getElementById("shape").value == 6){
+                if (shapeVal == 6) {
                     coeffDecentr = randomIn(ky * nx + kx + 1 + 1) * .5;
                 }
-                if(document.getElementById("shape").value == 5){
+                if (shapeVal == 5) {
                     coeffDecentr = 0;
                 }
                 corners[ky][kx] = new Point(kx + alea(-coeffDecentr, coeffDecentr),
@@ -1710,9 +1972,8 @@ class Puzzle {
         for (let ky = 0; ky < ny; ++ky) {
             this.pieces[ky] = [];
             for (let kx = 0; kx < nx; ++kx) {
-                // Randomly select a twist function for this piece
-                if(document.getElementById("shape").value == 6){
-                    let twistFunctions = [twist0, twist1, twist2, twist3];
+                if (shapeVal == 6) {
+                    const twistFunctions = [twist0, twist1, twist2, twist3];
                     twistf = twistFunctions[Math.floor(randomIn(ky * nx + kx + 1) * twistFunctions.length)];
                 }
                 this.pieces[ky][kx] = np = new Piece(kx, ky, ky * nx + kx + 1);
@@ -1753,8 +2014,7 @@ class Puzzle {
     }
 
     
-    corners_and_sides_6(shapeDesc) {
-
+    corners_and_sides_6(shapeDesc, shapeVal) {
 
         let { coeffDecentr, twistf } = shapeDesc;
         const corners = [];
@@ -1763,10 +2023,10 @@ class Puzzle {
         for (let ky = -1; ky <= 2*ny+2; ++ky) {
             corners[ky] = [];
             for (let kx = -1; kx <= nx+2; ++kx) {
-                if(document.getElementById("shape").value == 6){
+                if (shapeVal == 6) {
                     coeffDecentr = randomIn(ky * nx + kx + 1 + 1) * .5;
                 }
-                if(document.getElementById("shape").value == 5){
+                if (shapeVal == 5) {
                     coeffDecentr = 0;
                 }
                 if(ky % 2 == 0){
@@ -1798,8 +2058,8 @@ class Puzzle {
         }
         for (let kx = 0; kx < nx; ++kx) {
             for (let ky = 0; ky < ny; ++ky) {
-                if(document.getElementById("shape").value == 6){
-                    let twistFunctions = [twist0, twist1, twist2, twist3];
+                if (shapeVal == 6) {
+                    const twistFunctions = [twist0, twist1, twist2, twist3];
                     twistf = twistFunctions[Math.floor(randomIn(ky * nx + kx + 1) * twistFunctions.length)];
                 }
                 const upy = (kx % 2 == 1) ? 1 : 0; // offset for odd columns
@@ -1903,18 +2163,17 @@ class Puzzle {
 
         if (this.srcImage) {
             this.sizeContainerByAspectRatio(aspectRatio);
-            const sqrtMultiplier = Math.sqrt(window.PUZZLE_AREA_SURFACE_MULTIPLIER || 1.25);
-            const availableW = this.contWidth / sqrtMultiplier;
-            const availableH = this.contHeight / sqrtMultiplier;
-            const nw = this.srcImage.naturalWidth | 0;
-            const nh = this.srcImage.naturalHeight | 0;
-            const imageAspect = (nw > 0 && nh > 0) ? (nw / nh) : aspectRatio;
-            if (availableW / availableH > imageAspect) {
+            const availableW = this.contWidth;
+            const availableH = this.contHeight;
+            const { w: srcW0, h: srcH0 } = this._getSourceDimensions(this.srcImage);
+            const imageAspect = (srcW0 > 0 && srcH0 > 0) ? (srcW0 / srcH0) : aspectRatio;
+            const contentAspect = this._getUniformTargetAspect(imageAspect);
+            if (availableW / availableH > contentAspect) {
                 this.gameHeight = availableH;
-                this.gameWidth = availableH * imageAspect;
+                this.gameWidth = availableH * contentAspect;
             } else {
                 this.gameWidth = availableW;
-                this.gameHeight = availableW / imageAspect;
+                this.gameHeight = availableW / contentAspect;
             }
         } else {
             this.getContainerSize();
@@ -1930,6 +2189,19 @@ class Puzzle {
         /* get a scaled copy of the source picture into a canvas */
         if (!Number.isFinite(this.gameWidth) || this.gameWidth <= 0) this.gameWidth = mmax(1, this.contWidth || 1);
         if (!Number.isFinite(this.gameHeight) || this.gameHeight <= 0) this.gameHeight = mmax(1, this.contHeight || 1);
+        /* store logical size before cap so display scale stays constant when only resolution preset changes */
+        this._logicalGameWidth = this.gameWidth;
+        this._logicalGameHeight = this.gameHeight;
+        /* cap internal resolution by puzzle resolution preset (same as render buffer cap) */
+        if (typeof getPuzzleResolution === "function" && typeof window.JigsawGetPuzzleResolutionMaxDimensions === "function") {
+            const preset = getPuzzleResolution();
+            const max = window.JigsawGetPuzzleResolutionMaxDimensions(preset);
+            if (max && max.maxW > 0 && max.maxH > 0) {
+                const scale = Math.min(max.maxW / this.gameWidth, max.maxH / this.gameHeight, 1);
+                this.gameWidth = mmax(1, Math.round(this.gameWidth * scale));
+                this.gameHeight = mmax(1, Math.round(this.gameHeight * scale));
+            }
+        }
         this.gameCanvas = document.createElement('CANVAS');
         this.gameCanvas.width = mmax(1, Math.round(this.gameWidth));
         this.gameCanvas.height = mmax(1, Math.round(this.gameHeight));
@@ -1945,12 +2217,35 @@ class Puzzle {
 
 
 
-        /* scale pieces */
-        this.scalex = window.downsize_to_fit * this.gameWidth / this.nx;    // average width of pieces, add zoom here
-        this.scaley = window.downsize_to_fit * this.gameHeight / this.ny;   // average height of pieces
+        /* scale pieces: use logical size for display so resolution preset only affects quality, not on-screen size */
+        // Display-only shrink factor (does not reduce gameCanvas resolution).
+        const rawAreaMultiplier = Number(window.PUZZLE_AREA_SURFACE_MULTIPLIER);
+        let areaScale = 1;
+        if (Number.isFinite(rawAreaMultiplier) && rawAreaMultiplier > 0) {
+            // Backward-compatible behavior:
+            // - multiplier > 1 : area/surface style shrink (per-axis = 1/sqrt(multiplier))
+            // - 0 < multiplier <= 1 : direct per-axis shrink (e.g. 0.9 => 10% workspace)
+            areaScale = (rawAreaMultiplier > 1) ? (1 / Math.sqrt(rawAreaMultiplier)) : rawAreaMultiplier;
+        }
+        const userScale = (Number(window.downsize_to_fit) > 0) ? Number(window.downsize_to_fit) : 1;
+        const pieceDisplayScale = Math.min(1, userScale * areaScale);
+        this.scalex = pieceDisplayScale * this._logicalGameWidth / this.nx;    // average width of pieces, add zoom here
+        this.scaley = pieceDisplayScale * this._logicalGameHeight / this.ny;   // average height of pieces
         this.diff_scalex = 0;
         this.diff_scaley = 0;
 
+        /* hexagonal: scale x/y independently from effective extents to preserve media aspect ratio
+           while keeping sampling in-bounds for the full hex footprint. */
+        if (window.pieceSides === 6) {
+            const hexExtentX = this.nx + 7 / 6;  // corner_to_shape_dist + fake-piece x offset
+            const hexExtentY = this.ny + 5 / 6;  // fake-piece y offset
+            const hexScaleX = pieceDisplayScale * (this._logicalGameWidth / hexExtentX);
+            const hexScaleY = pieceDisplayScale * (this._logicalGameHeight / hexExtentY);
+            this.diff_scalex = this.scalex - hexScaleX;
+            this.diff_scaley = this.scaley - hexScaleY;
+            this.scalex = hexScaleX;
+            this.scaley = hexScaleY;
+        }
 
         if(window.make_pieces_square){
             if(window.pieceSides == 4){
@@ -1962,42 +2257,36 @@ class Puzzle {
                 this.scaley = newy;
                 console.log("made pieces square scalex, scaley", this.scalex, this.scaley);
             }else{
-                let newx, newy, mmm;
-                if(this.scalex * Math.sqrt(3) < this.scaley * 2){
-                    mmm = this.scalex * Math.sqrt(3);
-                }else{
-                    mmm = this.scaley * Math.sqrt(3);
-                }
-                newx = mmm / 2;
-                newy = mmm / Math.sqrt(3);
-                this.diff_scalex = this.scalex - newx;
-                this.diff_scaley = this.scaley - newy;
-                this.scalex = newx;
-                this.scaley = newy;
-                console.log("made pieces square scalex, scaley (6)", this.scalex, this.scaley);
+                // For hex mode, forcing regular hex geometry here can distort media aspect.
+                // Keep the AR-preserving hex scales computed above.
+                console.log("kept hex scalex/scaley to preserve media aspect ratio", this.scalex, this.scaley);
             }
+        }
+
+        // Keep one canonical media content size for all sampling/conversion paths.
+        // Renderers and grayscale preview should convert from this same space.
+        if (window.pieceSides === 6) {
+            this._mediaContentWidth = (this.nx + 7 / 6) * this.scalex;
+            this._mediaContentHeight = (this.ny + 5 / 6) * this.scaley;
+        } else {
+            this._mediaContentWidth = this.nx * this.scalex;
+            this._mediaContentHeight = this.ny * this.scaley;
         }
 
         console.log(this.diff_scalex, this.gameWidth * window.downsize_to_fit * image_enlarge_x, this.nx)
 
-        // Keep media draw-space aligned with piece sample-space.
-        // Piece sampling uses coordinates derived from final scalex/scaley, so
-        // source media must be drawn from (0,0) with matching span.
-        this.drawParams = {
-            dx: 0,
-            dy: 0,
-            dw: this.scalex * this.nx * image_enlarge_x,
-            dh: this.scaley * this.ny * image_enlarge_y,
-          };
+        // Draw source into buffer at buffer size (gameWidth x gameHeight); display scale is from _logicalGame*.
+        const srcDims = this._getSourceDimensions(this.srcImage);
+        this.drawParams = this._buildDrawParamsForSource(
+            srcDims.w,
+            srcDims.h,
+            this.gameWidth,
+            this.gameHeight,
+            !!window.make_pieces_square
+        );
         this._gifDraw = this.drawParams;
 
-        this.gameCtx.drawImage(
-            this.srcImage, 
-            this.drawParams.dx, 
-            this.drawParams.dy, 
-            this.drawParams.dw, 
-            this.drawParams.dh
-        );
+        this.renderSourceToGameCanvas(this.srcImage);
         
 
         this.gameCanvas.classList.add("gameCanvas");
@@ -2006,9 +2295,12 @@ class Puzzle {
  
         
 
-        this.pieces.forEach(row => {
-            row.forEach(piece => piece.piece_scale(this));
-        }); // this.pieces.forEach, safe
+        if (Array.isArray(this.pieces)) {
+            this.pieces.forEach(row => {
+                if (!Array.isArray(row)) return;
+                row.forEach(piece => piece.piece_scale(this));
+            }); // this.pieces.forEach, safe
+        }
 
         /* calculate offset for centering image in container */
         this.offsx = (this.contWidth - this.gameWidth) / 2;
@@ -2018,6 +2310,39 @@ class Puzzle {
 
 
     } // Puzzle.scale
+
+    /** Updates only the internal buffer size from the current resolution preset; keeps display size (scalex/scaley) unchanged. */
+    applyResolutionPreset() {
+        if (this._logicalGameWidth == null || this._logicalGameHeight == null || !this.gameCanvas || !this.gameCtx) return;
+        if (!this.srcImage) return;
+        let w = this._logicalGameWidth;
+        let h = this._logicalGameHeight;
+        if (typeof getPuzzleResolution === "function" && typeof window.JigsawGetPuzzleResolutionMaxDimensions === "function") {
+            const preset = getPuzzleResolution();
+            const max = window.JigsawGetPuzzleResolutionMaxDimensions(preset);
+            if (max && max.maxW > 0 && max.maxH > 0) {
+                const scale = Math.min(max.maxW / w, max.maxH / h, 1);
+                w = mmax(1, Math.round(w * scale));
+                h = mmax(1, Math.round(h * scale));
+            }
+        }
+        this.gameWidth = w;
+        this.gameHeight = h;
+        this.gameCanvas.width = w;
+        this.gameCanvas.height = h;
+        const srcDims = this._getSourceDimensions(this.srcImage);
+        this.drawParams = this._buildDrawParamsForSource(
+            srcDims.w,
+            srcDims.h,
+            w,
+            h,
+            !!window.make_pieces_square
+        );
+        this._gifDraw = this.drawParams;
+        this.renderSourceToGameCanvas(this.srcImage);
+        this.offsx = (this.contWidth - this.gameWidth) / 2;
+        this.offsy = (this.contHeight - this.gameHeight) / 2;
+    }
 
     //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -2079,11 +2404,21 @@ class Puzzle {
             if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
             return;
         }
-        // re-assign zIndex (0-based piece index so no ties when sorting)
+        // Keep larger chunks behind smaller chunks while preserving prior order as much as possible.
+        // One backward pass is enough after a single merge, making this O(n).
+        for (let k = this.polyPieces.length - 1; k > 0; --k) {
+            const current = this.polyPieces[k];
+            const previous = this.polyPieces[k - 1];
+            const currentSize = (current && current.pieces) ? current.pieces.length : 0;
+            const previousSize = (previous && previous.pieces) ? previous.pieces.length : 0;
+            if (currentSize > previousSize) {
+                this.polyPieces[k] = previous;
+                this.polyPieces[k - 1] = current;
+            }
+        }
+        // Re-assign zIndex (0-based piece index so no ties when sorting).
         this.polyPieces.forEach((pp, k) => {
-            const z = k;
-            pp._zIndex = z;
-            if (pp.polypiece_canvas) pp.polypiece_canvas.style.zIndex = z;
+            pp._zIndex = k;
         });
         this._zOrderVersion = (this._zOrderVersion || 0) + 1;
         this._sortedPolyPiecesByZ = this.polyPieces.slice();
@@ -2094,11 +2429,22 @@ class Puzzle {
     renderSourceToGameCanvas(sourceOverride = null) {
         if (!this.gameCtx || !this._gifDraw) return;
       
-        const { dx, dy, dw, dh } = this._gifDraw;
+        const { sx, sy, sw, sh, dx, dy, dw, dh, sourceW, sourceH } = this._gifDraw;
         const source = sourceOverride || this.srcImage;
         if (!source) return;
+        const dims = this._getSourceDimensions(source);
+        const srcW = Math.max(1, dims.w || sourceW || 1);
+        const srcH = Math.max(1, dims.h || sourceH || 1);
+        const baseW = Math.max(1, sourceW || srcW);
+        const baseH = Math.max(1, sourceH || srcH);
+        const scaleX = srcW / baseW;
+        const scaleY = srcH / baseH;
+        const srcX = Math.max(0, Math.min(srcW - 1, Math.round((sx || 0) * scaleX)));
+        const srcY = Math.max(0, Math.min(srcH - 1, Math.round((sy || 0) * scaleY)));
+        const srcWDraw = Math.max(1, Math.min(srcW - srcX, Math.round((sw || baseW) * scaleX)));
+        const srcHDraw = Math.max(1, Math.min(srcH - srcY, Math.round((sh || baseH) * scaleY)));
         this.gameCtx.clearRect(0, 0, this.gameCanvas.width, this.gameCanvas.height);
-        this.gameCtx.drawImage(source, dx, dy, dw, dh);
+        this.gameCtx.drawImage(source, srcX, srcY, srcWDraw, srcHDraw, dx, dy, dw, dh);
       }
 
       applyMediaFrame(frameSource, nowMs) {
@@ -2114,9 +2460,6 @@ class Puzzle {
             this.renderSourceToGameCanvas(frameSource);
         }
         if ((viewState.showGrayscaleReference || viewState.showPreviewOutline) && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
-        if (activeRendererName !== "CanvasRenderer" && activeRendererName !== "WebGLRenderer") {
-            for (const pp of this.polyPieces) pp.polypiece_drawImage(true);
-        }
         this._lastMediaFrameMs = nowMs || 0;
         return true;
       }
@@ -2155,7 +2498,7 @@ function imageLoaded(puzzle) {
     } catch (_e) {
         puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
     }
-    events.push({ event: "srcImageLoaded" });
+    queueGameEvent({ event: "srcImageLoaded" });
     puzzle.imageLoaded = true;
 } // imageLoaded
 
@@ -2186,10 +2529,26 @@ function fitImage(img, width, height) {
 //-----------------------------------------------------------------------------
 let animate;
 let events = []; // queue for events
+let eventQueueHead = 0; // head index to avoid O(n) shift()
 let gameStarted = false;
 window.gameplayStarted = false;
 let manually_load_save_file = false;
+let state = 0;
 
+function jigsawPerfNow() {
+    return (window.jigsawPerf && typeof window.jigsawPerf.nowMs === "function")
+        ? window.jigsawPerf.nowMs()
+        : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
+}
+
+function queueGameEvent(evt) {
+    if (!evt) return;
+    if (typeof evt.queuedAt !== "number") evt.queuedAt = jigsawPerfNow();
+    events.push(evt);
+    if (window.jigsawPerf && typeof window.jigsawPerf.markQueueDepth === "function") {
+        window.jigsawPerf.markQueueDepth(events.length - eventQueueHead);
+    }
+}
 
 syncLegacyViewGlobals();
 
@@ -2198,6 +2557,9 @@ let tmpPreviewCtx = null;
 let syncedPreviewCanvas = null;
 let syncedPreviewCtx = null;
 let lastSyncedPreviewAt = 0;
+let hasDrawnStaticSyncedPreview = false;
+let prestartPreviewDirty = true; // only redraw prestart when dirty or media animated
+let lastPrestartPreviewAt = 0; // throttle animated prestart by framerate
 let grayscaleReferenceCanvas = null;
 let grayscaleReferenceCtx = null;
 let lastGrayscaleUpdateMs = 0;
@@ -2220,6 +2582,14 @@ function updateGrayscaleReferenceCanvas() {
     if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
     const w = Math.max(1, Math.round(puzzle.gameWidth));
     const h = Math.max(1, Math.round(puzzle.gameHeight));
+    const contentW = (typeof puzzle._mediaContentWidth === "number" && puzzle._mediaContentWidth > 0)
+        ? puzzle._mediaContentWidth
+        : ((puzzle.nx && puzzle.ny) ? puzzle.nx * puzzle.scalex : w);
+    const contentH = (typeof puzzle._mediaContentHeight === "number" && puzzle._mediaContentHeight > 0)
+        ? puzzle._mediaContentHeight
+        : ((puzzle.nx && puzzle.ny) ? puzzle.ny * puzzle.scaley : h);
+    const displayW = Math.max(1, Math.round(contentW));
+    const displayH = Math.max(1, Math.round(contentH));
     const halfRes = 2;
     const bufW = Math.max(1, Math.floor(w / halfRes));
     const bufH = Math.max(1, Math.floor(h / halfRes));
@@ -2237,10 +2607,12 @@ function updateGrayscaleReferenceCanvas() {
         grayscaleReferenceCanvas.width = bufW;
         grayscaleReferenceCanvas.height = bufH;
     }
-    grayscaleReferenceCanvas.style.width = w + "px";
-    grayscaleReferenceCanvas.style.height = h + "px";
-    grayscaleReferenceCanvas.style.left = (puzzle.offsx || 0) + "px";
-    grayscaleReferenceCanvas.style.top = (puzzle.offsy || 0) + "px";
+    grayscaleReferenceCanvas.style.width = displayW + "px";
+    grayscaleReferenceCanvas.style.height = displayH + "px";
+    const grayscaleLeft = (puzzle.contWidth != null && puzzle.contHeight != null) ? (puzzle.contWidth - displayW) / 2 : (puzzle.offsx || 0);
+    const grayscaleTop = (puzzle.contWidth != null && puzzle.contHeight != null) ? (puzzle.contHeight - displayH) / 2 : (puzzle.offsy || 0);
+    grayscaleReferenceCanvas.style.left = grayscaleLeft + "px";
+    grayscaleReferenceCanvas.style.top = grayscaleTop + "px";
     if (!grayscaleReferenceCtx) return;
 
     if (showGrayscale) {
@@ -2261,7 +2633,13 @@ function updateGrayscaleReferenceCanvas() {
                 const dy = g.dy / halfRes;
                 const dw = g.dw / halfRes;
                 const dh = g.dh / halfRes;
-                grayscaleReferenceCtx.drawImage(frameSource, 0, 0, vw, vh, dx, dy, dw, dh);
+                const baseW = Math.max(1, g.sourceW || vw);
+                const baseH = Math.max(1, g.sourceH || vh);
+                const sx = Math.max(0, Math.min(vw - 1, Math.round((g.sx || 0) * (vw / baseW))));
+                const sy = Math.max(0, Math.min(vh - 1, Math.round((g.sy || 0) * (vh / baseH))));
+                const sw = Math.max(1, Math.min(vw - sx, Math.round((g.sw || baseW) * (vw / baseW))));
+                const sh = Math.max(1, Math.min(vh - sy, Math.round((g.sh || baseH) * (vh / baseH))));
+                grayscaleReferenceCtx.drawImage(frameSource, sx, sy, sw, sh, dx, dy, dw, dh);
             } else if (kind === "gif-decoded" && frameSource && typeof frameSource.width === "number" && typeof frameSource.height === "number") {
                 grayscaleReferenceCtx.drawImage(frameSource, 0, 0, frameSource.width, frameSource.height, 0, 0, bufW, bufH);
             } else {
@@ -2399,6 +2777,37 @@ function resolvePrestartPreviewSource() {
     return puzzle && puzzle.srcImage ? puzzle.srcImage : null;
 }
 
+function ensurePreviewPuzzleDimensions() {
+    if (!puzzle || typeof puzzle.computenxAndny !== "function") return;
+    if (!(Number.isFinite(apnx) && Number.isFinite(apny) && apnx > 0 && apny > 0)) return;
+    if (puzzle.nx !== apnx || puzzle.ny !== apny) {
+        puzzle.computenxAndny(apnx, apny);
+        puzzle._previewDimsChanged = true;
+    }
+}
+
+function getPrestartPreviewDisplaySize() {
+    if (!puzzle) return { w: 1, h: 1 };
+    const w = (typeof puzzle._mediaContentWidth === "number" && puzzle._mediaContentWidth > 0)
+        ? puzzle._mediaContentWidth
+        : ((typeof puzzle.gameWidth === "number" && puzzle.gameWidth > 0) ? puzzle.gameWidth : (puzzle.contWidth || 1));
+    const h = (typeof puzzle._mediaContentHeight === "number" && puzzle._mediaContentHeight > 0)
+        ? puzzle._mediaContentHeight
+        : ((typeof puzzle.gameHeight === "number" && puzzle.gameHeight > 0) ? puzzle.gameHeight : (puzzle.contHeight || 1));
+    return { w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) };
+}
+
+function layoutPrestartPreviewCanvas() {
+    if (!tmpImage || !puzzle) return;
+    const display = getPrestartPreviewDisplaySize();
+    tmpImage.style.position = "absolute";
+    tmpImage.style.width = display.w + "px";
+    tmpImage.style.height = display.h + "px";
+    tmpImage.style.top = "50%";
+    tmpImage.style.left = "50%";
+    tmpImage.style.transform = "translate(-50%,-50%)";
+}
+
 function drawSyncedPreviewWindowFrame() {
     if (!syncedPreviewCanvas) {
         syncedPreviewCanvas = document.getElementById("prevsync");
@@ -2431,15 +2840,26 @@ function drawPrestartPreviewFrame() {
     const source = resolvePrestartPreviewSource();
     if (!source) return;
     if (source.tagName === "VIDEO" && source.readyState < 2) return;
-    const dims = getPreviewSourceDimensions(source);
-    if (dims.w <= 0 || dims.h <= 0) return;
-    if (tmpImage.width !== dims.w || tmpImage.height !== dims.h) {
-        tmpImage.width = dims.w;
-        tmpImage.height = dims.h;
-        fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+    if (!puzzle) return;
+    ensurePreviewPuzzleDimensions();
+    if (puzzle._previewDimsChanged || !(puzzle.gameWidth > 0) || !(puzzle.gameHeight > 0)) {
+        puzzle._previewDimsChanged = false;
+        if (typeof puzzle.puzzle_scale === "function") puzzle.puzzle_scale();
     }
+    const internalW = Math.max(1, Math.round(puzzle.gameWidth || 1));
+    const internalH = Math.max(1, Math.round(puzzle.gameHeight || 1));
+    if (tmpImage.width !== internalW || tmpImage.height !== internalH) {
+        tmpImage.width = internalW;
+        tmpImage.height = internalH;
+    }
+    layoutPrestartPreviewCanvas();
+    if (typeof puzzle.renderSourceToGameCanvas === "function") puzzle.renderSourceToGameCanvas(source);
     tmpPreviewCtx.clearRect(0, 0, tmpImage.width, tmpImage.height);
-    tmpPreviewCtx.drawImage(source, 0, 0, tmpImage.width, tmpImage.height);
+    if (puzzle.gameCanvas) {
+        tmpPreviewCtx.drawImage(puzzle.gameCanvas, 0, 0, tmpImage.width, tmpImage.height);
+    } else {
+        tmpPreviewCtx.drawImage(source, 0, 0, tmpImage.width, tmpImage.height);
+    }
 }
 
 function loadImageFunction(){
@@ -2474,13 +2894,16 @@ function loadImageFunction(){
     } else {
         puzzle.getContainerSize();
     }
-    fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+    ensurePreviewPuzzleDimensions();
+    if (typeof puzzle.puzzle_scale === "function") puzzle.puzzle_scale();
+    layoutPrestartPreviewCanvas();
     
     tmpImage.style.boxShadow = `${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px rgba(0, 0, 0, 0.5)`;
     
     puzzle.container.appendChild(tmpImage);
     drawPrestartPreviewFrame();
-    
+    prestartPreviewDirty = false;
+
     puzzle.prevWidth = puzzle.contWidth;
     puzzle.prevHeight = puzzle.contHeight;
 }
@@ -2506,6 +2929,9 @@ let moving; // for information about moved piece
 function setMovingState(nextMoving) {
     moving = nextMoving;
     window.moving = nextMoving || null;
+    if (!nextMoving && window.jigsawPerf && typeof window.jigsawPerf.cancelPendingPickup === "function") {
+        window.jigsawPerf.cancelPendingPickup();
+    }
 }
 setMovingState(null);
 
@@ -2516,67 +2942,235 @@ document.addEventListener("gesturestart", preventZoomWhileHoldingPiece, { passiv
 document.addEventListener("gesturechange", preventZoomWhileHoldingPiece, { passive: false, capture: true });
 document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive: false, capture: true });
 { // scope for animate
-    let state = 0;
     let stateAfterPan = 50;
     const HELD_Z_INDEX = 2147483647;
 
     function setHeldPieceState(pp, held) {
         if (!pp) return;
         pp._isHeld = !!held;
-        if (pp.polypiece_canvas) {
-            pp.polypiece_canvas.classList.toggle("moving", !!held);
-            if (held) pp.polypiece_canvas.style.zIndex = HELD_Z_INDEX;
-        }
         if (held) {
             pp._zIndex = HELD_Z_INDEX;
             puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
+            if (rendererFacade && rendererFacade.sceneState && rendererFacade.sceneState.markZOrderDirty) {
+                rendererFacade.sceneState.markZOrderDirty();
+            }
         } else {
-            // Released: set this piece's z to front (max of others + 1) without touching other pieces
-            let maxZ = -1;
-            if (puzzle.polyPieces) {
-                for (const p of puzzle.polyPieces) {
-                    const z = (p._zIndex != null && p._zIndex !== HELD_Z_INDEX) ? p._zIndex : (Number(p.polypiece_canvas && p.polypiece_canvas.style.zIndex) || 0);
-                    if (z !== HELD_Z_INDEX && z > maxZ) maxZ = z;
+            // Restore chunk-size layering on release; avoids permanently pinning large chunks on top.
+            if (typeof puzzle.evaluateZIndex === "function") {
+                puzzle.evaluateZIndex();
+                // Tie-break for equal-size chunks: most recently held chunk should be on top of its size band.
+                const pieces = Array.isArray(puzzle.polyPieces) ? puzzle.polyPieces : null;
+                if (pieces && pieces.length > 1) {
+                    const releasedSize = (pp && pp.pieces) ? pp.pieces.length : 0;
+                    const from = pieces.indexOf(pp);
+                    if (from >= 0) {
+                        let to = from;
+                        while (to + 1 < pieces.length) {
+                            const next = pieces[to + 1];
+                            const nextSize = (next && next.pieces) ? next.pieces.length : 0;
+                            if (nextSize !== releasedSize) break;
+                            to++;
+                        }
+                        if (to > from) {
+                            pieces.splice(from, 1);
+                            pieces.splice(to, 0, pp);
+                            for (let k = 0; k < pieces.length; k++) pieces[k]._zIndex = k;
+                            puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
+                            puzzle._sortedPolyPiecesByZ = pieces.slice();
+                            puzzle._sortedPolyPiecesVersion = puzzle._zOrderVersion;
+                            if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markZOrderDirty();
+                        }
+                    }
+                }
+            } else {
+                puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
+            }
+        }
+        // Hold state only changes ordering/shadow treatment; avoid expensive geometry/overlay rebuilds here.
+        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(pp);
+    }
+
+    function applyPanMoveEvent(event) {
+        const deltaClientX = event.position.clientX - startDragClientX;
+        const deltaClientY = event.position.clientY - startDragClientY;
+        if (!puzzle.contWidth || !puzzle.contHeight) puzzle.getContainerSize();
+        const baseScale = getActiveBaseScale();
+        const panScaleW = (puzzle.contWidth || 1) * baseScale;
+        const panScaleH = (puzzle.contHeight || 1) * baseScale;
+        viewState.panX += (deltaClientX / panScaleW) * viewState.panSensitivity;
+        viewState.panY += (deltaClientY / panScaleH) * viewState.panSensitivity;
+        startDragClientX = event.position.clientX;
+        startDragClientY = event.position.clientY;
+        applyViewTransform();
+    }
+
+    function applyPieceMoveEvent(event, perfMonitor) {
+        const dragMoveStartedAt = jigsawPerfNow();
+        if (perfMonitor && typeof perfMonitor.recordFirstMove === "function") {
+            perfMonitor.recordFirstMove(dragMoveStartedAt);
+        }
+        const event2_x = event.position.x;
+        const event2_y = event.position.y;
+        moving.xMouse = event2_x;
+        moving.yMouse = event2_y;
+        let to_x = event2_x - moving.xMouseInit + moving.ppXInit;
+        let to_y = event2_y - moving.yMouseInit + moving.ppYInit;
+
+        moving.pp.moveTo(to_x, to_y);
+        moving.pp.moveAwayFromBorder();
+        moving.pp.hasMovedEver = true;
+        if (window.gameplayStarted && !window.play_solo) {
+            const movingSyncId = getPolyPieceSyncId(moving.pp);
+            if(window.rotations == 0){
+                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+            }else{
+                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+            }
+        }
+        if (perfMonitor && typeof perfMonitor.recordDragMove === "function") {
+            perfMonitor.recordDragMove(jigsawPerfNow() - dragMoveStartedAt);
+        }
+    }
+
+    function tryBeginPiecePickup(event, perfMonitor) {
+        if (!event || event.event !== "touch" || event.button !== 0) return false;
+        if (!window.is_connected && !window.play_solo) return false;
+        const event_x = event.position.x;
+        const event_y = event.position.y;
+        const acquireStartedAt = jigsawPerfNow();
+        const hitPiece = rendererFacade
+            ? rendererFacade.findTopPieceAt(puzzle, event_x, event_y)
+            : (hitTestService && hitTestService.findTopPieceAt(puzzle, event_x, event_y));
+        if (perfMonitor && typeof perfMonitor.recordPickupAcquire === "function") {
+            perfMonitor.recordPickupAcquire(jigsawPerfNow() - acquireStartedAt, !!hitPiece);
+        }
+        if (!hitPiece) return false;
+        setMovingState({
+            xMouseInit: event_x,
+            yMouseInit: event_y,
+            xMouse: event_x,
+            yMouse: event_y,
+            pp: hitPiece,
+            ppXInit: hitPiece.x,
+            ppYInit: hitPiece.y
+        });
+        setHeldPieceState(hitPiece, true);
+        if (perfMonitor && typeof perfMonitor.beginPickup === "function") {
+            perfMonitor.beginPickup(jigsawPerfNow());
+        }
+        puzzle._releaseHandled = true;
+        state = 55;
+        return true;
+    }
+
+    function dequeueNextEvent(perfMonitor) {
+        const queueLength = events.length - eventQueueHead;
+        if (perfMonitor && typeof perfMonitor.markQueueDepth === "function") {
+            perfMonitor.markQueueDepth(queueLength);
+        }
+        if (queueLength <= 0) {
+            events.length = 0;
+            eventQueueHead = 0;
+            return null;
+        }
+        let evt = events[eventQueueHead++];
+        if (evt && typeof evt.queuedAt === "number" && perfMonitor && typeof perfMonitor.recordQueueDelay === "function") {
+            perfMonitor.recordQueueDelay(Math.max(0, jigsawPerfNow() - evt.queuedAt));
+        }
+        // Drain consecutive move bursts so drag follows latest pointer position.
+        if (evt && evt.event === "move") {
+            while (eventQueueHead < events.length && events[eventQueueHead].event === "move") {
+                evt = events[eventQueueHead++];
+                if (evt && typeof evt.queuedAt === "number" && perfMonitor && typeof perfMonitor.recordQueueDelay === "function") {
+                    perfMonitor.recordQueueDelay(Math.max(0, jigsawPerfNow() - evt.queuedAt));
                 }
             }
-            const newZ = maxZ + 1;
-            pp._zIndex = newZ;
-            if (pp.polypiece_canvas) pp.polypiece_canvas.style.zIndex = newZ;
-            puzzle._zOrderVersion = (puzzle._zOrderVersion || 0) + 1;
         }
-        queuePolyPieceSetup(pp, true, true);
-        if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(pp);
+        if (eventQueueHead >= events.length) {
+            events.length = 0;
+            eventQueueHead = 0;
+        }
+        return evt;
     }
 
     animate = function () {
         requestAnimationFrame(animate);
+        const perfMonitor = window.jigsawPerf || null;
+        const frameStartedAt = jigsawPerfNow();
+        try {
         const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+        let event = dequeueNextEvent(perfMonitor);
+        // For drag/pan move events, apply input before rendering this frame.
+        if (event && event.event === "move") {
+            const preRenderDispatchStartedAt = jigsawPerfNow();
+            if (state === 52) {
+                applyPanMoveEvent(event);
+                event = null;
+            } else if (state === 55 && moving && moving.pp) {
+                applyPieceMoveEvent(event, perfMonitor);
+                event = null;
+            }
+            if (!event && perfMonitor && typeof perfMonitor.recordEventDispatch === "function") {
+                perfMonitor.recordEventDispatch(jigsawPerfNow() - preRenderDispatchStartedAt);
+            }
+        } else if (event && state === 50 && tryBeginPiecePickup(event, perfMonitor)) {
+            if (perfMonitor && typeof perfMonitor.recordEventDispatch === "function") {
+                perfMonitor.recordEventDispatch(Math.max(0, jigsawPerfNow() - (event.queuedAt || jigsawPerfNow())));
+            }
+            event = null;
+        }
         // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
+        const setupStartedAt = jigsawPerfNow();
         if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
+        if (perfMonitor && typeof perfMonitor.recordSetupQueue === "function") {
+            perfMonitor.recordSetupQueue(jigsawPerfNow() - setupStartedAt);
+        }
+        const renderStartedAt = jigsawPerfNow();
         if (rendererFacade) rendererFacade.renderFrame(nowMs);
-        if (!(window.rendererConfig && window.rendererConfig.legacyMode)) {
+        if (perfMonitor && typeof perfMonitor.recordRender === "function") {
+            perfMonitor.recordRender(jigsawPerfNow() - renderStartedAt);
+        }
+        if (state < 50) hasDrawnStaticSyncedPreview = false;
+        const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
+        if (animated) {
             const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
             if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
                 drawSyncedPreviewWindowFrame();
                 lastSyncedPreviewAt = nowMs;
             }
+            hasDrawnStaticSyncedPreview = false;
+        } else if (state >= 50 && !hasDrawnStaticSyncedPreview) {
+            drawSyncedPreviewWindowFrame();
+            hasDrawnStaticSyncedPreview = true;
         }
-        if (state === 15) drawPrestartPreviewFrame();
-        if (state >= 50 && puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
+        if (state === 15) {
+            const prestartAnimated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
+            if (prestartPreviewDirty) {
+                drawPrestartPreviewFrame();
+                prestartPreviewDirty = false;
+                lastPrestartPreviewAt = nowMs;
+            } else if (prestartAnimated) {
+                const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+                if (nowMs - lastPrestartPreviewAt >= intervalMs) {
+                    drawPrestartPreviewFrame();
+                    lastPrestartPreviewAt = nowMs;
+                }
+            }
+        }
 
-        let event;
-        
-        if (events.length) event = events.shift(); // read event from queue
-
+        const eventDispatchStartedAt = event ? jigsawPerfNow() : 0;
+        try {
         if (event && event.event === "puzzleAreaScaleChanged" && puzzle) {
             const srcImg = puzzle.srcImage || null;
             const ar = getEffectivePuzzleAreaAspectRatio(srcImg);
             if (state === 15 && tmpImage) {
                 puzzle.sizeContainerByAspectRatio(ar);
-                fitImage(tmpImage, puzzle.contWidth * 0.90, puzzle.contHeight * 0.90);
+                puzzle.puzzle_scale();
+                layoutPrestartPreviewCanvas();
+                prestartPreviewDirty = true;
             } else if (state >= 25) {
                 puzzle.puzzle_scale();
-                if (rendererFacade) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+                if (rendererFacade) maybeOnResize(puzzle, rendererFacade);
             }
             applyViewTransform();
             return;
@@ -2598,11 +3192,13 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             // remember dimensions of container before resize
             puzzle.getContainerSize();
             if (state == 15 || state > 60) { // resize initial or final picture
-                fitImage(tmpImage, puzzle.contWidth * window.downsize_to_fit, puzzle.contHeight * window.downsize_to_fit);
+                puzzle.puzzle_scale();
+                layoutPrestartPreviewCanvas();
+                if (state == 15) prestartPreviewDirty = true;
             }
             else if (state >= 25) { // resize pieces
                 puzzle.puzzle_scale();
-                if (rendererFacade) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+                if (rendererFacade) maybeOnResize(puzzle, rendererFacade);
 
                 const x_change = puzzle.contWidth / puzzle.prevWidth;
                 const y_change = puzzle.contHeight / puzzle.prevHeight;
@@ -2618,7 +3214,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             puzzle.prevHeight = puzzle.contHeight;
 
             applyViewTransform();
-            if (rendererFacade && puzzle) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+            if (rendererFacade && puzzle) maybeOnResize(puzzle, rendererFacade);
             if (state >= 25 && typeof updateGrayscaleReferenceCanvas === "function") updateGrayscaleReferenceCanvas();
 
             return;
@@ -2779,7 +3375,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     let num_rots = Math.round(360 / window.rotations);
                     if (window.rotations == 0) num_rots = 1;
 
-                    unlocked_pieces.sort(() => Math.random() - 0.5).forEach(index => {
+                    (function () { const arr = unlocked_pieces.slice(); shuffleArray(arr); return arr; }()).forEach(index => {
                         if (window.save_file[index] === undefined) {
                             let random_rotation = 0;
                             if (window.rotations == 180){
@@ -2798,7 +3394,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                         }
                     });
 
-                    unlocked_fake_pieces.sort(() => Math.random() - 0.5).forEach(index => {
+                    (function () { const arr = unlocked_fake_pieces.slice(); shuffleArray(arr); return arr; }()).forEach(index => {
                         if (window.save_file[index] === undefined) {
                             let random_rotation = 0;
                             if (window.rotations == 180){
@@ -2836,48 +3432,47 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
 
             case 19:  // process save file and start game
                 window.useCanonicalAspectForLayout = true;
-                let coordinates = {}
-                let groups = {}
-                let hasmoved = {}
-                let unlocked = {}
-
-                let all_indices = []
-
-                for (let key = 1; key <= window.apnx * window.apny; key++) {
-                    all_indices.push(key);
+                let coordinates = {};
+                let groups = {};
+                let hasmoved = {};
+                let unlocked = {};
+                const remainingIndices = new Set();
+                for (let key = 1; key <= window.apnx * window.apny; key++) remainingIndices.add(key);
+                if (window.fake_pieces_mimic.length >= 1) {
+                    for (let i = 0; i < window.fake_pieces_mimic.length; i++) remainingIndices.add(-1 - i);
                 }
-                if(window.fake_pieces_mimic.length >= 1){
-                    for(let i = 0; i < window.fake_pieces_mimic.length; i++){
-                        all_indices.push(-1 - i);
-                    }
-                }
+                const referToGroupKey = {};
 
-                for (let [key, value] of Object.entries(window.save_file)) {
-                    all_indices = all_indices.filter(index => index !== parseInt(key));
+                for (const [key, value] of Object.entries(window.save_file)) {
+                    const keyNum = parseInt(key, 10);
+                    remainingIndices.delete(keyNum);
 
                     if (Array.isArray(value[0])) {
                         coordinates[key] = value[0];
                         hasmoved[key] = value[1];
-                        groups[key] = [parseInt(key)];
+                        groups[key] = [keyNum];
+                        referToGroupKey[keyNum] = key;
                         unlocked[key] = true;
                     } else {
                         let refer_to = value[0];
-                        let groupKey = Object.keys(groups).find(groupKey => groups[groupKey].includes(refer_to));
-                        // console.log(key, refer_to)
+                        let groupKey = referToGroupKey[refer_to];
+                        if (groupKey == null) groupKey = Object.keys(groups).find(gk => groups[gk].includes(refer_to));
                         if (groupKey) {
-                            groups[groupKey].push(parseInt(key));
+                            groups[groupKey].push(keyNum);
+                            referToGroupKey[keyNum] = groupKey;
                         } else {
-                            console.log(key, refer_to, "not found, gonna go ahead and put it at 0,0")
-                            coordinates[key] = [0,0];
-                            groups[key] = [parseInt(key)];
+                            console.log(key, refer_to, "not found, gonna go ahead and put it at 0,0");
+                            coordinates[key] = [0, 0];
+                            groups[key] = [keyNum];
                             unlocked[key] = true;
+                            referToGroupKey[keyNum] = key;
                         }
                     }
                 }
 
-                for(let key of all_indices){
+                for (const key of remainingIndices) {
                     groups[key] = [key];
-                    coordinates[key] = [30,30];
+                    coordinates[key] = [30, 30];
                     hasmoved[key] = false;
                     unlocked[key] = false;
                 }
@@ -2887,7 +3482,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 menu.open();
 
                 document.getElementById("m2").style.display = "none";
-                document.getElementById("m3").style.display = "none";
+                    document.getElementById("m3").style.display = "none";
                 document.getElementById("m3a").style.display = "none";
                 document.getElementById("m3b").style.display = "none";
                 document.getElementById("m3c").style.display = "none";
@@ -2899,7 +3494,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 /* prepare puzzle */
                 viewState.customDropNormX = 0.1;
                 viewState.customDropNormY = 0.1;
-                puzzle.puzzle_create(coordinates, groups, hasmoved, unlocked); // create shape of pieces, independant of size
+                puzzle.puzzle_create(coordinates, groups, hasmoved, unlocked);
 
 
 
@@ -2908,7 +3503,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 console.log("done getting backlog of actions")
                 
                 puzzle.puzzle_scale();
-                if (rendererFacade) rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+                if (rendererFacade) maybeOnResize(puzzle, rendererFacade);
                 let downgradedAtStart = false;
                 if (rendererFacade) {
                     if (puzzle._webglStartBlockedReason) {
@@ -2918,7 +3513,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     }
                     const mode = (window.rendererConfig && window.rendererConfig.mode) || "canvas2d";
                     rendererFacade.selectMode(mode, puzzle);
-                    rendererFacade.onResize(puzzle.contWidth, puzzle.contHeight);
+                    maybeOnResize(puzzle, rendererFacade);
                     if (rendererFacade.ensureStartRendererCompatibility) {
                         downgradedAtStart = rendererFacade.ensureStartRendererCompatibility() === true;
                     }
@@ -2932,8 +3527,6 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     }
                 }
 
-                console.log("done scaling puzzle")
-                // Queue initial render setup only after puzzle_scale has finalized dimensions.
                 for (let pp of puzzle.polyPieces) {
                     queuePolyPieceSetup(pp, false, false);
                 }
@@ -2999,8 +3592,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             case 45:
                 // run function after ini
                 state = 50;
-                
-                window.gameplayStarted = true;            
+                if (puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
+                window.gameplayStarted = true;
                 break;
 
                 /* wait for user grabbing a piece or other action */
@@ -3029,14 +3622,21 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                     });
     
                     /* evaluates if contact inside a PolyPiece, by decreasing z-index */
+                    const acquireStartedAt = jigsawPerfNow();
                     const hitPiece = rendererFacade
                         ? rendererFacade.findTopPieceAt(puzzle, event_x, event_y)
                         : (hitTestService && hitTestService.findTopPieceAt(puzzle, event_x, event_y));
+                    if (perfMonitor && typeof perfMonitor.recordPickupAcquire === "function") {
+                        perfMonitor.recordPickupAcquire(jigsawPerfNow() - acquireStartedAt, !!hitPiece);
+                    }
                     if (hitPiece) {
                         moving.pp = hitPiece;
                         moving.ppXInit = hitPiece.x;
                         moving.ppYInit = hitPiece.y;
                         setHeldPieceState(hitPiece, true);
+                        if (perfMonitor && typeof perfMonitor.beginPickup === "function") {
+                            perfMonitor.beginPickup(jigsawPerfNow());
+                        }
                         
                         puzzle._releaseHandled = true;
                         state = 55;
@@ -3065,19 +3665,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 if (!event) return;
                 switch (event.event) {
                     case "move":
-                        // Anchor under cursor: 1:1 pan in screen pixels. Pan translate is applied after scale(zoom), so screen delta = panDelta * contSize * baseScale (zoom does not scale the pan).
-                        const deltaClientX = event.position.clientX - startDragClientX;
-                        const deltaClientY = event.position.clientY - startDragClientY;
-                        if (!puzzle.contWidth || !puzzle.contHeight) puzzle.getContainerSize();
-                        const baseScale = getActiveBaseScale();
-                        const panScaleW = (puzzle.contWidth || 1) * baseScale;
-                        const panScaleH = (puzzle.contHeight || 1) * baseScale;
-                        viewState.panX += (deltaClientX / panScaleW) * viewState.panSensitivity;
-                        viewState.panY += (deltaClientY / panScaleH) * viewState.panSensitivity;
-                        startDragClientX = event.position.clientX;
-                        startDragClientY = event.position.clientY;
-                        applyViewTransform();
-                        
+                        applyPanMoveEvent(event);
                         break;
                     case "leave":
                         if (moving && moving.pp) setHeldPieceState(moving.pp, false);
@@ -3091,38 +3679,16 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 if (!event) return;
                 if (!moving){
                     state = 50;
+                    if (puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
                     return;
                 }
 
                 
                 switch (event.event) {
                     case "move":
-                        const event2_x = event.position.x;
-                        const event2_y = event.position.y;
-                        moving.xMouse = event2_x;
-                        moving.yMouse = event2_y;
-                        let to_x = event2_x - moving.xMouseInit + moving.ppXInit;
-                        let to_y = event2_y - moving.yMouseInit + moving.ppYInit;
-
-
-                        
-                        moving.pp.moveTo(to_x, to_y);
-                        moving.pp.moveAwayFromBorder();
-                        moving.pp.hasMovedEver = true;
-                        if (window.gameplayStarted && !window.play_solo) {
-                            // console.log("move piece", moving.pp.pieces[0].index, moving.pp);                 
-                            const movingSyncId = getPolyPieceSyncId(moving.pp);
-                            if(window.rotations == 0){
-                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
-                            }else{
-                                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
-                            }    
-                        }
-
+                        applyPieceMoveEvent(event, perfMonitor);
                         break;
                     case "leave":
-                        // check if moved polypiece is close to a matching other polypiece
-                        // check repeatedly since polypieces moved by merging may come close to other polypieces
                         const m = moving.pp;
                         const mRot = rotateVector(m.x + m.nx * puzzle.scalex / 2, m.y + m.ny * puzzle.scaley / 2, m.rot);
                         const mx = mRot.x - puzzle.scalex * (m.pckxmax + m.pckxmin) / 2;
@@ -3136,10 +3702,9 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                             const ppy = ppRot.y - puzzle.scaley * (pp.pckymax + pp.pckymin) / 2;
                             if (((mx - ppx) ** 2 + (my - ppy) ** 2) >= puzzle.dConnect) continue;
                             if (m.ifNear(pp)) { // a match !
-                                // compare polypieces sizes to move smallest one
                                 if (pp.pieces.length > moving.pp.pieces.length || (pp.pieces.length == moving.pp.pieces.length && pp.pieces[0].index > moving.pp.pieces[0].index)) {
                                     pp.merge(moving.pp);
-                                    moving.pp = pp; // memorize piece to follow
+                                    moving.pp = pp; 
                                     setHeldPieceState(moving.pp, true);
                                 } else {
                                     moving.pp.merge(pp);
@@ -3164,7 +3729,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
 
                         // not at its right place
                         state = 50;
-                        
+                        if (puzzle && typeof updateDropLocationTarget === "function") updateDropLocationTarget();
                         return;
                 } // switch (event.event)
 
@@ -3180,6 +3745,16 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 state = 9999;  // to display message beyond only once
                 throw ("oops, unknown state " + st);
         } // switch(state)
+        } finally {
+            if (eventDispatchStartedAt > 0 && perfMonitor && typeof perfMonitor.recordEventDispatch === "function") {
+                perfMonitor.recordEventDispatch(jigsawPerfNow() - eventDispatchStartedAt);
+            }
+        }
+        } finally {
+            if (perfMonitor && typeof perfMonitor.recordFrame === "function") {
+                perfMonitor.recordFrame(jigsawPerfNow() - frameStartedAt);
+            }
+        }
     } // animate
 } // scope for animate
 //-----------------------------------------------------------------------------
@@ -3206,7 +3781,7 @@ let menu = (function () {
             const scaleSelect = document.getElementById("puzzleAreaScale");
             if (scaleSelect) scaleSelect.value = window.puzzleAreaScale;
         } else {
-            document.getElementById("m3").style.display = "none"
+            document.getElementById("m3").style.display = "block"
             document.getElementById("m3a").style.display = "none"
             document.getElementById("m3b").style.display = "none"
             document.getElementById("m3c").style.display = "none"
@@ -3357,7 +3932,7 @@ if (puzzleAreaScaleEl) {
     puzzleAreaScaleEl.value = "Landscape";
     puzzleAreaScaleEl.addEventListener("change", function () {
         window.puzzleAreaScale = this.value;
-        events.push({ event: "puzzleAreaScaleChanged" });
+        queueGameEvent({ event: "puzzleAreaScaleChanged" });
     });
 }
 document.getElementById("m4").addEventListener("click", () => {
@@ -3395,7 +3970,7 @@ document.getElementById("m4").addEventListener("click", () => {
         for (let i = 0; i < K; i++) unlockPiece(window.soloUnlockOrder[i]);
         updateMergesLabels();
     }
-    events.push({ event: "nbpieces", nbpieces: 81 });
+    queueGameEvent({ event: "nbpieces", nbpieces: 81 });
 });
 
 document.getElementById("m5").addEventListener("click", () => {
@@ -3445,6 +4020,8 @@ if (window.JigsawViewControls && typeof window.JigsawViewControls.init === "func
         viewDebug: VIEW_DEBUG
     });
 }
+const forPuzzleEl = document.getElementById("forPuzzle");
+if (forPuzzleEl && typeof applyDisplayPreferences === "function") applyDisplayPreferences(forPuzzleEl);
 
 function applyViewTransform() {
     if (_viewControlsApi && _viewControlsApi.applyViewTransform) _viewControlsApi.applyViewTransform();
@@ -3491,6 +4068,18 @@ if (window.JigsawRendererModeControl && typeof window.JigsawRendererModeControl.
             if (value === "16k" || value === "8k" || value === "4k" || value === "1440p" || value === "1080p" || value === "720p" || value === "540p") {
                 viewState.puzzleResolution = value;
                 try { localStorage.setItem("puzzleResolution", value); } catch (_e) {}
+                if (puzzle && state >= 25) {
+                    if (typeof puzzle.applyResolutionPreset === "function") {
+                        puzzle.applyResolutionPreset();
+                    } else if (typeof puzzle.puzzle_scale === "function") {
+                        puzzle.puzzle_scale();
+                    }
+                    if (rendererFacade) {
+                        maybeOnResize(puzzle, rendererFacade);
+                        if (rendererFacade.sceneState && rendererFacade.sceneState.markAllDirty) rendererFacade.sceneState.markAllDirty();
+                    }
+                    if (puzzle.polyPieces) puzzle.polyPieces.forEach(pp => queuePolyPieceSetup(pp, false, false));
+                }
             }
         }
     });
@@ -3509,7 +4098,6 @@ if (window.JigsawPieceSetupQueue && typeof window.JigsawPieceSetupQueue.create =
         getRendererConfig: () => window.rendererConfig,
         getRendererFacade: () => rendererFacade
     });
-    // Queue is driven from animate() to avoid a second requestAnimationFrame loop.
 }
 
 function queuePolyPieceSetup(pp, ignoreRedraw = false, highPriority = false, onDone = null) {
@@ -3572,7 +4160,7 @@ class PuzzleBoard {
         this._unusedIds = [];
         for (let id = 0; id < maxIsolated; id++) this._unusedIds.push(id);
 
-        // Precompute adjacency for each index (0-based). Index i => column i % width, row i // width.
+        // Precompute adjacency for each index (0-based). Index i => column i % width, row i / width.
         this.adjacentPieces = [];
         for (let i = 0; i < size; i++) {
             const x = i % width;
@@ -3710,6 +4298,19 @@ function findPolyPieceBySyncId(syncId) {
 var puzzle_ini = false;
 var unlocked_pieces = [];
 
+function applyUnlockDropAndRotation(pp, index) {
+    const drop = getDropPositionPixels(puzzle, 0.03);
+    pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
+    if (window.rotations > 0) {
+        const num_rots = Math.round(360 / window.rotations);
+        const random_rotation = window.rotations == 180
+            ? Math.floor(2 * Math.floor(((index + 10) * 2345.1234) % 2))
+            : Math.floor(((index + 10) * 2345.1234) % num_rots);
+        pp.rotateTo(random_rotation);
+    }
+    pp.unlocked = true;
+}
+
 function unlockPiece(index) {
     unlocked_pieces.push(index);
 
@@ -3719,19 +4320,7 @@ function unlockPiece(index) {
             console.log("PolyPiece not found for index", index);
             return;
         }
-        const drop = getDropPositionPixels(puzzle, 0.03);
-        pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
-        if (window.rotations > 0) {
-            let num_rots = Math.round(360 / window.rotations);
-            let random_rotation = 0;
-            if (window.rotations == 180){
-                random_rotation = Math.floor(2 * Math.floor(((index+10) * 2345.1234) % 2));
-            }else{
-                random_rotation = Math.floor(((index+10) * 2345.1234) % num_rots);
-            }
-            pp.rotateTo(random_rotation);
-        }
-        pp.unlocked = true;
+        applyUnlockDropAndRotation(pp, index);
     }else if (accept_pending_actions){
         console.log("Adding to pending actions", index)
         pending_actions.push([`x_x_x_${index}`, "unlock", "x"]);
@@ -3751,19 +4340,7 @@ function unlockFakePiece() {
     if(process_pending_actions){
         let pp = findPolyPieceUsingPuzzlePiece(index);
         console.log(pp)
-        const drop = getDropPositionPixels(puzzle, 0.03);
-        pp.moveTo(drop.x - puzzle.scalex * 0.5, drop.y - puzzle.scaley * 0.5);
-        if (window.rotations > 0) {
-            let num_rots = Math.round(360 / window.rotations);
-            let random_rotation = 0;
-            if (window.rotations == 180){
-                random_rotation = Math.floor(2 * Math.floor(((index+10) * 2345.1234) % 2));
-            }else{
-                random_rotation = Math.floor(((index+10) * 2345.1234) % num_rots);
-                pp.rotateTo(random_rotation);
-            }
-        }
-        pp.unlocked = true;
+        applyUnlockDropAndRotation(pp, index);
     }else if (accept_pending_actions){
         console.log("Adding to pending actions", index)
         pending_actions.push([`x_x_x_${index}`, "unlock", "x"]);
@@ -3815,14 +4392,11 @@ function doRotateTrap(){
 }
 
 function getRandomPiece(numberOfPieces, maxcluster) {
-
-    // Get all PolyPieces that have only one piece (i.e., not merged)
     if(!puzzle || !puzzle.polyPieces) return [];
     const singlePieces = puzzle.polyPieces.filter(pp => pp.pieces.length <= maxcluster);
     const singleUnlockedPieces = singlePieces.filter(pp => pp.unlocked);
-    // Shuffle the array
-    const shuffled = singleUnlockedPieces.sort(() => Math.random() - 0.5);
-    // Return up to numberOfPieces PolyPieces
+    const shuffled = singleUnlockedPieces.slice();
+    shuffleArray(shuffled);
     return shuffled.slice(0, numberOfPieces);
 }
 
@@ -3951,14 +4525,14 @@ function removeAllHints(){
         if(pp.hinted){
             pp.hinted = false;
             pp.polypiece_drawImage(false);
-            // pp.polypiece_canvas.classList.remove('hinted')
         }
     });
 }
 
 function askForHint(alsoConnect = false){
     if(!window.play_solo && !window.is_connected) return;
-    const shuffledIndices = [...Array(puzzle.polyPieces.length).keys()].sort(() => Math.random() - 0.5);
+    const shuffledIndices = [...Array(puzzle.polyPieces.length).keys()];
+    shuffleArray(shuffledIndices);
     for (let i = 0; i < shuffledIndices.length; i++) {
         for (let j = i + 1; j < shuffledIndices.length; j++) {
             let k = shuffledIndices[i];
@@ -3978,17 +4552,14 @@ function askForHint(alsoConnect = false){
                     if(!pp1.hinted){
                         pp1.hinted = true;
                         pp1.polypiece_drawImage(false);
-                        // pp1.polypiece_canvas.classList.add('hinted')
                         return;
                     }
                     if(!pp2.hinted){
                         pp2.hinted = true;
                         pp2.polypiece_drawImage(false);
-                        // pp2.polypiece_canvas.classList.add('hinted')
                         return;
                     }
                 }else{
-                    // compare polypieces sizes to move smallest one
                     if (pp1.pieces.length > pp2.pieces.length  || (pp1.pieces.length == pp2.pieces.length && pp1.pieces[0].index > pp2.pieces[0].index)) {
                         pp1.merge(pp2);
                         console.log(pp1)
@@ -4042,31 +4613,6 @@ document.addEventListener('keydown', function(event) {
 });
 
 
-// debug :)
-document.addEventListener('keydown', function(event) {
-    return;
-    if(!window.debug || !puzzle || !puzzle.polyPieces) return;
-    if (event.key === 'S' || event.key === 's' || event.key === 'H' || event.key === 'h') {
-        const hint = event.key === 'H' || event.key === 'h';
-        askForHint(!hint);
-    }
-    if(event.key === 'Q' || event.key === 'q'){
-        window.goTo8888State = true;
-    }
-    if (event.key === 'D' || event.key === 'd') {
-        doRotateTrap();
-    }
-    if (event.key === 'A' || event.key === 'a') {
-        const interval = () => {
-            setTimeout(() => {
-            askForHint(true);
-            interval();
-            }, 100);
-        };
-        interval();
-    }
-});
-
 // drawer
 
 function withdraw(numToWithdraw){
@@ -4076,8 +4622,8 @@ function withdraw(numToWithdraw){
 
         if (numToWithdraw !== "all") {
             numToWithdraw = parseInt(numToWithdraw, 10);
-            // Shuffle and take only the requested number
-            piecesToWithdraw = piecesToWithdraw.sort(() => Math.random() - 0.5).slice(0, numToWithdraw);
+            shuffleArray(piecesToWithdraw);
+            piecesToWithdraw = piecesToWithdraw.slice(0, numToWithdraw);
         }
 
         piecesToWithdraw.forEach(pp => {
@@ -4161,8 +4707,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (numToDeposit !== "all") {
                 numToDeposit = parseInt(numToDeposit, 10);
-                // Shuffle and take only the requested number
-                piecesToDeposit = piecesToDeposit.sort(() => Math.random() - 0.5).slice(0, numToDeposit);
+                shuffleArray(piecesToDeposit);
+                piecesToDeposit = piecesToDeposit.slice(0, numToDeposit);
             }
 
             piecesToDeposit.forEach(pp => {

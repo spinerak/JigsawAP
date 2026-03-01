@@ -26,6 +26,14 @@
         let viewTransformRaf = 0;
         let lastPinchZoomUpdateAt = 0;
 
+        function queueUiEvent(evt) {
+            if (!evt) return;
+            if (typeof evt.queuedAt !== "number") {
+                evt.queuedAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+            }
+            events.push(evt);
+        }
+
         function redrawAllPiecesForDisplayOptions() {
             const puzzle = getPuzzle();
             if (!puzzle || !puzzle.polyPieces || !puzzle.polyPieces.length) return;
@@ -93,20 +101,22 @@
                 });
             }
 
+            const displayPrefs = globalScope.displayPrefs;
+            const applyDisplayPrefs = typeof globalScope.applyDisplayPreferences === "function" ? globalScope.applyDisplayPreferences : null;
             if (heldShadowInput && forPuzzleEl) {
                 heldShadowInput.addEventListener("pointerdown", function () { interaction.heldShadow = true; });
                 heldShadowInput.addEventListener("input", function () {
                     if (interaction.heldShadow) {
                         const val = parseFloat(heldShadowInput.value);
-                        localStorage.setItem("heldPieceShadowDarkness", String(val));
-                        forPuzzleEl.style.setProperty("--held-piece-shadow-darkness", String(val));
+                        if (displayPrefs) displayPrefs.heldPieceShadowDarkness = val;
+                        try { localStorage.setItem("heldPieceShadowDarkness", String(val)); } catch (_e) {}
+                        if (applyDisplayPrefs) applyDisplayPrefs(forPuzzleEl);
                         if (heldShadowValueSpan) heldShadowValueSpan.textContent = val.toFixed(2);
                     } else {
-                        const saved = localStorage.getItem("heldPieceShadowDarkness");
-                        const val = saved !== null ? parseFloat(saved) : 0.35;
+                        const val = (displayPrefs && displayPrefs.heldPieceShadowDarkness != null) ? displayPrefs.heldPieceShadowDarkness : 0.35;
                         heldShadowInput.value = val;
                         if (heldShadowValueSpan) heldShadowValueSpan.textContent = val.toFixed(2);
-                        forPuzzleEl.style.setProperty("--held-piece-shadow-darkness", String(val));
+                        if (applyDisplayPrefs) applyDisplayPrefs(forPuzzleEl);
                     }
                 });
             }
@@ -115,15 +125,15 @@
                 feltOpacityInput.addEventListener("input", function () {
                     if (interaction.felt) {
                         const val = parseFloat(feltOpacityInput.value);
-                        localStorage.setItem("feltOpacity", String(val));
-                        forPuzzleEl.style.setProperty("--felt-opacity", String(val));
+                        if (displayPrefs) displayPrefs.feltOpacity = val;
+                        try { localStorage.setItem("feltOpacity", String(val)); } catch (_e) {}
+                        if (applyDisplayPrefs) applyDisplayPrefs(forPuzzleEl);
                         if (feltOpacityValueSpan) feltOpacityValueSpan.textContent = val.toFixed(2);
                     } else {
-                        const saved = localStorage.getItem("feltOpacity");
-                        const val = saved !== null ? parseFloat(saved) : 0.5;
+                        const val = (displayPrefs && displayPrefs.feltOpacity != null) ? displayPrefs.feltOpacity : 0.5;
                         feltOpacityInput.value = val;
                         if (feltOpacityValueSpan) feltOpacityValueSpan.textContent = val.toFixed(2);
-                        forPuzzleEl.style.setProperty("--felt-opacity", String(val));
+                        if (applyDisplayPrefs) applyDisplayPrefs(forPuzzleEl);
                     }
                 });
             }
@@ -132,15 +142,15 @@
                 playAreaRadiusInput.addEventListener("input", function () {
                     if (interaction.radius) {
                         const val = parseInt(playAreaRadiusInput.value, 10);
-                        localStorage.setItem("playAreaRadius", String(val));
-                        forPuzzleEl.style.setProperty("--play-area-radius", val + "px");
+                        if (displayPrefs) displayPrefs.playAreaRadius = val;
+                        try { localStorage.setItem("playAreaRadius", String(val)); } catch (_e) {}
+                        if (applyDisplayPrefs) applyDisplayPrefs(forPuzzleEl);
                         if (playAreaRadiusValueSpan) playAreaRadiusValueSpan.textContent = val + "px";
                     } else {
-                        const saved = localStorage.getItem("playAreaRadius");
-                        const val = saved !== null ? parseInt(saved, 10) : 64;
+                        const val = (displayPrefs && displayPrefs.playAreaRadius != null) ? displayPrefs.playAreaRadius : 64;
                         playAreaRadiusInput.value = val;
                         if (playAreaRadiusValueSpan) playAreaRadiusValueSpan.textContent = val + "px";
-                        forPuzzleEl.style.setProperty("--play-area-radius", val + "px");
+                        if (applyDisplayPrefs) applyDisplayPrefs(forPuzzleEl);
                     }
                 });
             }
@@ -178,22 +188,28 @@
             const green = document.getElementById("bgcolorG").value;
             const blue = document.getElementById("bgcolorB").value;
             const newColor = `#${red}${green}${blue}`;
-            forPuzzle.style.backgroundColor = newColor;
-            localStorage.setItem("backgroundColor", newColor);
+            if (globalScope.displayPrefs) globalScope.displayPrefs.backgroundColor = newColor;
+            try { localStorage.setItem("backgroundColor", newColor); } catch (_e) {}
+            if (typeof globalScope.applyDisplayPreferences === "function") globalScope.applyDisplayPreferences(forPuzzle);
         }
 
         function initBackgroundControls() {
+            if (typeof globalScope.applyDisplayPreferences === "function") globalScope.applyDisplayPreferences(forPuzzle);
+
             ["bgcolorR", "bgcolorG", "bgcolorB"].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.addEventListener("change", applyBackgroundColor);
             });
 
-            let color = localStorage.getItem("backgroundColor");
-            if (color === null) color = "#DD9";
+            const displayPrefs = globalScope.displayPrefs || {};
+            let color = displayPrefs.backgroundColor != null ? displayPrefs.backgroundColor : "#DD9";
             forPuzzle.style.backgroundColor = color;
-            document.getElementById("bgcolorR").value = color.slice(1, 2);
-            document.getElementById("bgcolorG").value = color.slice(2, 3);
-            document.getElementById("bgcolorB").value = color.slice(3, 4);
+            const bgR = document.getElementById("bgcolorR");
+            const bgG = document.getElementById("bgcolorG");
+            const bgB = document.getElementById("bgcolorB");
+            if (bgR) bgR.value = color.length >= 4 ? color.slice(1, 2) : "D";
+            if (bgG) bgG.value = color.length >= 4 ? color.slice(2, 3) : "D";
+            if (bgB) bgB.value = color.length >= 4 ? color.slice(3, 4) : "9";
 
             function applyDropLocationColor() {
                 const r = document.getElementById("dropLocationR").value;
@@ -220,29 +236,20 @@
             const playAreaRadius = document.getElementById("displayPlayAreaRadius");
             const playAreaRadiusValue = document.getElementById("displayPlayAreaRadiusValue");
             if (feltOpacity && playAreaRadius) {
-                const savedFelt = localStorage.getItem("feltOpacity");
-                const defaultFelt = 0.5;
-                const felt = savedFelt !== null ? parseFloat(savedFelt) : defaultFelt;
+                const felt = (displayPrefs.feltOpacity != null && !isNaN(displayPrefs.feltOpacity)) ? displayPrefs.feltOpacity : 0.5;
                 feltOpacity.value = felt;
                 if (feltOpacityValue) feltOpacityValue.textContent = felt.toFixed(2);
-                forPuzzle.style.setProperty("--felt-opacity", String(felt));
 
-                const savedRadius = localStorage.getItem("playAreaRadius");
-                const defaultRadius = 64;
-                const radius = savedRadius !== null ? parseInt(savedRadius, 10) : defaultRadius;
+                const radius = (displayPrefs.playAreaRadius != null && !isNaN(displayPrefs.playAreaRadius)) ? displayPrefs.playAreaRadius : 64;
                 playAreaRadius.value = radius;
                 if (playAreaRadiusValue) playAreaRadiusValue.textContent = radius + "px";
-                forPuzzle.style.setProperty("--play-area-radius", radius + "px");
             }
             const heldShadowSlider = document.getElementById("displayHeldPieceShadowDarkness");
             const heldShadowValue = document.getElementById("displayHeldPieceShadowDarknessValue");
-            const savedHeldShadow = localStorage.getItem("heldPieceShadowDarkness");
-            const defaultHeldShadow = 0.35;
-            const heldShadow = savedHeldShadow !== null ? parseFloat(savedHeldShadow) : defaultHeldShadow;
+            const heldShadow = (displayPrefs.heldPieceShadowDarkness != null && !isNaN(displayPrefs.heldPieceShadowDarkness)) ? displayPrefs.heldPieceShadowDarkness : 0.35;
             if (heldShadowSlider) {
                 heldShadowSlider.value = heldShadow;
                 if (heldShadowValue) heldShadowValue.textContent = heldShadow.toFixed(2);
-                forPuzzle.style.setProperty("--held-piece-shadow-darkness", String(heldShadow));
             }
         }
 
@@ -255,12 +262,11 @@
         function applyViewTransform() {
             clampPanToBounds();
             const baseScale = getActiveBaseScale();
-            const parent = forPuzzle.parentElement;
-            const pw = parent ? parent.clientWidth : 0;
-            const fw = forPuzzle.offsetWidth || 1;
-            const centerXPercent = (pw > 0 && fw > 0) ? (50 * (pw / fw - 1)) : (50 * (baseScale - 1));
+            // Keep container centering stable even when layout metrics momentarily report
+            // stale/transitioning widths during media/puzzle area updates.
+            forPuzzle.style.left = "50%";
             forPuzzle.style.transform = `
-                translate(${centerXPercent}%, -50%)
+                translate(-50%, -50%)
                 scale(${baseScale})
                 translate(${viewState.panX * 100}%, ${viewState.panY * 100}%)
                 scale(${viewState.zoom})
@@ -360,7 +366,7 @@
             localStorage.setItem("viewEnableScaling", String(enabled));
             if (enabled) {
                 unlockScalingLayout();
-                events.push({ event: "resize" });
+                queueUiEvent({ event: "resize" });
             } else {
                 lockScalingLayout();
                 const puzzle = getPuzzle();
@@ -386,28 +392,6 @@
             const fullscreenButton = document.getElementById("taskbarFullscreen");
             const panButtonToggle = document.getElementById("viewPanButtonToggle");
             if (!zoomToggle || !panToggle || !scalingToggle || !resetButton || !zoomSensitivity || !panSensitivity || !zoomSensitivityValue || !panSensitivityValue || !fullscreenButton) return;
-
-            const savedZoom = localStorage.getItem("viewEnableZoom");
-            if (savedZoom !== null) viewState.enableZoom = savedZoom === "true";
-            const savedPan = localStorage.getItem("viewEnablePan");
-            if (savedPan !== null) viewState.enablePan = savedPan === "true";
-            const savedScaling = localStorage.getItem("viewEnableScaling");
-            if (savedScaling !== null) viewState.enableScaling = savedScaling === "true";
-            const savedPanBtn = localStorage.getItem("viewPanButton");
-            if (savedPanBtn !== null) {
-                const pb = parseInt(savedPanBtn, 10);
-                if (!isNaN(pb) && pb >= 0 && pb <= 2) viewState.panButton = pb;
-            }
-            const savedZoomSen = localStorage.getItem("viewZoomSensitivity");
-            if (savedZoomSen !== null) {
-                const zs = parseFloat(savedZoomSen);
-                if (!isNaN(zs)) viewState.zoomSensitivity = clamp(zs, 0.2, 3);
-            }
-            const savedPanSen = localStorage.getItem("viewPanSensitivity");
-            if (savedPanSen !== null) {
-                const ps = parseFloat(savedPanSen);
-                if (!isNaN(ps)) viewState.panSensitivity = clamp(ps, 0.2, 3);
-            }
 
             viewControls = {
                 zoom: zoomToggle,
@@ -497,7 +481,7 @@
             globalScope.addEventListener("resize", () => {
                 if (resizeTimeout) clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(() => {
-                    events.push({ event: "resize" });
+                    queueUiEvent({ event: "resize" });
                     resizeTimeout = null;
                 }, 300);
             });

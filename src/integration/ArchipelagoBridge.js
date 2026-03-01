@@ -134,7 +134,6 @@
                 if (typeof oldValue === "number") return;
 
                 if (movingThatPiece || movingId === value) {
-                    if (moving && moving.pp && moving.pp.polypiece_canvas) moving.pp.polypiece_canvas.classList.remove("moving");
                     deps.setMoving(null);
                 }
                 const pp2 = resolvePolyPieceById(value);
