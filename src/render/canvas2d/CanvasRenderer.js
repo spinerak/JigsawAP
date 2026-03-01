@@ -153,15 +153,10 @@
                 darkness = this._cachedHeldShadowDarkness;
             }
             const localShadow = this._worldToPieceLocal(pp, Math.max(6, w * 0.05), Math.max(6, h * 0.06));
-            const blur = Math.max(18, Math.min(w, h) * 0.24);
             ctx.save();
             ctx.translate(localShadow.x, localShadow.y);
-            ctx.shadowColor = `rgba(0,0,0,${Math.min(1, darkness * 0.85)})`;
-            ctx.shadowBlur = blur;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-            // Keep the core very faint so most weight comes from the blurred edge.
-            ctx.fillStyle = `rgba(0,0,0,${Math.min(1, darkness * 0.12)})`;
+            // Solid offset shadow only; no shadowBlur to avoid GPU cost.
+            ctx.fillStyle = `rgba(0,0,0,${Math.min(1, darkness * 0.35)})`;
             ctx.fill(pp.path);
             ctx.restore();
         }
