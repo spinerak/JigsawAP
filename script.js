@@ -2217,7 +2217,8 @@ class Puzzle {
 
         /* scale pieces: use logical size for display so resolution preset only affects quality, not on-screen size */
         // Display-only shrink factor (does not reduce gameCanvas resolution).
-        const rawAreaMultiplier = Number(window.PUZZLE_AREA_SURFACE_MULTIPLIER);
+        // Online games: 100%; local (solo) games: use PUZZLE_AREA_SURFACE_MULTIPLIER (default 75%).
+        const rawAreaMultiplier = Number(window.play_solo ? window.PUZZLE_AREA_SURFACE_MULTIPLIER : 1);
         let areaScale = 1;
         if (Number.isFinite(rawAreaMultiplier) && rawAreaMultiplier > 0) {
             // Backward-compatible behavior:
