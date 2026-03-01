@@ -129,12 +129,47 @@
   <div class="changelog-modal-card">
     <div class="changelog-modal-title">Changelog</div>
     <div class="changelog-modal-subtitle">
-      Current changelog version: <span class="changelog-current-version">0.10.1</span>
+      Current changelog version: <span class="changelog-current-version">0.10.3</span>
     </div>
     <div class="changelog-modal-scroll">
       <div class="changelog-modal-intro">
         This changelog appears automatically when a new changelog version is detected and can always be reopened from the login page.
       </div>
+      <div class="changelog-modal-notice" style="margin: 1em 0; padding: 0.75em 1em; background: rgba(77, 171, 247, 0.2); border: 2px solid #4dabf7; border-radius: 8px; font-size: 1.1em; font-weight: bold; text-align: center;">
+        Once you're in a jigsaw, please check out the ✨ cosmetic menu and the 📷 view controls menu!
+      </div>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Version 0.10.3</div>
+        <div class="changelog-entry-body">
+          <ul>
+            <li><strong>Memory & performance:</strong> Guy who said he had 23 jigsaws open, this is for you. Significant improvements. Single-canvas rendering (one main canvas instead of per-piece) cuts memory while keeping behavior the same. Per-tab memory can drop by roughly 5–15× in typical use. At 1080p and above, piece edges are drawn at higher resolution and scaled down for smoother borders.</li>
+            <li><strong>Less CPU when idle:</strong> The puzzle uses less CPU when you're not interacting. Synced preview, drop-location indicator, and start-screen preview only redraw when the image/video or settings change (or for the next frame); animated previews follow the game framerate to save CPU and battery.</li>
+            <li><strong>Settings on first load:</strong> Zoom/pan sensitivity, puzzle area size, video frame rate, display options (background, felt, play area, shadow), and view options (zoom/pan toggles, scaling, pan button) now apply as soon as you open a puzzle — no refresh needed.</li>
+            <li><strong>Visual fixes:</strong> Bevels use the same outline as pieces and no longer appear shifted. Bevels now show at any piece count when the slider is above 0 (the 150+ piece limit is removed).</li>
+            <li><strong>Image, video & preview:</strong> Correct media aspect ratio (no stretching/squishing). Padding no longer reduces image quality. "Uniform piece size" crops to fit instead of distorting. Same crop/alignment for static images, video/GIF, and grayscale; pre-start preview matches final puzzle framing. Play area centering is more stable.</li>
+            <li><strong>Piece layering:</strong> Larger groups of connected pieces stay behind smaller groups and single pieces, so an almost-finished section doesn't cover everything when you grab it. Layering updates only when you merge or release, not every frame.</li>
+            <li><strong>Responsiveness & dragging:</strong> Grabbing and dragging feel more responsive with less lag and "snap," especially with many pieces or on slower devices. Canvas2D redraws only the moving piece while dragging; the rest comes from a cached layer. WebGL does less redundant work and fewer GPU state changes. Hit-testing is faster; input is processed before drawing; grab/release no longer trigger heavy rebuilds. Input stays responsive when lots of moves happen at once.</li>
+            <li><strong>Speed & setup:</strong> Puzzle generation and loading from save are faster, especially with more pieces. Merges and boundary updates are quicker. Main render and shadow handling are more efficient.</li>
+            <li><strong>Bug fixes:</strong> Unlocking fake pieces in 180° rotation mode now applies the correct rotation. The "Piece shape" dropdown is visible again when playing online; your choice overrides the Archipelago server.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="changelog-entry">
+        <div class="changelog-entry-title">Version 0.10.2</div>
+        <div class="changelog-entry-body">
+          <ul>
+            <li>Fix piece merge flicker, for real this time.</li>
+            <li>Revert routing video directly to the canvas as it sometimes caused pieces to get the wrong canvas position.</li>
+            <li>Fix changing renderer didn't refresh puzzle pieces, so issues could linger.</li>
+            <li>Fix black square / faulty initialization when webgl failed part-way through, leaving black squares instead of puzzle pieces.</li>
+            <li>Restore the images page. It got moved when I cleaned up unlinked files. It's not linked from within the repository so I overlooked it. Oops.</li>
+            <li>Fix some quirks with z-index where things could shift while you were holding a piece.</li>
+            <li>Improve (?) the Cosmetic Options menu.</li>
+          </ul>
+        </div>
+      </article>
 
       <article class="changelog-entry">
         <div class="changelog-entry-title">Version 0.10.1</div>
@@ -142,7 +177,6 @@
           <ul>
             <li><strong>Resolution & display:</strong> Puzzle resolution now supports 1440p, 4K, 8K, and 16K (default stays 1080p). Higher resolutions can affect performance—a tooltip on the dropdown reminds you. The puzzle image uses more of the play area (90% instead of 85%) so pieces look a bit sharper. Scaling looks better when resolution is capped, and piece edges are crisper.</li>
             <li><strong>Cleaner, consistent windows:</strong> Chat/Log, View controls, Cosmetic options, Piece drawer, and Load custom media all use the same compact header and layout. Less padding, smaller titles, and the same look everywhere. Chat can be resized shorter; only the content area scrolls. Load custom media opens in the right place and stays on top of other UI.</li>
-            <li><strong>Legacy mode for slower devices:</strong> A new “Legacy mode (low‑performance devices)” option in display settings uses a lighter rendering path (Canvas2D only, lower frame rate, no held‑piece shadow) so the game runs better on older tablets and slower PCs. When Legacy mode is on, WebGL is disabled until you turn it off; a short message explains this.</li>
             <li><strong>Performance:</strong> Piece movement is smoother, piece picking is faster, and the piece you’re holding stays on top. Dropping a piece checks only nearby pieces for merges, so drops feel snappier. Resizing the window spreads redraws over several frames so the game stays responsive. The preview/sync window only redraws when it’s open. One animation loop instead of two and fewer things drawn each frame help on slower devices. Several console logs that could slow things down were removed.</li>
             <li><strong>Video and animation:</strong> A new “Video / animation framerate” option (Cosmetics) lets you cap video/GIF updates at 60, 30, 24, 20, or 15 fps (default 30). Lower values reduce load on weaker devices. Video and GIF no longer push at full decode rate, so the game stays responsive. The grayscale reference behind pieces updates less often with video/GIF (about 8 times per second) to save work. Video and GIF now work correctly and more efficiently with both Canvas2D and WebGL.</li>
             <li><strong>Cosmetic options:</strong> “Preview outline only” draws an outline around the puzzle preview so you can see the puzzle size without showing the full grayscale image. The outline follows the actual image area (including square pieces and other layouts).</li>
@@ -276,101 +310,112 @@
       <button type="button" class="control-btn drawer-header-minimize" id="control-btn5" title="Minimize">−</button>
     </header>
     <div class="display-options-body cosmetic-window-body">
-      <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
-        <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
-        <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
-          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-        </select>
-        <select id="bgcolorG" class="display-options-select" aria-label="Background color green">
-          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-        </select>
-        <select id="bgcolorB" class="display-options-select" aria-label="Background color blue">
-          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-        </select>
-      </div>
-      <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
-        <label for="displayPieceBevel">Piece bevel</label>
-        <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
-        <span id="displayPieceBevelValue">0.1</span>
-      </div>
-      <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
-        <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
-        <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
-        <span id="displayHeldPieceShadowDarknessValue">0.35</span>
-      </div>
-      <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
-        <label for="displayFeltOpacity">Felt opacity</label>
-        <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
-        <span id="displayFeltOpacityValue">0.5</span>
-      </div>
-      <div class="display-options-slider" title="Rounded corners of the play area (px).">
-        <label for="displayPlayAreaRadius">Rounded corners</label>
-        <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
-        <span id="displayPlayAreaRadiusValue">64px</span>
-      </div>
-      <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources). Canvas2D is the compatibility path and is used when WebGL is unavailable, blocked, or downgraded for this session.">
-        <label for="rendererModeSelect" title="Auto: preferred default. It attempts WebGL and falls back to Canvas2D when needed. WebGL: GPU path for best performance with large piece counts/animated media. Canvas2D: CPU single-canvas compatibility path.">Renderer backend</label>
-        <select id="rendererModeSelect" class="display-options-select" title="Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available. Canvas2D: compatibility path used when WebGL is unavailable/blocked.">
-          <option value="auto">auto</option>
-          <option value="webgl">webgl</option>
-          <option value="canvas2d">canvas2d</option>
-        </select>
-      </div>
-      <div class="display-options-row display-options-row--label-wide" title="Legacy mode: forces Canvas2D, reduces effects and frame rate to improve responsiveness on slow devices (e.g. old tablets).">
-        <label for="rendererLegacyMode" class="display-options-label-inline">Legacy mode (low‑performance devices)</label>
-        <input type="checkbox" id="rendererLegacyMode" class="display-options-checkbox" aria-label="Legacy mode for slow devices">
-      </div>
-      <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited. Resolutions above 1080p can severely hinder performance, especially with animations.">
-        <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen. Resolutions above 1080p can severely hinder performance, especially with animations.">Puzzle resolution</label>
-        <select id="puzzleResolutionSelect" class="display-options-select" aria-label="Puzzle render resolution cap">
-          <option value="16k">16K</option>
-          <option value="8k">8K</option>
-          <option value="4k">4K</option>
-          <option value="1440p">1440p</option>
-          <option value="1080p" selected>1080p</option>
-          <option value="720p">720p</option>
-          <option value="540p">540p</option>
-        </select>
-      </div>
-      <div class="display-options-slider renderer-mode-slider" title="Cap how often video or animated media frames are applied. Lower framerates reduce CPU/GPU load; Uncapped uses the source&#39;s native rate.">
-        <label for="videoFrameRateSelect" title="Video / animation framerate cap. Lower values improve performance on slow devices.">Video / animation framerate</label>
-        <select id="videoFrameRateSelect" class="display-options-select" aria-label="Video animation framerate cap">
-          <option value="0">Uncapped</option>
-          <option value="16">60 fps</option>
-          <option value="33" selected>30 fps</option>
-          <option value="42">24 fps</option>
-          <option value="50">20 fps</option>
-          <option value="66">15 fps</option>
-        </select>
-      </div>
-      <div class="display-options-row display-options-row--label-wide" title="Show the puzzle image in grayscale behind the pieces as a reference while solving.">
-        <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
-        <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">
-      </div>
-      <div class="display-options-row display-options-row--label-wide" title="Show an outline around the puzzle preview area (size only, no image). Useful when you want to see the puzzle bounds without the grayscale reference.">
-        <label for="showPreviewOutline" class="display-options-label-inline">Preview outline only</label>
-        <input type="checkbox" id="showPreviewOutline" class="display-options-checkbox" aria-label="Show outline around preview area">
-      </div>
-      <div class="display-options-row display-options-row--label-wide" title="Show a draggable handle for where new pieces will appear; drag to move it. The drop location is reset when you start a new puzzle.">
-        <label for="useCustomDropLocation" class="display-options-label-inline">Show drop location handle</label>
-        <input type="checkbox" id="useCustomDropLocation" class="display-options-checkbox" aria-label="Show drop location handle">
-      </div>
-      <div class="display-options-row" title="Color of the drop location target (hex R, G, B).">
-        <label for="dropLocationR" class="display-options-label-inline">Drop location color #</label>
-        <select id="dropLocationR" class="display-options-select" aria-label="Drop location color red">
-          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-        </select>
-        <select id="dropLocationG" class="display-options-select" aria-label="Drop location color green">
-          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-        </select>
-        <select id="dropLocationB" class="display-options-select" aria-label="Drop location color blue">
-          <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
-        </select>
-      </div>
-      <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
-        <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
-        <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>
-      </div>
+      <section class="cosmetic-window-card">
+        <h4 class="cosmetic-window-title">Play area</h4>
+        <div class="display-options-row" title="Background color of the play area (hex R, G, B).">
+          <label for="bgcolorR" class="display-options-label-inline">BG color #</label>
+          <select id="bgcolorR" class="display-options-select" aria-label="Background color red">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+          <select id="bgcolorG" class="display-options-select" aria-label="Background color green">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+          <select id="bgcolorB" class="display-options-select" aria-label="Background color blue">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+        </div>
+        <div class="display-options-slider" title="Opacity of the felt texture over the play area.">
+          <label for="displayFeltOpacity">Felt opacity</label>
+          <input id="displayFeltOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
+          <span id="displayFeltOpacityValue">0.5</span>
+        </div>
+        <div class="display-options-slider" title="Rounded corners of the play area (px).">
+          <label for="displayPlayAreaRadius">Rounded corners</label>
+          <input id="displayPlayAreaRadius" type="range" min="0" max="128" step="4" value="64">
+          <span id="displayPlayAreaRadiusValue">64px</span>
+        </div>
+      </section>
+      <section class="cosmetic-window-card">
+        <h4 class="cosmetic-window-title">Pieces</h4>
+        <div class="display-options-slider" title="Thickness of the 3D edge effect on piece borders (0 = off). Redraws when you release the slider.">
+          <label for="displayPieceBevel">Piece bevel</label>
+          <input id="displayPieceBevel" type="range" min="0" max="2" step="0.1" value="0.1">
+          <span id="displayPieceBevelValue">0.1</span>
+        </div>
+        <div class="display-options-slider" title="Darkness (opacity) of the drop shadow on the piece you are dragging.">
+          <label for="displayHeldPieceShadowDarkness">Held piece shadow darkness</label>
+          <input id="displayHeldPieceShadowDarkness" type="range" min="0" max="1" step="0.05" value="0.35">
+          <span id="displayHeldPieceShadowDarknessValue">0.35</span>
+        </div>
+      </section>
+      <section class="cosmetic-window-card">
+        <h4 class="cosmetic-window-title">Preview &amp; reference</h4>
+        <div class="display-options-row display-options-row--label-wide" title="Show the puzzle image in grayscale behind the pieces as a reference while solving.">
+          <label for="showGrayscaleReference" class="display-options-label-inline">Grayscale reference behind pieces</label>
+          <input type="checkbox" id="showGrayscaleReference" class="display-options-checkbox" aria-label="Show grayscale reference image behind pieces">
+        </div>
+        <div class="display-options-row display-options-row--label-wide" title="Show an outline around the puzzle preview area (size only, no image). Useful when you want to see the puzzle bounds without the grayscale reference.">
+          <label for="showPreviewOutline" class="display-options-label-inline">Preview outline only</label>
+          <input type="checkbox" id="showPreviewOutline" class="display-options-checkbox" aria-label="Show outline around preview area">
+        </div>
+      </section>
+      <section class="cosmetic-window-card">
+        <h4 class="cosmetic-window-title">Drop location</h4>
+        <div class="display-options-row display-options-row--label-wide" title="Show a draggable handle for where new pieces will appear; drag to move it. The drop location is reset when you start a new puzzle.">
+          <label for="useCustomDropLocation" class="display-options-label-inline">Show drop location handle</label>
+          <input type="checkbox" id="useCustomDropLocation" class="display-options-checkbox" aria-label="Show drop location handle">
+        </div>
+        <div class="display-options-row" title="Color of the drop location target (hex R, G, B).">
+          <label for="dropLocationR" class="display-options-label-inline">Drop location color #</label>
+          <select id="dropLocationR" class="display-options-select" aria-label="Drop location color red">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+          <select id="dropLocationG" class="display-options-select" aria-label="Drop location color green">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+          <select id="dropLocationB" class="display-options-select" aria-label="Drop location color blue">
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option>
+          </select>
+        </div>
+      </section>
+      <section class="cosmetic-window-card">
+        <h4 class="cosmetic-window-title">Renderer &amp; performance</h4>
+        <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources). Canvas2D is the compatibility path and is used when WebGL is unavailable, blocked, or downgraded for this session.">
+          <label for="rendererModeSelect" title="Auto: preferred default. It attempts WebGL and falls back to Canvas2D when needed. WebGL: GPU path for best performance with large piece counts/animated media. Canvas2D: CPU single-canvas compatibility path.">Renderer backend</label>
+          <select id="rendererModeSelect" class="display-options-select" title="Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available. Canvas2D: compatibility path used when WebGL is unavailable/blocked.">
+            <option value="auto">auto</option>
+            <option value="webgl">webgl</option>
+            <option value="canvas2d">canvas2d</option>
+          </select>
+        </div>
+        <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited. Resolutions above 1080p can severely hinder performance, especially with animations.">
+          <label for="puzzleResolutionSelect" title="Lower resolution uses fewer pixels for drawing and can reduce lag when dragging in fullscreen. Resolutions above 1080p can severely hinder performance, especially with animations.">Puzzle resolution</label>
+          <select id="puzzleResolutionSelect" class="display-options-select" aria-label="Puzzle render resolution cap">
+            <option value="16k">16K</option>
+            <option value="8k">8K</option>
+            <option value="4k">4K</option>
+            <option value="1440p">1440p</option>
+            <option value="1080p" selected>1080p</option>
+            <option value="720p">720p</option>
+            <option value="540p">540p</option>
+          </select>
+        </div>
+        <div class="display-options-slider renderer-mode-slider" title="Cap how often video or animated media frames are applied. Lower framerates reduce CPU/GPU load; Uncapped uses the source&#39;s native rate.">
+          <label for="videoFrameRateSelect" title="Video / animation framerate cap. Lower values improve performance on slow devices.">Video / animation framerate</label>
+          <select id="videoFrameRateSelect" class="display-options-select" aria-label="Video animation framerate cap">
+            <option value="0">Uncapped</option>
+            <option value="16">60 fps</option>
+            <option value="33" selected>30 fps</option>
+            <option value="42">24 fps</option>
+            <option value="50">20 fps</option>
+            <option value="66">15 fps</option>
+          </select>
+        </div>
+        <div id="rendererFallbackRow" class="renderer-fallback-row" style="display:none;">
+          <span id="rendererModeStatus" class="renderer-mode-status" aria-live="polite" title="WebGL fallback reason for this session."></span>
+          <button id="rendererModeRetry" type="button" class="drawer-btn" title="Retry WebGL in this session after a downgrade. Use this if source/security conditions changed.">Retry WebGL</button>
+        </div>
+      </section>
     </div>
   </div>
   <div class="resizer corner" id="resizerCorner5"></div>

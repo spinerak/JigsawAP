@@ -5,7 +5,6 @@
         constructor() {
             this.puzzle = null;
             this.dirtyPieces = new Set();
-            this.dirtyRects = [];
             this.version = 0;
             this.mediaContentDirty = true;
             this.zOrderDirty = false;
@@ -22,6 +21,12 @@
             this.version++;
         }
 
+        clearPieceDirty(piece) {
+            if (!piece) return;
+            this.dirtyPieces.delete(piece);
+            this.version++;
+        }
+
         markAllDirty() {
             this.dirtyPieces.clear();
             if (this.puzzle && this.puzzle.polyPieces) {
@@ -32,6 +37,11 @@
 
         markZOrderDirty() {
             this.zOrderDirty = true;
+            this.version++;
+        }
+
+        clearZOrderDirty() {
+            this.zOrderDirty = false;
             this.version++;
         }
 
@@ -47,18 +57,6 @@
 
         dirtyPieceCount() {
             return this.dirtyPieces.size;
-        }
-
-        addDirtyRect(rect) {
-            if (!rect) return;
-            this.dirtyRects.push(rect);
-            this.version++;
-        }
-
-        consumeDirtyRects() {
-            const out = this.dirtyRects.slice();
-            this.dirtyRects.length = 0;
-            return out;
         }
     }
 

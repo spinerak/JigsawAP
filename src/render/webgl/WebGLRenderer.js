@@ -33,6 +33,8 @@
             this._boundProgram = null;
             this._boundTexture0 = null;
             this._boundTexture1 = null;
+            this._activeTextureUnit = -1;
+            this._resolutionSerial = 1;
             this._frameCounter = 0;
             this._sortedPieces = [];
             this._sortedPiecesVersion = -1;
@@ -50,6 +52,12 @@
             this._sharedOverlayCtx = null;
             this._sharedMaskCanvas = null;
             this._sharedMaskCtx = null;
+        }
+
+        _isOverlayOversampleEnabled() {
+            if (typeof globalScope === "undefined" || typeof globalScope.getPuzzleResolution !== "function") return false;
+            const preset = globalScope.getPuzzleResolution();
+            return preset === "1080p" || preset === "1440p" || preset === "4k" || preset === "8k" || preset === "16k";
         }
 
         _ensureSharedOverlayCanvas(w, h) {
@@ -125,10 +133,22 @@
         }
 
         resize(bufferW, bufferH, displayW, displayH) {
+            const prevCanvasW = this.canvas.width | 0;
+            const prevCanvasH = this.canvas.height | 0;
+            const prevDisplayW = this._displayWidth | 0;
+            const prevDisplayH = this._displayHeight | 0;
             this.canvas.width = Math.max(1, Math.round(bufferW));
             this.canvas.height = Math.max(1, Math.round(bufferH));
             this._displayWidth = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayW)) : this.canvas.width;
             this._displayHeight = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayH)) : this.canvas.height;
+            if (
+                prevCanvasW !== (this.canvas.width | 0) ||
+                prevCanvasH !== (this.canvas.height | 0) ||
+                prevDisplayW !== (this._displayWidth | 0) ||
+                prevDisplayH !== (this._displayHeight | 0)
+            ) {
+                this._resolutionSerial++;
+            }
             if (this.gl) this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         }
 
@@ -144,38 +164,48 @@
 
                 const sourceCanvas = this.puzzle.gameCanvas || null;
                 const videoSource = (this.mediaSource && typeof this.mediaSource.videoWidth === "number" && typeof this.mediaSource.videoHeight === "number") ? this.mediaSource : null;
-                const gifDraw = this.puzzle._gifDraw || null;
-                const useVideoTexture = !!(videoSource && gifDraw && gifDraw.dw > 0 && gifDraw.dh > 0);
-                const mediaSource = useVideoTexture ? videoSource : sourceCanvas;
-                const forceUpload = useVideoTexture || sceneState == null || !!(sceneState && sceneState.mediaContentDirty);
+                if (videoSource && sourceCanvas && typeof this.puzzle.renderSourceToGameCanvas === "function") {
+                    this.puzzle.renderSourceToGameCanvas(videoSource);
+                }
+                const mediaSource = sourceCanvas;
+                const forceUpload = !!videoSource || sceneState == null || !!(sceneState && sceneState.mediaContentDirty);
                 if (!mediaSource || !this._updateMediaTexture(mediaSource, forceUpload)) return;
 
                 const pieces = this._getSortedPieces();
-                const sourceW = useVideoTexture ? (gifDraw.dw || 1) : (sourceCanvas ? sourceCanvas.width : 1);
-                const sourceH = useVideoTexture ? (gifDraw.dh || 1) : (sourceCanvas ? sourceCanvas.height : 1);
-                const sourceDx = useVideoTexture ? (gifDraw.dx || 0) : undefined;
-                const sourceDy = useVideoTexture ? (gifDraw.dy || 0) : undefined;
+                const sourceW = sourceCanvas ? sourceCanvas.width : 1;
+                const sourceH = sourceCanvas ? sourceCanvas.height : 1;
+                const sourceDx = undefined;
+                const sourceDy = undefined;
+                const contentW = (typeof this.puzzle._mediaContentWidth === "number" && this.puzzle._mediaContentWidth > 0)
+                    ? this.puzzle._mediaContentWidth
+                    : ((this.puzzle._logicalGameWidth != null && this.puzzle._logicalGameHeight != null && this.puzzle.nx && this.puzzle.ny)
+                        ? this.puzzle.nx * this.puzzle.scalex
+                        : sourceW);
+                const contentH = (typeof this.puzzle._mediaContentHeight === "number" && this.puzzle._mediaContentHeight > 0)
+                    ? this.puzzle._mediaContentHeight
+                    : ((this.puzzle._logicalGameWidth != null && this.puzzle._logicalGameHeight != null && this.puzzle.nx && this.puzzle.ny)
+                        ? this.puzzle.ny * this.puzzle.scaley
+                        : sourceH);
 
-                const legacyMode = typeof globalScope !== "undefined" && globalScope.rendererConfig && globalScope.rendererConfig.legacyMode;
-                if (this._cachedHeldShadowFrameMs !== nowMs) {
+                if (this._cachedHeldShadowAlpha == null || (nowMs - (this._cachedHeldShadowFrameMs || 0) > 300)) {
                     this._cachedHeldShadowFrameMs = nowMs;
-                    this._cachedHeldShadowAlpha = legacyMode ? 0 : Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35") * 0.95));
+                    this._cachedHeldShadowAlpha = Math.max(0, Math.min(1, parseFloat(localStorage.getItem("heldPieceShadowDarkness") || "0.35") * 0.95));
                 }
-                const heldShadowAlpha = legacyMode ? 0 : this._cachedHeldShadowAlpha;
-                const activePieces = new Set();
+                const heldShadowAlpha = this._cachedHeldShadowAlpha;
+                const visibleFrameMark = this._frameCounter + 1;
                 const drawItems = [];
                 let numHeld = 0;
                 const puzzle = this.puzzle;
                 for (const pp of pieces) {
-                    const w = pp.polypiece_canvas ? (pp.polypiece_canvas.width | 0) : (pp.nx * puzzle.scalex);
-                    const h = pp.polypiece_canvas ? (pp.polypiece_canvas.height | 0) : (pp.ny * puzzle.scaley);
+                    const w = pp.nx * puzzle.scalex;
+                    const h = pp.ny * puzzle.scaley;
                     if (w <= 0 || h <= 0 || !pp.path) continue;
                     if (!pp._mediaSample) continue;
                     if (!this._isPieceVisible(pp, w, h)) continue;
-                    activePieces.add(pp);
 
-                    const cache = this._ensurePieceTextures(pp);
+                    const cache = this._ensurePieceTextures(pp, sceneState);
                     if (!cache || !cache.maskTexture || !cache.overlayTexture) continue;
+                    cache.lastSeenFrame = visibleFrameMark;
                     const held = !!pp._isHeld;
                     if (held) numHeld++;
                     drawItems.push({
@@ -202,7 +232,7 @@
                     let pieceIdx = 0;
                     for (const item of drawItems) {
                         const pieceOffsetFloats = (numHeld + pieceIdx) * 36;
-                        this._writePieceVerticesTo(item.pp, item.w, item.h, sourceW, sourceH, this._batchedVertices, pieceOffsetFloats, sourceDx, sourceDy);
+                        this._writePieceVerticesTo(item.pp, item.w, item.h, sourceW, sourceH, this._batchedVertices, pieceOffsetFloats, sourceDx, sourceDy, contentW, contentH);
                         if (item.held) {
                             const shadowDx = Math.max(6, item.w * 0.05);
                             const shadowDy = Math.max(6, item.h * 0.06);
@@ -248,7 +278,7 @@
                     }
                 }
                 this._frameCounter++;
-                if ((this._frameCounter % 30) === 0) this._pruneTextureCache(activePieces);
+                if ((this._frameCounter % 30) === 0) this._pruneTextureCache(visibleFrameMark);
                 this.lastDrawCount = drawItems.length * 2 + numHeld;
                 this.lastMediaUploads = this._mediaUploadsThisFrame || 0;
             } catch (e) {
@@ -308,6 +338,8 @@
             this._boundProgram = null;
             this._boundTexture0 = null;
             this._boundTexture1 = null;
+            this._activeTextureUnit = -1;
+            this._resolutionSerial++;
 
             const vertexSrc = `
                 attribute vec2 a_position;
@@ -432,13 +464,7 @@
             }
         }
 
-        _buildPieceVertices(pp, w, h, sourceW, sourceH) {
-            const out = new Float32Array(36);
-            this._writePieceVerticesTo(pp, w, h, sourceW, sourceH, out, 0);
-            return out;
-        }
-
-        _writePieceVerticesTo(pp, w, h, sourceW, sourceH, out, offsetFloats, sourceDx, sourceDy) {
+        _writePieceVerticesTo(pp, w, h, sourceW, sourceH, out, offsetFloats, sourceDx, sourceDy, contentW, contentH) {
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             const deg = (globalScope.rotations === 180 ? 90 : globalScope.rotations) || 0;
@@ -450,10 +476,12 @@
             const ms = pp._mediaSample || { sx: 0, sy: 0, destx: 0, desty: 0, w: w, h: h };
             const dx = (typeof sourceDx === "number") ? sourceDx : ms.destx;
             const dy = (typeof sourceDy === "number") ? sourceDy : ms.desty;
-            const u0 = (ms.sx - dx) / sourceW;
-            const u1 = (ms.sx + ms.w - dx) / sourceW;
-            const v0 = (ms.sy - dy) / sourceH;
-            const v1 = (ms.sy + ms.h - dy) / sourceH;
+            const uw = (contentW != null && contentH != null && contentW > 0 && contentH > 0) ? contentW : sourceW;
+            const uh = (contentW != null && contentH != null && contentW > 0 && contentH > 0) ? contentH : sourceH;
+            const u0 = (ms.sx - dx) / uw;
+            const u1 = (ms.sx + ms.w - dx) / uw;
+            const v0 = (ms.sy - dy) / uh;
+            const v1 = (ms.sy + ms.h - dy) / uh;
             const tl = this._rotateAndTranslate(-hw, -hh, c, s, cx, cy);
             const tr = this._rotateAndTranslate(hw, -hh, c, s, cx, cy);
             const bl = this._rotateAndTranslate(-hw, hh, c, s, cx, cy);
@@ -480,15 +508,6 @@
             }
         }
 
-        _buildShadowVertices(vertices, shadowDx, shadowDy) {
-            const out = new Float32Array(vertices);
-            for (let i = 0; i < out.length; i += 6) {
-                out[i] += shadowDx;
-                out[i + 1] += shadowDy;
-            }
-            return out;
-        }
-
         _rotateAndTranslate(x, y, c, s, tx, ty) {
             return {
                 x: x * c - y * s + tx,
@@ -496,9 +515,9 @@
             };
         }
 
-        _pruneTextureCache(activePieces) {
+        _pruneTextureCache(visibleFrameMark) {
             for (const [piece, entry] of this._pieceTextureCache.entries()) {
-                if (!activePieces.has(piece)) {
+                if (!entry || entry.lastSeenFrame !== visibleFrameMark) {
                     if (this.gl && entry.maskTexture) this.gl.deleteTexture(entry.maskTexture);
                     if (this.gl && entry.overlayTexture) this.gl.deleteTexture(entry.overlayTexture);
                     this._pieceTextureCache.delete(piece);
@@ -506,12 +525,12 @@
             }
         }
 
-        _ensurePieceTextures(pp) {
+        _ensurePieceTextures(pp, sceneState) {
             const gl = this.gl;
             const puzzle = this.puzzle;
             if (!puzzle) return null;
-            const w = pp.polypiece_canvas ? (pp.polypiece_canvas.width | 0) : Math.max(1, pp.nx * puzzle.scalex);
-            const h = pp.polypiece_canvas ? (pp.polypiece_canvas.height | 0) : Math.max(1, pp.ny * puzzle.scaley);
+            const w = Math.max(1, pp.nx * puzzle.scalex);
+            const h = Math.max(1, pp.ny * puzzle.scaley);
             if (w <= 0 || h <= 0 || !pp.path) return null;
 
             let entry = this._pieceTextureCache.get(pp);
@@ -524,11 +543,13 @@
                     maskConfigured: false,
                     overlayConfigured: false,
                     maskW: 0,
-                    maskH: 0
+                    maskH: 0,
+                    lastSeenFrame: 0
                 };
                 this._pieceTextureCache.set(pp, entry);
             }
             if (!entry.maskTexture || !entry.overlayTexture) return null;
+            if (entry.lastSeenFrame == null) entry.lastSeenFrame = 0;
 
             const maskVersion = pp._maskVersion != null ? pp._maskVersion : (pp._overlayVersion || 0);
             if (entry.maskVersion !== maskVersion) {
@@ -574,22 +595,38 @@
                     }
                     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
                     try {
-                        if (pp.polypiece_canvas) {
-                            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pp.polypiece_canvas);
-                        } else if (typeof pp.drawOverlayToContext === "function") {
-                            const octx = this._ensureSharedOverlayCanvas(w, h);
+                        if (typeof pp.drawOverlayToContext === "function") {
+                            const oversample = this._isOverlayOversampleEnabled();
+                            let ow = oversample ? Math.min(2048, Math.max(1, 2 * (w | 0))) : (w | 0);
+                            let oh = oversample ? Math.min(2048, Math.max(1, 2 * (h | 0))) : (h | 0);
+                            const oversampleFits = ow >= 2 * (w | 0) && oh >= 2 * (h | 0);
+                            if (oversample && !oversampleFits) {
+                                ow = Math.max(1, w | 0);
+                                oh = Math.max(1, h | 0);
+                            }
+                            const octx = this._ensureSharedOverlayCanvas(ow, oh);
                             octx.setTransform(1, 0, 0, 1, 0, 0);
-                            octx.clearRect(0, 0, w, h);
-                            pp.drawOverlayToContext(octx, w, h, puzzle);
+                            octx.clearRect(0, 0, ow, oh);
+                            if (oversample && oversampleFits) {
+                                octx.save();
+                                octx.scale(2, 2);
+                                pp.drawOverlayToContext(octx, w, h, puzzle);
+                                octx.restore();
+                            } else {
+                                pp.drawOverlayToContext(octx, w, h, puzzle);
+                            }
                             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._sharedOverlayCanvas);
+                            this._uploadCountThisFrame += 1;
                         }
-                        this._uploadCountThisFrame += 1;
                     } catch (e) {
                         this._handleUploadFailure(e);
                         return null;
                     }
                     entry.overlayVersion = pp._overlayVersion || 0;
                 }
+            }
+            if (entry.maskVersion === maskVersion && entry.overlayVersion === (pp._overlayVersion || 0) && sceneState && typeof sceneState.clearPieceDirty === "function") {
+                sceneState.clearPieceDirty(pp);
             }
             return entry;
         }
@@ -609,7 +646,10 @@
                 gl.enableVertexAttribArray(programInfo.aMediaUv);
                 gl.vertexAttribPointer(programInfo.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
             }
-            gl.uniform2f(programInfo.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
+            if (programInfo._resolutionAppliedSerial !== this._resolutionSerial) {
+                gl.uniform2f(programInfo.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
+                programInfo._resolutionAppliedSerial = this._resolutionSerial;
+            }
         }
 
         _configureTextureDefaults(texture) {
@@ -632,7 +672,10 @@
 
         _bindTextureUnit(unit, texture) {
             const gl = this.gl;
-            gl.activeTexture(unit === 0 ? gl.TEXTURE0 : gl.TEXTURE1);
+            if (this._activeTextureUnit !== unit) {
+                gl.activeTexture(unit === 0 ? gl.TEXTURE0 : gl.TEXTURE1);
+                this._activeTextureUnit = unit;
+            }
             if (unit === 0 && this._boundTexture0 === texture) return;
             if (unit === 1 && this._boundTexture1 === texture) return;
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -654,8 +697,8 @@
             if (this._sortedPiecesVersion !== version || this._sortedPieces.length !== pieces.length) {
                 this._sortedPieces = pieces.slice();
                 this._sortedPieces.sort((a, b) => {
-                    const za = (a._zIndex != null) ? a._zIndex : (Number(a.polypiece_canvas && a.polypiece_canvas.style.zIndex) || 0);
-                    const zb = (b._zIndex != null) ? b._zIndex : (Number(b.polypiece_canvas && b.polypiece_canvas.style.zIndex) || 0);
+                    const za = (a._zIndex != null) ? a._zIndex : 0;
+                    const zb = (b._zIndex != null) ? b._zIndex : 0;
                     return za - zb;
                 });
                 this._sortedPiecesVersion = version;
