@@ -36,8 +36,29 @@
 
         _ensureHeldOverlay() {
             if (!this.canvas || !this.container) return;
-            const w = this.canvas.width;
-            const h = this.canvas.height;
+            const cw = this.canvas.width;
+            const ch = this.canvas.height;
+            let tw = this.container.clientWidth || 0;
+            let th = this.container.clientHeight || 0;
+            if (tw === 0 && th === 0 && this.puzzle) {
+                tw = this.puzzle.contWidth || 0;
+                th = this.puzzle.contHeight || 0;
+            }
+            let w;
+            let h;
+            if (cw <= 0 || ch <= 0) {
+                w = tw;
+                h = th;
+            } else if (cw === 1 && ch === 1 && (tw > 1 || th > 1)) {
+                w = tw;
+                h = th;
+            } else {
+                w = cw;
+                h = ch;
+            }
+            w = Math.max(1, Math.round(w));
+            h = Math.max(1, Math.round(h));
+
             if (!this._heldOverlayCanvas) {
                 this._heldOverlayCanvas = document.createElement("canvas");
                 this._heldOverlayCanvas.className = "jigsaw-held-overlay-renderer";
@@ -49,6 +70,12 @@
                 this._heldOverlayCanvas.style.zIndex = "100000000";
                 this._heldOverlayCanvas.style.pointerEvents = "none";
                 this._heldOverlayCtx = this._heldOverlayCanvas.getContext("2d");
+                if (this.canvas.nextSibling) {
+                    this.container.insertBefore(this._heldOverlayCanvas, this.canvas.nextSibling);
+                } else {
+                    this.container.appendChild(this._heldOverlayCanvas);
+                }
+            } else if (!this._heldOverlayCanvas.parentElement) {
                 if (this.canvas.nextSibling) {
                     this.container.insertBefore(this._heldOverlayCanvas, this.canvas.nextSibling);
                 } else {
