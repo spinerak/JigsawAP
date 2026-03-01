@@ -1657,8 +1657,7 @@ class Puzzle {
             event.preventDefault();
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
-            
-            queueGameEvent({ event: 'move', button: event.button, position: this.relativeMouseCoordinates(event) });
+            queueGameEvent({ event: 'move', button: event.button, position: { clientX: event.clientX, clientY: event.clientY } });
         });
         this.container.addEventListener("touchmove", event => {
             event.preventDefault();
@@ -1666,8 +1665,7 @@ class Puzzle {
             let ev = event.touches[0];
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
-            // console.log("touch", event.offsetX, event.offsetY, event)
-            queueGameEvent({ event: 'move', button: 0, position: this.relativeMouseCoordinates(ev) });
+            queueGameEvent({ event: 'move', button: 0, position: { clientX: ev.clientX, clientY: ev.clientY } });
         }, { passive: false });
 
         /* create canvas to contain picture - will be styled later */
@@ -3003,7 +3001,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         viewState.panY += (deltaClientY / panScaleH) * viewState.panSensitivity;
         startDragClientX = event.position.clientX;
         startDragClientY = event.position.clientY;
-        applyViewTransform();
+        applyViewTransform(true);
     }
 
     function applyPieceMoveEvent(event, perfMonitor) {
@@ -3109,6 +3107,13 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 applyPanMoveEvent(event);
                 event = null;
             } else if (state === 55 && moving && moving.pp) {
+                if (event.position.x == null || event.position.y == null) {
+                    const pos = puzzle.screenToPuzzle(event.position.clientX, event.position.clientY);
+                    event.position.x = pos.x;
+                    event.position.y = pos.y;
+                    event.position.p_x = pos.p_x;
+                    event.position.p_y = pos.p_y;
+                }
                 applyPieceMoveEvent(event, perfMonitor);
                 event = null;
             }
@@ -4031,8 +4036,8 @@ if (window.JigsawViewControls && typeof window.JigsawViewControls.init === "func
 const forPuzzleEl = document.getElementById("forPuzzle");
 if (forPuzzleEl && typeof applyDisplayPreferences === "function") applyDisplayPreferences(forPuzzleEl);
 
-function applyViewTransform() {
-    if (_viewControlsApi && _viewControlsApi.applyViewTransform) _viewControlsApi.applyViewTransform();
+function applyViewTransform(panOnly) {
+    if (_viewControlsApi && _viewControlsApi.applyViewTransform) _viewControlsApi.applyViewTransform(panOnly);
 }
 
 function resetView() {

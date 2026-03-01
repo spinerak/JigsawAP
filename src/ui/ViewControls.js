@@ -259,7 +259,7 @@
             viewState.panY = clamp(viewState.panY, -maxOffset, maxOffset);
         }
 
-        function applyViewTransform() {
+        function applyViewTransform(panOnly = false) {
             clampPanToBounds();
             const baseScale = getActiveBaseScale();
             // Keep container centering stable even when layout metrics momentarily report
@@ -276,7 +276,7 @@
             const puzzle = getPuzzle();
             if (puzzle) {
                 if (puzzle._invalidateViewMetricsCache) puzzle._invalidateViewMetricsCache();
-                if (Number.isFinite(puzzle.scalex)) puzzle.refreshConnectionDistance();
+                if (!panOnly && Number.isFinite(puzzle.scalex)) puzzle.refreshConnectionDistance();
             }
         }
 
