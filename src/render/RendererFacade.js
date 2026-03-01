@@ -345,7 +345,7 @@
         isMediaAnimated() {
             const status = this.media && this.media.getStatus ? this.media.getStatus() : null;
             const kind = status && status.kind ? status.kind : "image";
-            return kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded";
+            return kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded" || kind === "gif";
         }
 
         renderFrame(nowMs) {
