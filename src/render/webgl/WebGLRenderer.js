@@ -16,9 +16,7 @@
             this.puzzle = null;
             this.supportsPieceRendering = false;
             this._eventsBound = false;
-            this._mediaProgram = null;
-            this._overlayProgram = null;
-            this._shadowProgram = null;
+            this._pieceProgram = null;
             this._vertexBuffer = null;
             this._pieceTextureCache = new Map();
             this._mediaTexture = null;
@@ -30,7 +28,6 @@
             this._fatalErrorLogged = false;
             this.failureReason = "";
             this.mediaSource = null;
-            this._boundProgram = null;
             this._boundTexture0 = null;
             this._boundTexture1 = null;
             this._activeTextureUnit = -1;
@@ -161,7 +158,7 @@
                 gl.viewport(0, 0, this.canvas.width, this.canvas.height);
                 gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
-                if (!this.puzzle || !this._mediaProgram || !this._overlayProgram || !this._shadowProgram) return;
+                if (!this.puzzle || !this._pieceProgram) return;
 
                 const sourceCanvas = this.puzzle.gameCanvas || null;
                 const videoSource = (this.mediaSource && typeof this.mediaSource.videoWidth === "number" && typeof this.mediaSource.videoHeight === "number") ? this.mediaSource : null;
@@ -253,31 +250,43 @@
                     gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
                     gl.bufferData(gl.ARRAY_BUFFER, this._batchedVertices.subarray(0, requiredFloats), gl.STREAM_DRAW);
 
+                    gl.useProgram(this._pieceProgram.program);
+                    gl.enableVertexAttribArray(this._pieceProgram.aPosition);
+                    gl.enableVertexAttribArray(this._pieceProgram.aTexCoord);
+                    gl.enableVertexAttribArray(this._pieceProgram.aMediaUv);
+                    if (this._pieceProgram._resolutionAppliedSerial !== this._resolutionSerial) {
+                        gl.uniform2f(this._pieceProgram.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
+                        this._pieceProgram._resolutionAppliedSerial = this._resolutionSerial;
+                    }
+
                     for (const item of drawItems) {
                         if (item.held && item.shadowVertexOffsetFloats >= 0) {
-                            this._bindProgram(this._shadowProgram, item.shadowVertexOffsetFloats * 4);
+                            this._setVertexOffset(item.shadowVertexOffsetFloats * 4);
+                            gl.uniform1f(this._pieceProgram.uMode, 0.0);
                             this._bindTextureUnit(0, item.maskTexture);
-                            gl.uniform1i(this._shadowProgram.uMask, 0);
-                            gl.uniform1f(this._shadowProgram.uAlpha, item.heldShadowAlpha);
+                            gl.uniform1i(this._pieceProgram.uMask, 0);
+                            gl.uniform1f(this._pieceProgram.uAlpha, item.heldShadowAlpha);
                             gl.uniform2f(
-                                this._shadowProgram.uTexel,
+                                this._pieceProgram.uTexel,
                                 1 / Math.max(1, item.maskW),
                                 1 / Math.max(1, item.maskH)
                             );
-                            gl.uniform1f(this._shadowProgram.uSoftness, 3.0);
+                            gl.uniform1f(this._pieceProgram.uSoftness, 3.0);
                             gl.drawArrays(gl.TRIANGLES, 0, 6);
                         }
 
-                        this._bindProgram(this._mediaProgram, item.pieceVertexOffsetFloats * 4);
+                        this._setVertexOffset(item.pieceVertexOffsetFloats * 4);
+                        gl.uniform1f(this._pieceProgram.uMode, 1.0);
                         this._bindTextureUnit(0, this._mediaTexture);
-                        gl.uniform1i(this._mediaProgram.uMedia, 0);
+                        gl.uniform1i(this._pieceProgram.uMedia, 0);
                         this._bindTextureUnit(1, item.maskTexture);
-                        gl.uniform1i(this._mediaProgram.uMask, 1);
+                        gl.uniform1i(this._pieceProgram.uMask, 1);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-                        this._bindProgram(this._overlayProgram, item.pieceVertexOffsetFloats * 4);
+                        this._setVertexOffset(item.pieceVertexOffsetFloats * 4);
+                        gl.uniform1f(this._pieceProgram.uMode, 2.0);
                         this._bindTextureUnit(0, item.overlayTexture);
-                        gl.uniform1i(this._overlayProgram.uOverlay, 0);
+                        gl.uniform1i(this._pieceProgram.uOverlay, 0);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
                     }
                 }
@@ -307,17 +316,13 @@
                 this._pieceTextureCache.clear();
                 if (this._vertexBuffer) this.gl.deleteBuffer(this._vertexBuffer);
                 if (this._mediaTexture) this.gl.deleteTexture(this._mediaTexture);
-                if (this._mediaProgram && this._mediaProgram.program) this.gl.deleteProgram(this._mediaProgram.program);
-                if (this._overlayProgram && this._overlayProgram.program) this.gl.deleteProgram(this._overlayProgram.program);
-                if (this._shadowProgram && this._shadowProgram.program) this.gl.deleteProgram(this._shadowProgram.program);
+                if (this._pieceProgram && this._pieceProgram.program) this.gl.deleteProgram(this._pieceProgram.program);
             }
             this._vertexBuffer = null;
             this._mediaTexture = null;
             this._mediaTextureW = 0;
             this._mediaTextureH = 0;
-            this._mediaProgram = null;
-            this._overlayProgram = null;
-            this._shadowProgram = null;
+            this._pieceProgram = null;
             if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
             this.gl = null;
         }
@@ -327,9 +332,7 @@
             const gl = this.gl;
             if (this._vertexBuffer) gl.deleteBuffer(this._vertexBuffer);
             if (this._mediaTexture) gl.deleteTexture(this._mediaTexture);
-            if (this._mediaProgram && this._mediaProgram.program) gl.deleteProgram(this._mediaProgram.program);
-            if (this._overlayProgram && this._overlayProgram.program) gl.deleteProgram(this._overlayProgram.program);
-            if (this._shadowProgram && this._shadowProgram.program) gl.deleteProgram(this._shadowProgram.program);
+            if (this._pieceProgram && this._pieceProgram.program) gl.deleteProgram(this._pieceProgram.program);
             for (const entry of this._pieceTextureCache.values()) {
                 if (entry.maskTexture) gl.deleteTexture(entry.maskTexture);
                 if (entry.overlayTexture) gl.deleteTexture(entry.overlayTexture);
@@ -339,7 +342,6 @@
             this._mediaTextureW = 0;
             this._mediaTextureH = 0;
             this._mediaTextureConfigured = false;
-            this._boundProgram = null;
             this._boundTexture0 = null;
             this._boundTexture1 = null;
             this._activeTextureUnit = -1;
@@ -360,53 +362,43 @@
                     v_mediaUv = a_mediaUv;
                 }
             `;
-            const mediaFragSrc = `
+            const combinedFragSrc = `
                 precision mediump float;
                 varying vec2 v_texCoord;
                 varying vec2 v_mediaUv;
+                uniform float u_mode;
                 uniform sampler2D u_media;
                 uniform sampler2D u_mask;
-                void main() {
-                    vec4 media = texture2D(u_media, v_mediaUv);
-                    float alpha = texture2D(u_mask, v_texCoord).a;
-                    gl_FragColor = vec4(media.rgb, media.a * alpha);
-                }
-            `;
-            const overlayFragSrc = `
-                precision mediump float;
-                varying vec2 v_texCoord;
                 uniform sampler2D u_overlay;
-                void main() {
-                    gl_FragColor = texture2D(u_overlay, v_texCoord);
-                }
-            `;
-            const shadowFragSrc = `
-                precision mediump float;
-                varying vec2 v_texCoord;
-                uniform sampler2D u_mask;
                 uniform float u_alpha;
                 uniform vec2 u_texel;
                 uniform float u_softness;
                 void main() {
-                    vec2 d = u_texel * u_softness;
-                    float alpha = 0.0;
-                    alpha += texture2D(u_mask, v_texCoord).a * 0.227027;
-                    alpha += texture2D(u_mask, v_texCoord + vec2( d.x, 0.0)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(-d.x, 0.0)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(0.0,  d.y)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(0.0, -d.y)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2( d.x,  d.y)).a * 0.1216216;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(-d.x,  d.y)).a * 0.1216216;
-                    alpha += texture2D(u_mask, v_texCoord + vec2( d.x, -d.y)).a * 0.1216216;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(-d.x, -d.y)).a * 0.1216216;
-                    alpha = alpha * 0.62;
-                    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha * u_alpha);
+                    if (u_mode < 0.5) {
+                        vec2 d = u_texel * u_softness;
+                        float alpha = 0.0;
+                        alpha += texture2D(u_mask, v_texCoord).a * 0.227027;
+                        alpha += texture2D(u_mask, v_texCoord + vec2( d.x, 0.0)).a * 0.1945946;
+                        alpha += texture2D(u_mask, v_texCoord + vec2(-d.x, 0.0)).a * 0.1945946;
+                        alpha += texture2D(u_mask, v_texCoord + vec2(0.0,  d.y)).a * 0.1945946;
+                        alpha += texture2D(u_mask, v_texCoord + vec2(0.0, -d.y)).a * 0.1945946;
+                        alpha += texture2D(u_mask, v_texCoord + vec2( d.x,  d.y)).a * 0.1216216;
+                        alpha += texture2D(u_mask, v_texCoord + vec2(-d.x,  d.y)).a * 0.1216216;
+                        alpha += texture2D(u_mask, v_texCoord + vec2( d.x, -d.y)).a * 0.1216216;
+                        alpha += texture2D(u_mask, v_texCoord + vec2(-d.x, -d.y)).a * 0.1216216;
+                        alpha = alpha * 0.62;
+                        gl_FragColor = vec4(0.0, 0.0, 0.0, alpha * u_alpha);
+                    } else if (u_mode < 1.5) {
+                        vec4 media = texture2D(u_media, v_mediaUv);
+                        float alpha = texture2D(u_mask, v_texCoord).a;
+                        gl_FragColor = vec4(media.rgb, media.a * alpha);
+                    } else {
+                        gl_FragColor = texture2D(u_overlay, v_texCoord);
+                    }
                 }
             `;
-            this._mediaProgram = this._createProgramInfo(vertexSrc, mediaFragSrc, "media");
-            this._overlayProgram = this._createProgramInfo(vertexSrc, overlayFragSrc, "overlay");
-            this._shadowProgram = this._createProgramInfo(vertexSrc, shadowFragSrc, "shadow");
-            if (!this._mediaProgram || !this._overlayProgram || !this._shadowProgram) return false;
+            this._pieceProgram = this._createProgramInfo(vertexSrc, combinedFragSrc, "combined");
+            if (!this._pieceProgram) return false;
             this._vertexBuffer = gl.createBuffer();
             if (!this._vertexBuffer) return false;
             gl.disable(gl.DEPTH_TEST);
@@ -635,25 +627,12 @@
             return entry;
         }
 
-        _bindProgram(programInfo, byteOffset) {
+        _setVertexOffset(byteOffset) {
             const gl = this.gl;
             const offset = byteOffset || 0;
-            if (this._boundProgram !== programInfo.program) {
-                gl.useProgram(programInfo.program);
-                this._boundProgram = programInfo.program;
-            }
-            gl.enableVertexAttribArray(programInfo.aPosition);
-            gl.vertexAttribPointer(programInfo.aPosition, 2, gl.FLOAT, false, 24, offset);
-            gl.enableVertexAttribArray(programInfo.aTexCoord);
-            gl.vertexAttribPointer(programInfo.aTexCoord, 2, gl.FLOAT, false, 24, offset + 8);
-            if (programInfo.aMediaUv >= 0) {
-                gl.enableVertexAttribArray(programInfo.aMediaUv);
-                gl.vertexAttribPointer(programInfo.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
-            }
-            if (programInfo._resolutionAppliedSerial !== this._resolutionSerial) {
-                gl.uniform2f(programInfo.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
-                programInfo._resolutionAppliedSerial = this._resolutionSerial;
-            }
+            gl.vertexAttribPointer(this._pieceProgram.aPosition, 2, gl.FLOAT, false, 24, offset);
+            gl.vertexAttribPointer(this._pieceProgram.aTexCoord, 2, gl.FLOAT, false, 24, offset + 8);
+            gl.vertexAttribPointer(this._pieceProgram.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
         }
 
         _configureTextureDefaults(texture) {
@@ -771,6 +750,7 @@
                 aTexCoord: gl.getAttribLocation(program, "a_texCoord"),
                 aMediaUv: gl.getAttribLocation(program, "a_mediaUv"),
                 uResolution: gl.getUniformLocation(program, "u_resolution"),
+                uMode: null,
                 uMedia: null,
                 uMask: null,
                 uOverlay: null,
@@ -778,13 +758,11 @@
                 uTexel: null,
                 uSoftness: null
             };
-            if (kind === "media") {
+            if (kind === "combined") {
+                info.uMode = gl.getUniformLocation(program, "u_mode");
                 info.uMedia = gl.getUniformLocation(program, "u_media");
                 info.uMask = gl.getUniformLocation(program, "u_mask");
-            } else if (kind === "overlay") {
                 info.uOverlay = gl.getUniformLocation(program, "u_overlay");
-            } else if (kind === "shadow") {
-                info.uMask = gl.getUniformLocation(program, "u_mask");
                 info.uAlpha = gl.getUniformLocation(program, "u_alpha");
                 info.uTexel = gl.getUniformLocation(program, "u_texel");
                 info.uSoftness = gl.getUniformLocation(program, "u_softness");
