@@ -2560,6 +2560,8 @@ let lastSyncedPreviewAt = 0;
 let hasDrawnStaticSyncedPreview = false;
 let prestartPreviewDirty = true; // only redraw prestart when dirty or media animated
 let lastPrestartPreviewAt = 0; // throttle animated prestart by framerate
+const LOOP_CAP_MS = 1000 / 60; // cap loop render phase to 60 fps
+let lastLoopTickMs = 0;
 let grayscaleReferenceCanvas = null;
 let grayscaleReferenceCtx = null;
 let lastGrayscaleUpdateMs = 0;
@@ -3119,41 +3121,47 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             }
             event = null;
         }
-        // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
-        const setupStartedAt = jigsawPerfNow();
-        if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
-        if (perfMonitor && typeof perfMonitor.recordSetupQueue === "function") {
-            perfMonitor.recordSetupQueue(jigsawPerfNow() - setupStartedAt);
-        }
-        const renderStartedAt = jigsawPerfNow();
-        if (rendererFacade) rendererFacade.renderFrame(nowMs);
-        if (perfMonitor && typeof perfMonitor.recordRender === "function") {
-            perfMonitor.recordRender(jigsawPerfNow() - renderStartedAt);
-        }
-        if (state < 50) hasDrawnStaticSyncedPreview = false;
-        const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
-        if (animated) {
-            const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
-            if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
-                drawSyncedPreviewWindowFrame();
-                lastSyncedPreviewAt = nowMs;
+        // Run render phase at most 60 fps so input (move/pan) stays responsive every rAF but GPU work is capped.
+        const elapsedSinceLoopTick = nowMs - lastLoopTickMs;
+        const runRenderPhase = lastLoopTickMs === 0 || elapsedSinceLoopTick >= LOOP_CAP_MS;
+        if (runRenderPhase) {
+            lastLoopTickMs = nowMs;
+            // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
+            const setupStartedAt = jigsawPerfNow();
+            if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
+            if (perfMonitor && typeof perfMonitor.recordSetupQueue === "function") {
+                perfMonitor.recordSetupQueue(jigsawPerfNow() - setupStartedAt);
             }
-            hasDrawnStaticSyncedPreview = false;
-        } else if (state >= 50 && !hasDrawnStaticSyncedPreview) {
-            drawSyncedPreviewWindowFrame();
-            hasDrawnStaticSyncedPreview = true;
-        }
-        if (state === 15) {
-            const prestartAnimated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
-            if (prestartPreviewDirty) {
-                drawPrestartPreviewFrame();
-                prestartPreviewDirty = false;
-                lastPrestartPreviewAt = nowMs;
-            } else if (prestartAnimated) {
-                const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
-                if (nowMs - lastPrestartPreviewAt >= intervalMs) {
+            const renderStartedAt = jigsawPerfNow();
+            if (rendererFacade) rendererFacade.renderFrame(nowMs);
+            if (perfMonitor && typeof perfMonitor.recordRender === "function") {
+                perfMonitor.recordRender(jigsawPerfNow() - renderStartedAt);
+            }
+            if (state < 50) hasDrawnStaticSyncedPreview = false;
+            const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
+            if (animated) {
+                const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+                if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
+                    drawSyncedPreviewWindowFrame();
+                    lastSyncedPreviewAt = nowMs;
+                }
+                hasDrawnStaticSyncedPreview = false;
+            } else if (state >= 50 && !hasDrawnStaticSyncedPreview) {
+                drawSyncedPreviewWindowFrame();
+                hasDrawnStaticSyncedPreview = true;
+            }
+            if (state === 15) {
+                const prestartAnimated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
+                if (prestartPreviewDirty) {
                     drawPrestartPreviewFrame();
+                    prestartPreviewDirty = false;
                     lastPrestartPreviewAt = nowMs;
+                } else if (prestartAnimated) {
+                    const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
+                    if (nowMs - lastPrestartPreviewAt >= intervalMs) {
+                        drawPrestartPreviewFrame();
+                        lastPrestartPreviewAt = nowMs;
+                    }
                 }
             }
         }
