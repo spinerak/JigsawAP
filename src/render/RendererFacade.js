@@ -372,19 +372,6 @@
             }
             if (!shouldRenderThisFrame) return;
 
-            if (this.media && puzzle && !mediaAdvanced) {
-                const status = this.media.getStatus ? this.media.getStatus() : null;
-                const kind = status && status.kind ? status.kind : "image";
-                const animated = kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded";
-                if (animated) {
-                    const frameSource = this.media.getFrameSource();
-                    if (frameSource && puzzle.applyMediaFrame && puzzle.applyMediaFrame(frameSource, nowMs)) {
-                        this.sceneState.markAllDirty();
-                        mediaAdvanced = true;
-                    }
-                }
-            }
-
             // Catch WebGL failures before dirty-skip can short-circuit fallback.
             if (this._isWebGLRuntimeFailed()) {
                 this._fallbackToCanvasFromWebGL("runtime-precheck");
