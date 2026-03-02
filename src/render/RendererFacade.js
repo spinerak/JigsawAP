@@ -192,7 +192,7 @@
             }
             this.webglDowngraded = false;
             this.webglDowngradeReason = "";
-            const mode = (preferredMode === "webgl" || preferredMode === "auto") ? preferredMode : "auto";
+            const mode = (preferredMode === "webgl" || preferredMode === "auto" || preferredMode === "canvas2d") ? preferredMode : "canvas2d";
             this.selectMode(mode, puzzle);
             if (this.activeMode === "webgl" && this.ensureStartRendererCompatibility() === true) {
                 if (this.activeRenderer && this.activeRenderer.renderDirtyPieces) {

@@ -17,7 +17,7 @@
             const cfg = deps.getRendererConfig() || {};
             const modeStatus = getModeStatus();
             const webglDowngraded = modeStatus.webglDowngraded === true;
-            const requested = cfg.mode || "auto";
+            const requested = cfg.mode || "canvas2d";
             const active = modeStatus.active || "none";
             const forceCanvas = webglDowngraded;
             const wantedValue = forceCanvas ? "canvas2d" : (active === "webgl" || active === "canvas2d" ? active : requested);
@@ -106,7 +106,14 @@
                 });
             }
             rendererModeControl = { control: null, select: select, status: status, retryBtn: retryBtn || null, fallbackRow: fallbackRow || null };
-            refreshRendererModeControl();
+            // Apply dropdown value so HTML default (e.g. canvas2d) is the actual mode on first load
+            const initialMode = (select.value === "webgl" || select.value === "auto" || select.value === "canvas2d") ? select.value : "canvas2d";
+            const currentCfg = deps.getRendererConfig() || {};
+            if ((currentCfg.mode || "canvas2d") !== initialMode) {
+                setRendererMode(initialMode);
+            } else {
+                refreshRendererModeControl();
+            }
             globalScope.addEventListener("jigsaw-renderer-status-change", refreshRendererModeControl);
 
             const resolutionSelect = document.getElementById("puzzleResolutionSelect");
