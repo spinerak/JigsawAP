@@ -33,6 +33,18 @@
             return deps.getPuzzle ? deps.getPuzzle() : null;
         }
 
+        function tryRestoreWebGLIfSourceSafe() {
+            const puzzle = getPuzzle();
+            const facade = getRendererFacade();
+            if (!puzzle || !facade || !facade.webglDowngraded) return;
+            if (puzzle._webglStartBlockedReason) return;
+            const cfg = deps.getRendererConfig && deps.getRendererConfig();
+            const preferredMode = (cfg && cfg.mode) || "auto";
+            if (typeof facade.retryWebGLAfterDowngrade === "function") {
+                facade.retryWebGLAfterDowngrade(preferredMode);
+            }
+        }
+
         function isGifSource(src) {
             return typeof src === "string" && (
                 src.startsWith("data:image/gif") || /\.gif(\?|#|$)/i.test(src)
@@ -304,6 +316,7 @@
             const cfg = deps.getRendererConfig();
             if (cfg) cfg.media = options.kind || "video";
             if (rendererFacade) rendererFacade.setVideoSource(video, options.kind || "video");
+            tryRestoreWebGLIfSourceSafe();
         }
 
         function setImagePath(path, options = {}) {
@@ -397,6 +410,7 @@
             // Startup/state machine will react to srcImage load event.
             if (puzzle.srcImage.complete && (puzzle.srcImage.naturalWidth | 0) > 0 && (puzzle.srcImage.naturalHeight | 0) > 0) {
                 deps.loadImageFunction();
+                tryRestoreWebGLIfSourceSafe();
             }
         }
 
@@ -452,6 +466,7 @@
             const cfg = deps.getRendererConfig();
             if (cfg) cfg.media = "camera";
             rendererFacade.setVideoSource(cameraVideo, "camera");
+            tryRestoreWebGLIfSourceSafe();
         }
 
         async function startLinkCaptureSource(stream) {
@@ -468,6 +483,7 @@
             const cfg = deps.getRendererConfig();
             if (cfg) cfg.media = "display";
             rendererFacade.setVideoSource(displayVideo, "display");
+            tryRestoreWebGLIfSourceSafe();
         }
 
         function loadInitialFile() {

@@ -27,8 +27,65 @@
             this._staticCtx = null;
             this._staticLayerDirty = true;
             this._lastStaticDrawCount = 0;
+            this._heldOverlayCanvas = null;
+            this._heldOverlayCtx = null;
+            this._heldPiecesCountLastFrame = -1;
             this._cachedHeldShadowDarkness = null;
             this._cachedHeldShadowAt = 0;
+        }
+
+        _ensureHeldOverlay() {
+            if (!this.canvas || !this.container) return;
+            const cw = this.canvas.width;
+            const ch = this.canvas.height;
+            let tw = this.container.clientWidth || 0;
+            let th = this.container.clientHeight || 0;
+            if (tw === 0 && th === 0 && this.puzzle) {
+                tw = this.puzzle.contWidth || 0;
+                th = this.puzzle.contHeight || 0;
+            }
+            let w;
+            let h;
+            if (cw <= 0 || ch <= 0) {
+                w = tw;
+                h = th;
+            } else if (cw === 1 && ch === 1 && (tw > 1 || th > 1)) {
+                w = tw;
+                h = th;
+            } else {
+                w = cw;
+                h = ch;
+            }
+            w = Math.max(1, Math.round(w));
+            h = Math.max(1, Math.round(h));
+
+            if (!this._heldOverlayCanvas) {
+                this._heldOverlayCanvas = document.createElement("canvas");
+                this._heldOverlayCanvas.className = "jigsaw-held-overlay-renderer";
+                this._heldOverlayCanvas.style.position = "absolute";
+                this._heldOverlayCanvas.style.left = "0px";
+                this._heldOverlayCanvas.style.top = "0px";
+                this._heldOverlayCanvas.style.width = "100%";
+                this._heldOverlayCanvas.style.height = "100%";
+                this._heldOverlayCanvas.style.zIndex = "100000000";
+                this._heldOverlayCanvas.style.pointerEvents = "none";
+                this._heldOverlayCtx = this._heldOverlayCanvas.getContext("2d");
+                if (this.canvas.nextSibling) {
+                    this.container.insertBefore(this._heldOverlayCanvas, this.canvas.nextSibling);
+                } else {
+                    this.container.appendChild(this._heldOverlayCanvas);
+                }
+            } else if (!this._heldOverlayCanvas.parentElement) {
+                if (this.canvas.nextSibling) {
+                    this.container.insertBefore(this._heldOverlayCanvas, this.canvas.nextSibling);
+                } else {
+                    this.container.appendChild(this._heldOverlayCanvas);
+                }
+            }
+            if (this._heldOverlayCanvas.width !== w || this._heldOverlayCanvas.height !== h) {
+                this._heldOverlayCanvas.width = w;
+                this._heldOverlayCanvas.height = h;
+            }
         }
 
         _isOverlayOversampleEnabled() {
@@ -61,10 +118,12 @@
             this.canvas.style.height = "100%";
             this.enabled = true;
             this._markStaticLayerDirty();
+            this._ensureHeldOverlay();
         }
 
         setVisible(visible) {
             this.canvas.style.display = visible ? "block" : "none";
+            if (this._heldOverlayCanvas) this._heldOverlayCanvas.style.display = visible ? "block" : "none";
         }
 
         setMediaSource(source) {
@@ -78,12 +137,16 @@
             this.canvas.height = Math.max(1, Math.round(bufferH));
             this._displayWidth = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayW)) : this.canvas.width;
             this._displayHeight = (displayW != null && displayH != null) ? Math.max(1, Math.round(displayH)) : this.canvas.height;
+            this._ensureHeldOverlay();
             this._markStaticLayerDirty();
         }
 
         clear() {
             if (!this.enabled) return;
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            if (this._heldOverlayCtx && this._heldOverlayCanvas) {
+                this._heldOverlayCtx.clearRect(0, 0, this._heldOverlayCanvas.width, this._heldOverlayCanvas.height);
+            }
         }
 
         _getSortedPieces() {
@@ -106,8 +169,7 @@
             return this._sortedPieces;
         }
 
-        _isPieceVisible(pp, w, h) {
-            const deg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+        _isPieceVisible(pp, w, h, deg, dw, dh) {
             const angle = (pp.rot || 0) * deg * Math.PI / 180;
             let hw = w / 2;
             let hh = h / 2;
@@ -122,8 +184,6 @@
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             if (cx + hw < 0 || cy + hh < 0) return false;
-            const dw = this._displayWidth || this.canvas.width;
-            const dh = this._displayHeight || this.canvas.height;
             if (cx - hw > dw || cy - hh > dh) return false;
             return true;
         }
@@ -153,15 +213,10 @@
                 darkness = this._cachedHeldShadowDarkness;
             }
             const localShadow = this._worldToPieceLocal(pp, Math.max(6, w * 0.05), Math.max(6, h * 0.06));
-            const blur = Math.max(18, Math.min(w, h) * 0.24);
             ctx.save();
             ctx.translate(localShadow.x, localShadow.y);
-            ctx.shadowColor = `rgba(0,0,0,${Math.min(1, darkness * 0.85)})`;
-            ctx.shadowBlur = blur;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-            // Keep the core very faint so most weight comes from the blurred edge.
-            ctx.fillStyle = `rgba(0,0,0,${Math.min(1, darkness * 0.12)})`;
+            // Solid offset shadow only; no shadowBlur to avoid GPU cost.
+            ctx.fillStyle = `rgba(0,0,0,${Math.min(1, darkness * 0.35)})`;
             ctx.fill(pp.path);
             ctx.restore();
         }
@@ -197,11 +252,11 @@
             }
         }
 
-        _drawPieceToContext(ctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, drawHeldShadow) {
+        _drawPieceToContext(ctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, drawHeldShadow, viewportDeg, viewportDw, viewportDh) {
             const w = pp.nx * puzzle.scalex;
             const h = pp.ny * puzzle.scaley;
             if (w <= 0 || h <= 0 || !pp.path) return false;
-            if (!this._isPieceVisible(pp, w, h)) return false;
+            if (!this._isPieceVisible(pp, w, h, viewportDeg, viewportDw, viewportDh)) return false;
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             ctx.save();
@@ -256,11 +311,16 @@
             return true;
         }
 
-        _shouldRebuildStaticLayer(sceneState) {
+        // Rebuild static layer only when something on it actually changed. Do not rebuild when the
+        // only dirty pieces are held (they are drawn on the overlay); do rebuild when any
+        // non-held piece is dirty (e.g. position/rotation from network or merge).
+        // Also rebuild when held count changes (pick up or drop) so static no longer includes the held piece.
+        _shouldRebuildStaticLayer(sceneState, heldCount) {
             if (this._staticLayerDirty) return true;
             if (!sceneState) return true;
             if (sceneState.mediaContentDirty) return true;
             if (sceneState.zOrderDirty) return true;
+            if (typeof heldCount === "number" && heldCount !== this._heldPiecesCountLastFrame) return true;
             if (sceneState.dirtyPieces && sceneState.dirtyPieces.size > 0) {
                 for (const dirtyPiece of sceneState.dirtyPieces) {
                     if (!dirtyPiece || !dirtyPiece._isHeld) return true;
@@ -295,6 +355,9 @@
                 this._cachedHeldShadowAt = now;
             }
             const heldShadowDarkness = this._cachedHeldShadowDarkness;
+            const viewportDeg = (window.rotations === 180 ? 90 : window.rotations) || 0;
+            const viewportDw = this._displayWidth || this.canvas.width;
+            const viewportDh = this._displayHeight || this.canvas.height;
 
             if (!this._heldPieces) this._heldPieces = [];
             if (!this._staticPieces) this._staticPieces = [];
@@ -306,33 +369,49 @@
             }
 
             this._ensureStaticLayer();
-            if (this._shouldRebuildStaticLayer(sceneState)) {
+            const rebuiltStatic = this._shouldRebuildStaticLayer(sceneState, this._heldPieces.length);
+            if (rebuiltStatic) {
                 const sctx = this._staticCtx;
                 sctx.setTransform(1, 0, 0, 1, 0, 0);
                 sctx.clearRect(0, 0, this._staticCanvas.width, this._staticCanvas.height);
                 this._configureDrawContext(sctx);
                 let staticDrawn = 0;
                 for (const pp of this._staticPieces) {
-                    if (this._drawPieceToContext(sctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, false)) {
+                    if (this._drawPieceToContext(sctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, false, viewportDeg, viewportDw, viewportDh)) {
                         staticDrawn++;
                     }
                 }
                 this._lastStaticDrawCount = staticDrawn;
                 this._staticLayerDirty = false;
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this._staticCanvas) this.ctx.drawImage(this._staticCanvas, 0, 0);
             }
 
-            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            if (this._staticCanvas) this.ctx.drawImage(this._staticCanvas, 0, 0);
-            this._configureDrawContext(this.ctx);
+            this._ensureHeldOverlay();
+            const heldCtx = this._heldOverlayCtx;
+            const heldCanvas = this._heldOverlayCanvas;
+            if (heldCtx && heldCanvas) {
+                heldCtx.setTransform(1, 0, 0, 1, 0, 0);
+                heldCtx.clearRect(0, 0, heldCanvas.width, heldCanvas.height);
+                this._configureDrawContext(heldCtx);
+            }
             let heldDrawn = 0;
+            const drawHeldTo = heldCtx || this.ctx;
+            if (!heldCtx && rebuiltStatic === false) {
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this._staticCanvas) this.ctx.drawImage(this._staticCanvas, 0, 0);
+                this._configureDrawContext(this.ctx);
+            }
             for (const pp of this._heldPieces) {
-                if (this._drawPieceToContext(this.ctx, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, true)) {
+                if (this._drawPieceToContext(drawHeldTo, pp, puzzle, sourceCanvas, scaleSrcX, scaleSrcY, heldShadowDarkness, true, viewportDeg, viewportDw, viewportDh)) {
                     heldDrawn++;
                 }
             }
             this.lastDrawCount = this._lastStaticDrawCount + heldDrawn;
             this.lastMediaUploads = 0;
+            this._heldPiecesCountLastFrame = this._heldPieces.length;
         }
 
         renderDirtyPieces(sceneState) {
@@ -343,6 +422,11 @@
 
         destroy() {
             this.enabled = false;
+            if (this._heldOverlayCanvas && this._heldOverlayCanvas.parentElement) {
+                this._heldOverlayCanvas.parentElement.removeChild(this._heldOverlayCanvas);
+            }
+            this._heldOverlayCanvas = null;
+            this._heldOverlayCtx = null;
             if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
             this._staticCanvas = null;
             this._staticCtx = null;

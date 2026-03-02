@@ -224,7 +224,13 @@ function setMinSizeToContent(draggable, options = {}) {
         const panelW = panel ? panel.scrollWidth : 0;
         const resizerH = resizer ? resizer.offsetHeight : 0;
         if (enforceHeight) {
-            const heightPx = Math.ceil(panelH + resizerH) + 'px';
+            const minHeightPx = 200;
+            const rawH = Math.ceil(panelH + resizerH);
+            const maxHeightPx = window.innerHeight - 110;
+            const clampedH = draggable === draggable6
+                ? Math.max(minHeightPx, Math.min(rawH, maxHeightPx))
+                : rawH;
+            const heightPx = clampedH + 'px';
             draggable.style.minHeight = heightPx;
             if (setExplicitHeight) {
                 draggable.style.height = heightPx;
@@ -253,7 +259,6 @@ function restoreDiv5() {
     draggable5.style.display = (draggable5.style.display === 'none') ? 'block' : 'none';
     if (draggable5.style.display === 'block' || draggable5.style.display === '') {
         taskbarCosmeticControls.style.backgroundColor = '#909090';
-        /* Do not enforce height: cosmetic window has fixed height and scrolls; enforcing would set minHeight to full content and make the window full-screen tall */
         setMinSizeToContent(draggable5, { enforceHeight: false, enforceWidth: true });
     } else {
         taskbarCosmeticControls.style.backgroundColor = '';
@@ -304,22 +309,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 
-// const resizerRight1 = document.getElementById('resizerRight1');
-// const resizerBottom1 = document.getElementById('resizerBottom1');
 const resizerCorner1 = document.getElementById('resizerCorner1');
-
-// const resizerRight2 = document.getElementById('resizerRight2');
-// const resizerBottom2 = document.getElementById('resizerBottom2');
 const resizerCorner2 = document.getElementById('resizerCorner2');
 const resizerCorner4 = document.getElementById('resizerCorner4');
 const resizerCorner5 = document.getElementById('resizerCorner5');
 const resizerCorner6 = document.getElementById('resizerCorner6');
 
-// enableResizing1(resizerRight1, true, false);
-// enableResizing1(resizerBottom1, false, true);
 enableResizing1(resizerCorner1, true, true);
-// enableResizing2(resizerRight2, true, false);
-// enableResizing2(resizerBottom2, false, true);
 enableResizing2(resizerCorner2, true, true);
 if (resizerCorner4 && draggable4) enableResizing1(resizerCorner4, true, true, draggable4);
 if (resizerCorner5 && draggable5) enableResizing1(resizerCorner5, true, true, draggable5);
@@ -366,6 +362,7 @@ function enableResizing1(resizer, horizontal, vertical, target) {
 
     document.addEventListener('touchmove', (e) => {
         if (!resizing) return;
+        e.preventDefault();
         const touch = e.touches[0];
         if (horizontal) {
             const newWidth = startWidth + (touch.clientX - startX);
@@ -379,7 +376,7 @@ function enableResizing1(resizer, horizontal, vertical, target) {
             el.style.height = `${(Math.min(newHeight, maxHeight) / window.innerHeight) * 100}vh`;
             adjustedSize(el);
         }
-    });
+    }, { passive: false });
 
     document.addEventListener('mouseup', () => { resizing = false; });
     document.addEventListener('touchend', () => { resizing = false; });
@@ -448,6 +445,7 @@ function enableResizing2(resizer, horizontal, vertical) {
 
     document.addEventListener('touchmove', (e) => {
         if (!resizing) return;
+        e.preventDefault(); 
         const touch = e.touches[0];
         if (horizontal && vertical) {
             applyResize2(touch.clientX, touch.clientY);
@@ -465,7 +463,7 @@ function enableResizing2(resizer, horizontal, vertical) {
                 adjustedSize(draggable2);
             }
         }
-    });
+    }, { passive: false });
 
     document.addEventListener('mouseup', () => { resizing = false; });
     document.addEventListener('touchend', () => { resizing = false; });

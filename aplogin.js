@@ -810,6 +810,23 @@ function cleanLog() {
     }
 }
 
+function appendToChatLog(content, color) {
+    var el = typeof content === "string"
+        ? (function () {
+            var d = document.createElement("div");
+            d.innerText = content;
+            if (color) d.style.color = color;
+            return d;
+        })()
+        : content;
+    var log = document.getElementById("log");
+    if (!log) return;
+    var atBottom = log.scrollHeight - log.clientHeight <= log.scrollTop + 1;
+    log.appendChild(el);
+    cleanLog();
+    if (atBottom) log.scrollTop = log.scrollHeight - log.clientHeight;
+}
+
 var classaddcolor = [
     "rgba(6, 217, 217, 1)",
     "rgba(168, 147, 228, 1)",
@@ -930,74 +947,69 @@ function jsonListener(text, nodes) {
         messageElement.appendChild(nodeElement);
     }
 
-    var logTextarea = document.getElementById("log");
-
-    var isScrolledToBottom = logTextarea.scrollHeight - logTextarea.clientHeight <= logTextarea.scrollTop + 1;
-    logTextarea.appendChild(messageElement);
-    
-    cleanLog();
-    if (isScrolledToBottom) {
-        logTextarea.scrollTop = logTextarea.scrollHeight - logTextarea.clientHeight;
-    }
-    
+    appendToChatLog(messageElement);
 }
 window.jsonListener = jsonListener;
 
-let lastrandomnumbers = {};
-function doTrap(name, type, count = 1){
-    lastrandomnumbers[name] = Math.random() * 4;
-    console.log("my trap random number is", lastrandomnumbers[name]);
-    setTimeout(() => {
-        if (lastrandomnumbers[name] === null) {
-            return;
-        }
-        sendBounceTrapRandomNumber(name, type, count, lastrandomnumbers[name]);
-    }, lastrandomnumbers[name] * 1000);
+// Pending traps: name -> { random, fromName?, fromGame? }. random is used to compare with other player so only one trap fires when both trigger.
+var trapPending = {};
+
+function doTrap(name, type, count, sourceInfo){
+    var random = Math.random() * 4;
+    trapPending[name] = {
+        random: random,
+        fromName: sourceInfo && sourceInfo.fromName,
+        fromGame: sourceInfo && sourceInfo.fromGame
+    };
+    console.log("my trap random number is", random);
+    setTimeout(function () {
+        var p = trapPending[name];
+        if (!p) return;
+        sendBounceTrapRandomNumber(name, type, count, p.random);
+    }, random * 1000);
 }
 
 function deathListener(source, time, cause){
     console.log("Received death link from", source, "at time", time, "due to", cause);
+    var player = client && client.players ? client.players.findPlayer(source) : null;
+    var sourceInfo = {
+        fromName: player ? player.alias : (source != null ? "Slot " + source : undefined),
+        fromGame: player ? player.game : undefined
+    };
     if (receive_death_link > 0) {
-        doTrap("death"+time, "death");
+        doTrap("death" + time, "death", 1, sourceInfo);
     }
 }
 
 function sendBounceTrapRandomNumber(name, type, count, number){
     client.bounce({ "slots": [window.slot] }, [name, number]);
-    setTimeout(() => {
-        applyTrap(name, type, count);
-    }, 1000);
+    setTimeout(function () { applyTrap(name, type, count); }, 1000);
 }
 
 function applyTrap(name, type, count){
-    if(lastrandomnumbers[name] !== null){
-        if(type === "rotate"){
-            for (let i = 0; i < count; i++) {
-                window.doRotateTrap();
-            }
-        } else if(type === "swap"){
-            for (let i = 0; i < count; i++) {
-                window.doSwapTrap();
-            }
-        } else if(type === "death"){
-            for (let i = 0; i < receive_death_link; i++) {
-                window.doRotateTrap();
-                window.doSwapTrap();
-            }
-        }
-        lastrandomnumbers[name] = null;
-    }else{
+    var p = trapPending[name];
+    if (!p) {
         console.log("Trap", name, "was already applied or was not valid anymore.");
+        return;
+    }
+    var who = (p.fromName || "Someone") + (p.fromGame ? " (from " + p.fromGame + ")" : "");
+    appendToChatLog(who + " is sabotaging your experience!", "rgba(255, 100, 100, 1)");
+    delete trapPending[name];
+    if (type === "rotate") {
+        for (var i = 0; i < count; i++) window.doRotateTrap();
+    } else if (type === "swap") {
+        for (var i = 0; i < count; i++) window.doSwapTrap();
+    } else if (type === "death") {
+        for (var i = 0; i < receive_death_link; i++) {
+            window.doRotateTrap();
+            window.doSwapTrap();
+        }
     }
 }
 
 function gotRandomNumber(name, number){
     console.log("Got random number for trap", name, number);
-    if(lastrandomnumbers[name] !== null){
-        if(number < lastrandomnumbers[name]){
-            lastrandomnumbers[name] = null;
-        }
-    }
+    if (trapPending[name] && number < trapPending[name].random) delete trapPending[name];
 }
 
 const shapeParam = getUrlParameter("shape");

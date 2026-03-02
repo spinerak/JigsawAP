@@ -16,9 +16,7 @@
             this.puzzle = null;
             this.supportsPieceRendering = false;
             this._eventsBound = false;
-            this._mediaProgram = null;
-            this._overlayProgram = null;
-            this._shadowProgram = null;
+            this._pieceProgram = null;
             this._vertexBuffer = null;
             this._pieceTextureCache = new Map();
             this._mediaTexture = null;
@@ -30,7 +28,6 @@
             this._fatalErrorLogged = false;
             this.failureReason = "";
             this.mediaSource = null;
-            this._boundProgram = null;
             this._boundTexture0 = null;
             this._boundTexture1 = null;
             this._activeTextureUnit = -1;
@@ -52,6 +49,74 @@
             this._sharedOverlayCtx = null;
             this._sharedMaskCanvas = null;
             this._sharedMaskCtx = null;
+            this._atlasTextures = [];
+            this._atlasManager = null;
+        }
+
+        _createAtlasManager(gl) {
+            const maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
+            const atlasWidth = maxSize;
+            const atlasHeight = maxSize;
+            const textures = this._atlasTextures;
+            const freeRectsByAtlas = [];
+
+            const createAtlasTexture = () => {
+                const tex = gl.createTexture();
+                if (!tex) return null;
+                gl.bindTexture(gl.TEXTURE_2D, tex);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, atlasWidth, atlasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                const idx = textures.length;
+                textures.push(tex);
+                freeRectsByAtlas.push([{ x: 0, y: 0, w: atlasWidth, h: atlasHeight }]);
+                return idx;
+            };
+
+            return {
+                atlasWidth,
+                atlasHeight,
+                allocate(w, h) {
+                    return this._allocateInAtlas(w, h, -1);
+                },
+                allocateFromAtlas(preferredAtlasIndex, w, h) {
+                    return this._allocateInAtlas(w, h, preferredAtlasIndex);
+                },
+                _allocateInAtlas(w, h, preferredAtlasIndex) {
+                    const wu = Math.ceil(Math.max(1, w));
+                    const hu = Math.ceil(Math.max(1, h));
+                    const order = preferredAtlasIndex >= 0
+                        ? [preferredAtlasIndex].concat(freeRectsByAtlas.map((_, i) => i).filter(i => i !== preferredAtlasIndex))
+                        : freeRectsByAtlas.map((_, i) => i);
+                    for (let ai of order) {
+                        if (ai >= freeRectsByAtlas.length) continue;
+                        const freeRects = freeRectsByAtlas[ai];
+                        for (let i = 0; i < freeRects.length; i++) {
+                            const r = freeRects[i];
+                            if (r.w >= wu && r.h >= hu) {
+                                freeRects.splice(i, 1);
+                                if (r.w > wu) freeRects.push({ x: r.x + wu, y: r.y, w: r.w - wu, h: r.h });
+                                if (r.h > hu) freeRects.push({ x: r.x, y: r.y + hu, w: wu, h: r.h - hu });
+                                return { atlasIndex: ai, x: r.x, y: r.y, w: wu, h: hu };
+                            }
+                        }
+                    }
+                    if (preferredAtlasIndex >= 0) return null;
+                    const idx = createAtlasTexture();
+                    if (idx === null) return null;
+                    return this.allocate(w, h);
+                },
+                release(atlasIndex, x, y, w, h) {
+                    if (atlasIndex >= 0 && atlasIndex < freeRectsByAtlas.length) {
+                        freeRectsByAtlas[atlasIndex].push({ x, y, w, h });
+                    }
+                },
+                reset() {
+                    freeRectsByAtlas.length = 0;
+                }
+            };
         }
 
         _isOverlayOversampleEnabled() {
@@ -94,7 +159,8 @@
             if (!this.canvas.parentElement) this.container.appendChild(this.canvas);
             this.canvas.style.width = "100%";
             this.canvas.style.height = "100%";
-            this.gl = this.canvas.getContext("webgl2") || this.canvas.getContext("webgl");
+            const glOpts = { powerPreference: "high-performance" };
+            this.gl = this.canvas.getContext("webgl2", glOpts) || this.canvas.getContext("webgl", glOpts);
             if (!this.gl) {
                 this.enabled = false;
                 this.supportsPieceRendering = false;
@@ -160,7 +226,7 @@
                 gl.viewport(0, 0, this.canvas.width, this.canvas.height);
                 gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
-                if (!this.puzzle || !this._mediaProgram || !this._overlayProgram || !this._shadowProgram) return;
+                if (!this.puzzle || !this._pieceProgram) return;
 
                 const sourceCanvas = this.puzzle.gameCanvas || null;
                 const videoSource = (this.mediaSource && typeof this.mediaSource.videoWidth === "number" && typeof this.mediaSource.videoHeight === "number") ? this.mediaSource : null;
@@ -196,26 +262,45 @@
                 const drawItems = [];
                 let numHeld = 0;
                 const puzzle = this.puzzle;
+                const deg = (globalScope.rotations === 180 ? 90 : globalScope.rotations) || 0;
+                const dw = this._displayWidth || this.canvas.width;
+                const dh = this._displayHeight || this.canvas.height;
                 for (const pp of pieces) {
                     const w = pp.nx * puzzle.scalex;
                     const h = pp.ny * puzzle.scaley;
                     if (w <= 0 || h <= 0 || !pp.path) continue;
                     if (!pp._mediaSample) continue;
-                    if (!this._isPieceVisible(pp, w, h)) continue;
+                    if (!this._isPieceVisible(pp, w, h, deg, dw, dh)) continue;
 
                     const cache = this._ensurePieceTextures(pp, sceneState);
-                    if (!cache || !cache.maskTexture || !cache.overlayTexture) continue;
+                    if (!cache || cache.atlasIndex == null || cache.overlayAtlasIndex == null) continue;
                     cache.lastSeenFrame = visibleFrameMark;
                     const held = !!pp._isHeld;
                     if (held) numHeld++;
+                    const atlasW = this._atlasManager.atlasWidth;
+                    const atlasH = this._atlasManager.atlasHeight;
                     drawItems.push({
                         pp,
                         w,
                         h,
-                        maskTexture: cache.maskTexture,
-                        overlayTexture: cache.overlayTexture,
-                        maskW: cache.maskW || w,
-                        maskH: cache.maskH || h,
+                        maskAtlasTexture: this._atlasTextures[cache.atlasIndex],
+                        overlayAtlasTexture: this._atlasTextures[cache.overlayAtlasIndex],
+                        atlasIndex: cache.atlasIndex,
+                        overlayAtlasIndex: cache.overlayAtlasIndex,
+                        maskAtlasRect: [
+                            cache.maskX / atlasW,
+                            cache.maskY / atlasH,
+                            (cache.maskX + cache.maskW) / atlasW,
+                            (cache.maskY + cache.maskH) / atlasH
+                        ],
+                        overlayAtlasRect: [
+                            cache.overlayX / atlasW,
+                            cache.overlayY / atlasH,
+                            (cache.overlayX + cache.overlayW) / atlasW,
+                            (cache.overlayY + cache.overlayH) / atlasH
+                        ],
+                        maskW: cache.maskW_texel || w,
+                        maskH: cache.maskH_texel || h,
                         held,
                         heldShadowAlpha
                     });
@@ -249,31 +334,46 @@
                     gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
                     gl.bufferData(gl.ARRAY_BUFFER, this._batchedVertices.subarray(0, requiredFloats), gl.STREAM_DRAW);
 
+                    gl.useProgram(this._pieceProgram.program);
+                    gl.enableVertexAttribArray(this._pieceProgram.aPosition);
+                    gl.enableVertexAttribArray(this._pieceProgram.aTexCoord);
+                    gl.enableVertexAttribArray(this._pieceProgram.aMediaUv);
+                    if (this._pieceProgram._resolutionAppliedSerial !== this._resolutionSerial) {
+                        gl.uniform2f(this._pieceProgram.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
+                        this._pieceProgram._resolutionAppliedSerial = this._resolutionSerial;
+                    }
+
                     for (const item of drawItems) {
                         if (item.held && item.shadowVertexOffsetFloats >= 0) {
-                            this._bindProgram(this._shadowProgram, item.shadowVertexOffsetFloats * 4);
-                            this._bindTextureUnit(0, item.maskTexture);
-                            gl.uniform1i(this._shadowProgram.uMask, 0);
-                            gl.uniform1f(this._shadowProgram.uAlpha, item.heldShadowAlpha);
+                            this._setVertexOffset(item.shadowVertexOffsetFloats * 4);
+                            gl.uniform1f(this._pieceProgram.uMode, 0.0);
+                            this._bindTextureUnit(0, item.maskAtlasTexture);
+                            gl.uniform1i(this._pieceProgram.uAtlas, 0);
+                            gl.uniform4f(this._pieceProgram.uMaskAtlasRect, item.maskAtlasRect[0], item.maskAtlasRect[1], item.maskAtlasRect[2], item.maskAtlasRect[3]);
+                            gl.uniform1f(this._pieceProgram.uAlpha, item.heldShadowAlpha);
                             gl.uniform2f(
-                                this._shadowProgram.uTexel,
-                                1 / Math.max(1, item.maskW),
-                                1 / Math.max(1, item.maskH)
+                                this._pieceProgram.uTexel,
+                                (item.maskAtlasRect[2] - item.maskAtlasRect[0]) / Math.max(1, item.maskW),
+                                (item.maskAtlasRect[3] - item.maskAtlasRect[1]) / Math.max(1, item.maskH)
                             );
-                            gl.uniform1f(this._shadowProgram.uSoftness, 3.0);
+                            gl.uniform1f(this._pieceProgram.uSoftness, 3.0);
                             gl.drawArrays(gl.TRIANGLES, 0, 6);
                         }
 
-                        this._bindProgram(this._mediaProgram, item.pieceVertexOffsetFloats * 4);
+                        this._setVertexOffset(item.pieceVertexOffsetFloats * 4);
+                        gl.uniform1f(this._pieceProgram.uMode, 1.0);
                         this._bindTextureUnit(0, this._mediaTexture);
-                        gl.uniform1i(this._mediaProgram.uMedia, 0);
-                        this._bindTextureUnit(1, item.maskTexture);
-                        gl.uniform1i(this._mediaProgram.uMask, 1);
+                        this._bindTextureUnit(1, item.maskAtlasTexture);
+                        gl.uniform1i(this._pieceProgram.uMedia, 0);
+                        gl.uniform1i(this._pieceProgram.uAtlas, 1);
+                        gl.uniform4f(this._pieceProgram.uMaskAtlasRect, item.maskAtlasRect[0], item.maskAtlasRect[1], item.maskAtlasRect[2], item.maskAtlasRect[3]);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-                        this._bindProgram(this._overlayProgram, item.pieceVertexOffsetFloats * 4);
-                        this._bindTextureUnit(0, item.overlayTexture);
-                        gl.uniform1i(this._overlayProgram.uOverlay, 0);
+                        this._setVertexOffset(item.pieceVertexOffsetFloats * 4);
+                        gl.uniform1f(this._pieceProgram.uMode, 2.0);
+                        this._bindTextureUnit(0, item.overlayAtlasTexture);
+                        gl.uniform1i(this._pieceProgram.uAtlas, 0);
+                        gl.uniform4f(this._pieceProgram.uOverlayAtlasRect, item.overlayAtlasRect[0], item.overlayAtlasRect[1], item.overlayAtlasRect[2], item.overlayAtlasRect[3]);
                         gl.drawArrays(gl.TRIANGLES, 0, 6);
                     }
                 }
@@ -296,24 +396,19 @@
             this.enabled = false;
             this.supportsPieceRendering = false;
             if (this.gl) {
-                for (const entry of this._pieceTextureCache.values()) {
-                    if (entry.maskTexture) this.gl.deleteTexture(entry.maskTexture);
-                    if (entry.overlayTexture) this.gl.deleteTexture(entry.overlayTexture);
-                }
                 this._pieceTextureCache.clear();
+                for (const tex of this._atlasTextures) this.gl.deleteTexture(tex);
+                this._atlasTextures = [];
+                this._atlasManager = null;
                 if (this._vertexBuffer) this.gl.deleteBuffer(this._vertexBuffer);
                 if (this._mediaTexture) this.gl.deleteTexture(this._mediaTexture);
-                if (this._mediaProgram && this._mediaProgram.program) this.gl.deleteProgram(this._mediaProgram.program);
-                if (this._overlayProgram && this._overlayProgram.program) this.gl.deleteProgram(this._overlayProgram.program);
-                if (this._shadowProgram && this._shadowProgram.program) this.gl.deleteProgram(this._shadowProgram.program);
+                if (this._pieceProgram && this._pieceProgram.program) this.gl.deleteProgram(this._pieceProgram.program);
             }
             this._vertexBuffer = null;
             this._mediaTexture = null;
             this._mediaTextureW = 0;
             this._mediaTextureH = 0;
-            this._mediaProgram = null;
-            this._overlayProgram = null;
-            this._shadowProgram = null;
+            this._pieceProgram = null;
             if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
             this.gl = null;
         }
@@ -323,19 +418,15 @@
             const gl = this.gl;
             if (this._vertexBuffer) gl.deleteBuffer(this._vertexBuffer);
             if (this._mediaTexture) gl.deleteTexture(this._mediaTexture);
-            if (this._mediaProgram && this._mediaProgram.program) gl.deleteProgram(this._mediaProgram.program);
-            if (this._overlayProgram && this._overlayProgram.program) gl.deleteProgram(this._overlayProgram.program);
-            if (this._shadowProgram && this._shadowProgram.program) gl.deleteProgram(this._shadowProgram.program);
-            for (const entry of this._pieceTextureCache.values()) {
-                if (entry.maskTexture) gl.deleteTexture(entry.maskTexture);
-                if (entry.overlayTexture) gl.deleteTexture(entry.overlayTexture);
-            }
+            if (this._pieceProgram && this._pieceProgram.program) gl.deleteProgram(this._pieceProgram.program);
+            for (const tex of this._atlasTextures) gl.deleteTexture(tex);
+            this._atlasTextures = [];
+            this._atlasManager = this._createAtlasManager(gl);
             this._pieceTextureCache.clear();
             this._mediaTexture = null;
             this._mediaTextureW = 0;
             this._mediaTextureH = 0;
             this._mediaTextureConfigured = false;
-            this._boundProgram = null;
             this._boundTexture0 = null;
             this._boundTexture1 = null;
             this._activeTextureUnit = -1;
@@ -356,53 +447,46 @@
                     v_mediaUv = a_mediaUv;
                 }
             `;
-            const mediaFragSrc = `
+            const combinedFragSrc = `
                 precision mediump float;
                 varying vec2 v_texCoord;
                 varying vec2 v_mediaUv;
+                uniform float u_mode;
                 uniform sampler2D u_media;
-                uniform sampler2D u_mask;
-                void main() {
-                    vec4 media = texture2D(u_media, v_mediaUv);
-                    float alpha = texture2D(u_mask, v_texCoord).a;
-                    gl_FragColor = vec4(media.rgb, media.a * alpha);
-                }
-            `;
-            const overlayFragSrc = `
-                precision mediump float;
-                varying vec2 v_texCoord;
-                uniform sampler2D u_overlay;
-                void main() {
-                    gl_FragColor = texture2D(u_overlay, v_texCoord);
-                }
-            `;
-            const shadowFragSrc = `
-                precision mediump float;
-                varying vec2 v_texCoord;
-                uniform sampler2D u_mask;
+                uniform sampler2D u_atlas;
+                uniform vec4 u_maskAtlasRect;
+                uniform vec4 u_overlayAtlasRect;
                 uniform float u_alpha;
                 uniform vec2 u_texel;
                 uniform float u_softness;
                 void main() {
-                    vec2 d = u_texel * u_softness;
-                    float alpha = 0.0;
-                    alpha += texture2D(u_mask, v_texCoord).a * 0.227027;
-                    alpha += texture2D(u_mask, v_texCoord + vec2( d.x, 0.0)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(-d.x, 0.0)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(0.0,  d.y)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(0.0, -d.y)).a * 0.1945946;
-                    alpha += texture2D(u_mask, v_texCoord + vec2( d.x,  d.y)).a * 0.1216216;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(-d.x,  d.y)).a * 0.1216216;
-                    alpha += texture2D(u_mask, v_texCoord + vec2( d.x, -d.y)).a * 0.1216216;
-                    alpha += texture2D(u_mask, v_texCoord + vec2(-d.x, -d.y)).a * 0.1216216;
-                    alpha = alpha * 0.62;
-                    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha * u_alpha);
+                    vec2 maskUV = mix(u_maskAtlasRect.xy, u_maskAtlasRect.zw, v_texCoord);
+                    vec2 overlayUV = mix(u_overlayAtlasRect.xy, u_overlayAtlasRect.zw, v_texCoord);
+                    if (u_mode < 0.5) {
+                        vec2 d = u_texel * u_softness;
+                        float alpha = 0.0;
+                        alpha += texture2D(u_atlas, maskUV).a * 0.227027;
+                        alpha += texture2D(u_atlas, maskUV + vec2( d.x, 0.0)).a * 0.1945946;
+                        alpha += texture2D(u_atlas, maskUV + vec2(-d.x, 0.0)).a * 0.1945946;
+                        alpha += texture2D(u_atlas, maskUV + vec2(0.0,  d.y)).a * 0.1945946;
+                        alpha += texture2D(u_atlas, maskUV + vec2(0.0, -d.y)).a * 0.1945946;
+                        alpha += texture2D(u_atlas, maskUV + vec2( d.x,  d.y)).a * 0.1216216;
+                        alpha += texture2D(u_atlas, maskUV + vec2(-d.x,  d.y)).a * 0.1216216;
+                        alpha += texture2D(u_atlas, maskUV + vec2( d.x, -d.y)).a * 0.1216216;
+                        alpha += texture2D(u_atlas, maskUV + vec2(-d.x, -d.y)).a * 0.1216216;
+                        alpha = alpha * 0.62;
+                        gl_FragColor = vec4(0.0, 0.0, 0.0, alpha * u_alpha);
+                    } else if (u_mode < 1.5) {
+                        vec4 media = texture2D(u_media, v_mediaUv);
+                        float alpha = texture2D(u_atlas, maskUV).a;
+                        gl_FragColor = vec4(media.rgb, media.a * alpha);
+                    } else {
+                        gl_FragColor = texture2D(u_atlas, overlayUV);
+                    }
                 }
             `;
-            this._mediaProgram = this._createProgramInfo(vertexSrc, mediaFragSrc, "media");
-            this._overlayProgram = this._createProgramInfo(vertexSrc, overlayFragSrc, "overlay");
-            this._shadowProgram = this._createProgramInfo(vertexSrc, shadowFragSrc, "shadow");
-            if (!this._mediaProgram || !this._overlayProgram || !this._shadowProgram) return false;
+            this._pieceProgram = this._createProgramInfo(vertexSrc, combinedFragSrc, "combined");
+            if (!this._pieceProgram) return false;
             this._vertexBuffer = gl.createBuffer();
             if (!this._vertexBuffer) return false;
             gl.disable(gl.DEPTH_TEST);
@@ -518,8 +602,10 @@
         _pruneTextureCache(visibleFrameMark) {
             for (const [piece, entry] of this._pieceTextureCache.entries()) {
                 if (!entry || entry.lastSeenFrame !== visibleFrameMark) {
-                    if (this.gl && entry.maskTexture) this.gl.deleteTexture(entry.maskTexture);
-                    if (this.gl && entry.overlayTexture) this.gl.deleteTexture(entry.overlayTexture);
+                    if (this._atlasManager && entry.atlasIndex != null) {
+                        this._atlasManager.release(entry.atlasIndex, entry.maskX, entry.maskY, entry.maskW, entry.maskH);
+                        this._atlasManager.release(entry.overlayAtlasIndex, entry.overlayX, entry.overlayY, entry.overlayW, entry.overlayH);
+                    }
                     this._pieceTextureCache.delete(piece);
                 }
             }
@@ -528,42 +614,64 @@
         _ensurePieceTextures(pp, sceneState) {
             const gl = this.gl;
             const puzzle = this.puzzle;
-            if (!puzzle) return null;
+            if (!puzzle || !this._atlasManager) return null;
             const w = Math.max(1, pp.nx * puzzle.scalex);
             const h = Math.max(1, pp.ny * puzzle.scaley);
             if (w <= 0 || h <= 0 || !pp.path) return null;
 
             let entry = this._pieceTextureCache.get(pp);
+            if (entry && (w > entry.maskW || h > entry.maskH)) {
+                this._atlasManager.release(entry.atlasIndex, entry.maskX, entry.maskY, entry.maskW, entry.maskH);
+                this._atlasManager.release(entry.overlayAtlasIndex, entry.overlayX, entry.overlayY, entry.overlayW, entry.overlayH);
+                this._pieceTextureCache.delete(pp);
+                entry = null;
+            }
             if (!entry) {
+                const oversample = this._isOverlayOversampleEnabled();
+                let ow = oversample ? Math.min(2048, Math.max(1, 2 * (w | 0))) : (w | 0);
+                let oh = oversample ? Math.min(2048, Math.max(1, 2 * (h | 0))) : (h | 0);
+                const oversampleFits = ow >= 2 * (w | 0) && oh >= 2 * (h | 0);
+                if (oversample && !oversampleFits) {
+                    ow = Math.max(1, w | 0);
+                    oh = Math.max(1, h | 0);
+                }
+                const maskAlloc = this._atlasManager.allocate(w, h);
+                if (!maskAlloc) return null;
+                const overlayAlloc = this._atlasManager.allocateFromAtlas(maskAlloc.atlasIndex, ow, oh)
+                    || this._atlasManager.allocate(ow, oh);
+                if (!overlayAlloc) return null;
                 entry = {
-                    maskTexture: gl.createTexture(),
-                    overlayTexture: gl.createTexture(),
+                    atlasIndex: maskAlloc.atlasIndex,
+                    overlayAtlasIndex: overlayAlloc.atlasIndex,
+                    maskX: maskAlloc.x,
+                    maskY: maskAlloc.y,
+                    maskW: maskAlloc.w,
+                    maskH: maskAlloc.h,
+                    overlayX: overlayAlloc.x,
+                    overlayY: overlayAlloc.y,
+                    overlayW: overlayAlloc.w,
+                    overlayH: overlayAlloc.h,
                     maskVersion: -1,
                     overlayVersion: -1,
-                    maskConfigured: false,
-                    overlayConfigured: false,
-                    maskW: 0,
-                    maskH: 0,
+                    maskW_texel: w,
+                    maskH_texel: h,
                     lastSeenFrame: 0
                 };
                 this._pieceTextureCache.set(pp, entry);
             }
-            if (!entry.maskTexture || !entry.overlayTexture) return null;
             if (entry.lastSeenFrame == null) entry.lastSeenFrame = 0;
 
             const maskVersion = pp._maskVersion != null ? pp._maskVersion : (pp._overlayVersion || 0);
             if (entry.maskVersion !== maskVersion) {
                 const budget = this._uploadBudgetPerFrame != null ? this._uploadBudgetPerFrame : 12;
                 if (this._uploadCountThisFrame < budget) {
-                    this._bindTextureUnit(1, entry.maskTexture);
-                    if (!entry.maskConfigured) {
-                        this._configureMaskTextureDefaults(entry.maskTexture);
-                        entry.maskConfigured = true;
-                    }
+                    const atlasTex = this._atlasTextures[entry.atlasIndex];
+                    if (!atlasTex) return null;
+                    this._bindTextureUnit(0, atlasTex);
                     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
                     try {
                         if (pp._maskCanvas) {
-                            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pp._maskCanvas);
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, entry.maskX, entry.maskY, gl.RGBA, gl.UNSIGNED_BYTE, pp._maskCanvas);
                         } else {
                             const mctx = this._ensureSharedMaskCanvas(w, h);
                             if (mctx) {
@@ -571,7 +679,7 @@
                                 mctx.clearRect(0, 0, w, h);
                                 mctx.fillStyle = "#fff";
                                 mctx.fill(pp.path);
-                                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._sharedMaskCanvas);
+                                gl.texSubImage2D(gl.TEXTURE_2D, 0, entry.maskX, entry.maskY, gl.RGBA, gl.UNSIGNED_BYTE, this._sharedMaskCanvas);
                             }
                         }
                         this._uploadCountThisFrame += 1;
@@ -580,19 +688,17 @@
                         return null;
                     }
                     entry.maskVersion = maskVersion;
-                    entry.maskW = w;
-                    entry.maskH = h;
+                    entry.maskW_texel = w;
+                    entry.maskH_texel = h;
                 }
             }
 
             if (entry.overlayVersion !== (pp._overlayVersion || 0)) {
                 const budget = this._uploadBudgetPerFrame != null ? this._uploadBudgetPerFrame : 12;
                 if (this._uploadCountThisFrame < budget) {
-                    this._bindTextureUnit(0, entry.overlayTexture);
-                    if (!entry.overlayConfigured) {
-                        this._configureTextureDefaults(entry.overlayTexture);
-                        entry.overlayConfigured = true;
-                    }
+                    const atlasTex = this._atlasTextures[entry.overlayAtlasIndex];
+                    if (!atlasTex) return null;
+                    this._bindTextureUnit(0, atlasTex);
                     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
                     try {
                         if (typeof pp.drawOverlayToContext === "function") {
@@ -615,7 +721,7 @@
                             } else {
                                 pp.drawOverlayToContext(octx, w, h, puzzle);
                             }
-                            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._sharedOverlayCanvas);
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, entry.overlayX, entry.overlayY, gl.RGBA, gl.UNSIGNED_BYTE, this._sharedOverlayCanvas);
                             this._uploadCountThisFrame += 1;
                         }
                     } catch (e) {
@@ -631,25 +737,12 @@
             return entry;
         }
 
-        _bindProgram(programInfo, byteOffset) {
+        _setVertexOffset(byteOffset) {
             const gl = this.gl;
             const offset = byteOffset || 0;
-            if (this._boundProgram !== programInfo.program) {
-                gl.useProgram(programInfo.program);
-                this._boundProgram = programInfo.program;
-            }
-            gl.enableVertexAttribArray(programInfo.aPosition);
-            gl.vertexAttribPointer(programInfo.aPosition, 2, gl.FLOAT, false, 24, offset);
-            gl.enableVertexAttribArray(programInfo.aTexCoord);
-            gl.vertexAttribPointer(programInfo.aTexCoord, 2, gl.FLOAT, false, 24, offset + 8);
-            if (programInfo.aMediaUv >= 0) {
-                gl.enableVertexAttribArray(programInfo.aMediaUv);
-                gl.vertexAttribPointer(programInfo.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
-            }
-            if (programInfo._resolutionAppliedSerial !== this._resolutionSerial) {
-                gl.uniform2f(programInfo.uResolution, this._displayWidth || this.canvas.width, this._displayHeight || this.canvas.height);
-                programInfo._resolutionAppliedSerial = this._resolutionSerial;
-            }
+            gl.vertexAttribPointer(this._pieceProgram.aPosition, 2, gl.FLOAT, false, 24, offset);
+            gl.vertexAttribPointer(this._pieceProgram.aTexCoord, 2, gl.FLOAT, false, 24, offset + 8);
+            gl.vertexAttribPointer(this._pieceProgram.aMediaUv, 2, gl.FLOAT, false, 24, offset + 16);
         }
 
         _configureTextureDefaults(texture) {
@@ -706,8 +799,7 @@
             return this._sortedPieces;
         }
 
-        _isPieceVisible(pp, w, h) {
-            const deg = (globalScope.rotations === 180 ? 90 : globalScope.rotations) || 0;
+        _isPieceVisible(pp, w, h, deg, dw, dh) {
             const angle = (pp.rot || 0) * deg * Math.PI / 180;
             let hw = w / 2;
             let hh = h / 2;
@@ -722,8 +814,6 @@
             const cx = pp.x + w / 2;
             const cy = pp.y + h / 2;
             if (cx + hw < 0 || cy + hh < 0) return false;
-            const dw = this._displayWidth || this.canvas.width;
-            const dh = this._displayHeight || this.canvas.height;
             if (cx - hw > dw || cy - hh > dh) return false;
             return true;
         }
@@ -770,20 +860,21 @@
                 aTexCoord: gl.getAttribLocation(program, "a_texCoord"),
                 aMediaUv: gl.getAttribLocation(program, "a_mediaUv"),
                 uResolution: gl.getUniformLocation(program, "u_resolution"),
+                uMode: null,
                 uMedia: null,
-                uMask: null,
-                uOverlay: null,
+                uAtlas: null,
+                uMaskAtlasRect: null,
+                uOverlayAtlasRect: null,
                 uAlpha: null,
                 uTexel: null,
                 uSoftness: null
             };
-            if (kind === "media") {
+            if (kind === "combined") {
+                info.uMode = gl.getUniformLocation(program, "u_mode");
                 info.uMedia = gl.getUniformLocation(program, "u_media");
-                info.uMask = gl.getUniformLocation(program, "u_mask");
-            } else if (kind === "overlay") {
-                info.uOverlay = gl.getUniformLocation(program, "u_overlay");
-            } else if (kind === "shadow") {
-                info.uMask = gl.getUniformLocation(program, "u_mask");
+                info.uAtlas = gl.getUniformLocation(program, "u_atlas");
+                info.uMaskAtlasRect = gl.getUniformLocation(program, "u_maskAtlasRect");
+                info.uOverlayAtlasRect = gl.getUniformLocation(program, "u_overlayAtlasRect");
                 info.uAlpha = gl.getUniformLocation(program, "u_alpha");
                 info.uTexel = gl.getUniformLocation(program, "u_texel");
                 info.uSoftness = gl.getUniformLocation(program, "u_softness");

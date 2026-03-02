@@ -986,6 +986,7 @@
     .resizer.corner { 
         right: 0; bottom: 0; width: 15px; height: 15px; 
         cursor: nwse-resize; background: #888; border-radius: 3px;
+        touch-action: none; /* prevent browser pan/scroll when dragging resize handle on mobile */
     }
 
     /* Chat / Log window – themed like the drawer */
@@ -1013,6 +1014,9 @@
         min-height: 0;
         height: auto;
         max-height: calc(100vh - 110px);
+      }
+      #draggable6 {
+        min-height: 200px; 
       }
       #draggable4 .resizer.corner,
       #draggable5 .resizer.corner,

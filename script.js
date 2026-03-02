@@ -334,7 +334,7 @@ try {
     const storedVideoFps = localStorage.getItem("videoFrameIntervalMs");
     if (storedVideoFps !== null && storedVideoFps !== "") {
         const ms = parseInt(storedVideoFps, 10);
-        if (!isNaN(ms) && ms >= 0) viewState.videoFrameIntervalMs = ms;
+        if (!isNaN(ms) && ms >= 0) viewState.videoFrameIntervalMs = (ms <= 0 || ms < 33) ? 33 : ms;
     }
 } catch (_e) {}
 try {
@@ -1657,8 +1657,7 @@ class Puzzle {
             event.preventDefault();
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
-            
-            queueGameEvent({ event: 'move', button: event.button, position: this.relativeMouseCoordinates(event) });
+            queueGameEvent({ event: 'move', button: event.button, position: { clientX: event.clientX, clientY: event.clientY } });
         });
         this.container.addEventListener("touchmove", event => {
             event.preventDefault();
@@ -1666,8 +1665,7 @@ class Puzzle {
             let ev = event.touches[0];
             // do not accumulate move events in events queue - keep only current one
             if (events.length && events[events.length - 1].event == "move") events.pop();
-            // console.log("touch", event.offsetX, event.offsetY, event)
-            queueGameEvent({ event: 'move', button: 0, position: this.relativeMouseCoordinates(ev) });
+            queueGameEvent({ event: 'move', button: 0, position: { clientX: ev.clientX, clientY: ev.clientY } });
         }, { passive: false });
 
         /* create canvas to contain picture - will be styled later */
@@ -2219,7 +2217,8 @@ class Puzzle {
 
         /* scale pieces: use logical size for display so resolution preset only affects quality, not on-screen size */
         // Display-only shrink factor (does not reduce gameCanvas resolution).
-        const rawAreaMultiplier = Number(window.PUZZLE_AREA_SURFACE_MULTIPLIER);
+        // Online games: 100%; local (solo) games: use PUZZLE_AREA_SURFACE_MULTIPLIER (default 75%).
+        const rawAreaMultiplier = Number(window.play_solo ? window.PUZZLE_AREA_SURFACE_MULTIPLIER : 1);
         let areaScale = 1;
         if (Number.isFinite(rawAreaMultiplier) && rawAreaMultiplier > 0) {
             // Backward-compatible behavior:
@@ -2560,6 +2559,10 @@ let lastSyncedPreviewAt = 0;
 let hasDrawnStaticSyncedPreview = false;
 let prestartPreviewDirty = true; // only redraw prestart when dirty or media animated
 let lastPrestartPreviewAt = 0; // throttle animated prestart by framerate
+const TARGET_FRAME_MS_ACTIVE = 1000 / 30;
+const TARGET_FRAME_MS_STATIC = 1000 / 15;
+const TARGET_FRAME_MS_HIDDEN = 1000;
+let lastLoopTickMs = 0;
 let grayscaleReferenceCanvas = null;
 let grayscaleReferenceCtx = null;
 let lastGrayscaleUpdateMs = 0;
@@ -2944,6 +2947,8 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
 { // scope for animate
     let stateAfterPan = 50;
     const HELD_Z_INDEX = 2147483647;
+    const DRAG_SYNC_THROTTLE_MS = 100;
+    let lastDragSyncTime = 0;
 
     function setHeldPieceState(pp, held) {
         if (!pp) return;
@@ -3001,7 +3006,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         viewState.panY += (deltaClientY / panScaleH) * viewState.panSensitivity;
         startDragClientX = event.position.clientX;
         startDragClientY = event.position.clientY;
-        applyViewTransform();
+        applyViewTransform(true);
     }
 
     function applyPieceMoveEvent(event, perfMonitor) {
@@ -3020,11 +3025,15 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         moving.pp.moveAwayFromBorder();
         moving.pp.hasMovedEver = true;
         if (window.gameplayStarted && !window.play_solo) {
-            const movingSyncId = getPolyPieceSyncId(moving.pp);
-            if(window.rotations == 0){
-                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
-            }else{
-                if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+            const now = Date.now();
+            if ((now - lastDragSyncTime) >= DRAG_SYNC_THROTTLE_MS) {
+                const movingSyncId = getPolyPieceSyncId(moving.pp);
+                if (window.rotations == 0) {
+                    if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight], false);
+                } else {
+                    if (movingSyncId !== null) change_savedata_datastorage(movingSyncId, [to_x / puzzle.contWidth, to_y / puzzle.contHeight, moving.pp.rot], false);
+                }
+                lastDragSyncTime = now;
             }
         }
         if (perfMonitor && typeof perfMonitor.recordDragMove === "function") {
@@ -3107,6 +3116,13 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 applyPanMoveEvent(event);
                 event = null;
             } else if (state === 55 && moving && moving.pp) {
+                if (event.position.x == null || event.position.y == null) {
+                    const pos = puzzle.screenToPuzzle(event.position.clientX, event.position.clientY);
+                    event.position.x = pos.x;
+                    event.position.y = pos.y;
+                    event.position.p_x = pos.p_x;
+                    event.position.p_y = pos.p_y;
+                }
                 applyPieceMoveEvent(event, perfMonitor);
                 event = null;
             }
@@ -3119,41 +3135,50 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             }
             event = null;
         }
-        // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
-        const setupStartedAt = jigsawPerfNow();
-        if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
-        if (perfMonitor && typeof perfMonitor.recordSetupQueue === "function") {
-            perfMonitor.recordSetupQueue(jigsawPerfNow() - setupStartedAt);
-        }
-        const renderStartedAt = jigsawPerfNow();
-        if (rendererFacade) rendererFacade.renderFrame(nowMs);
-        if (perfMonitor && typeof perfMonitor.recordRender === "function") {
-            perfMonitor.recordRender(jigsawPerfNow() - renderStartedAt);
-        }
-        if (state < 50) hasDrawnStaticSyncedPreview = false;
-        const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
-        if (animated) {
-            const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
-            if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
-                drawSyncedPreviewWindowFrame();
-                lastSyncedPreviewAt = nowMs;
+        const isPageHidden = typeof document !== "undefined" && document.visibilityState !== "visible";
+        const isStatic = !(moving && moving.pp) && !(rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated());
+        const currentRenderCapMs = isPageHidden ? TARGET_FRAME_MS_HIDDEN : (isStatic ? TARGET_FRAME_MS_STATIC : TARGET_FRAME_MS_ACTIVE);
+        if (rendererFacade && rendererFacade.scheduler) rendererFacade.scheduler.targetFrameMs = currentRenderCapMs;
+        const elapsedSinceLoopTick = nowMs - lastLoopTickMs;
+        const runRenderPhase = lastLoopTickMs === 0 || elapsedSinceLoopTick >= currentRenderCapMs;
+        if (runRenderPhase) {
+            lastLoopTickMs = nowMs;
+            // Process piece setup (e.g. merge redraws) before rendering so merged polys use updated canvas content this frame.
+            const setupStartedAt = jigsawPerfNow();
+            if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) pieceSetupQueueApi.processPieceSetupQueue();
+            if (perfMonitor && typeof perfMonitor.recordSetupQueue === "function") {
+                perfMonitor.recordSetupQueue(jigsawPerfNow() - setupStartedAt);
             }
-            hasDrawnStaticSyncedPreview = false;
-        } else if (state >= 50 && !hasDrawnStaticSyncedPreview) {
-            drawSyncedPreviewWindowFrame();
-            hasDrawnStaticSyncedPreview = true;
-        }
-        if (state === 15) {
-            const prestartAnimated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
-            if (prestartPreviewDirty) {
-                drawPrestartPreviewFrame();
-                prestartPreviewDirty = false;
-                lastPrestartPreviewAt = nowMs;
-            } else if (prestartAnimated) {
-                const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : 16;
-                if (nowMs - lastPrestartPreviewAt >= intervalMs) {
+            const renderStartedAt = jigsawPerfNow();
+            if (rendererFacade) rendererFacade.renderFrame(nowMs);
+            if (perfMonitor && typeof perfMonitor.recordRender === "function") {
+                perfMonitor.recordRender(jigsawPerfNow() - renderStartedAt);
+            }
+            if (state < 50) hasDrawnStaticSyncedPreview = false;
+            const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
+            if (animated) {
+                const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE;
+                if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
+                    drawSyncedPreviewWindowFrame();
+                    lastSyncedPreviewAt = nowMs;
+                }
+                hasDrawnStaticSyncedPreview = false;
+            } else if (state >= 50 && !hasDrawnStaticSyncedPreview) {
+                drawSyncedPreviewWindowFrame();
+                hasDrawnStaticSyncedPreview = true;
+            }
+            if (state === 15) {
+                const prestartAnimated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
+                if (prestartPreviewDirty) {
                     drawPrestartPreviewFrame();
+                    prestartPreviewDirty = false;
                     lastPrestartPreviewAt = nowMs;
+                } else if (prestartAnimated) {
+                    const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE;
+                    if (nowMs - lastPrestartPreviewAt >= intervalMs) {
+                        drawPrestartPreviewFrame();
+                        lastPrestartPreviewAt = nowMs;
+                    }
                 }
             }
         }
@@ -4023,8 +4048,8 @@ if (window.JigsawViewControls && typeof window.JigsawViewControls.init === "func
 const forPuzzleEl = document.getElementById("forPuzzle");
 if (forPuzzleEl && typeof applyDisplayPreferences === "function") applyDisplayPreferences(forPuzzleEl);
 
-function applyViewTransform() {
-    if (_viewControlsApi && _viewControlsApi.applyViewTransform) _viewControlsApi.applyViewTransform();
+function applyViewTransform(panOnly) {
+    if (_viewControlsApi && _viewControlsApi.applyViewTransform) _viewControlsApi.applyViewTransform(panOnly);
 }
 
 function resetView() {
@@ -4495,7 +4520,8 @@ if (window.JigsawArchipelagoBridge && typeof window.JigsawArchipelagoBridge.crea
         getPuzzle: () => puzzle,
         findPolyPieceUsingPuzzlePiece: (idx, first) => findPolyPieceUsingPuzzlePiece(idx, first),
         findPolyPieceBySyncId: (syncId) => findPolyPieceBySyncId(syncId),
-        getPolyPieceSyncId: (pp) => getPolyPieceSyncId(pp)
+        getPolyPieceSyncId: (pp) => getPolyPieceSyncId(pp),
+        markPieceDirty: (pp) => { if (rendererFacade && rendererFacade.sceneState) rendererFacade.sceneState.markPieceDirty(pp); }
     });
 }
 

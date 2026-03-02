@@ -129,8 +129,9 @@
             const videoFrameRateSelect = document.getElementById("videoFrameRateSelect");
             if (videoFrameRateSelect) {
                 const viewState = globalScope.viewState;
-                const validValues = ["0", "16", "33", "42", "50", "66"];
-                const initialMs = (viewState && typeof viewState.videoFrameIntervalMs === "number") ? viewState.videoFrameIntervalMs : 33;
+                const validValues = ["33", "42", "50", "66"];
+                let initialMs = (viewState && typeof viewState.videoFrameIntervalMs === "number") ? viewState.videoFrameIntervalMs : 33;
+                if (initialMs <= 0 || initialMs < 33) initialMs = 33;
                 const initialValue = String(validValues.includes(String(initialMs)) ? initialMs : 33);
                 videoFrameRateSelect.value = initialValue;
                 const facade = deps.getRendererFacade();

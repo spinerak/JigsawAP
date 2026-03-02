@@ -27,7 +27,7 @@
             this.webglRenderer = null;
             this.activeRenderer = null;
             this.scheduler = new globalScope.JigsawRenderScheduler({
-                targetFrameMs: 16
+                targetFrameMs: 1000 / 30
             });
             this.sceneState = new globalScope.JigsawPuzzleSceneState();
             this.media = new globalScope.JigsawMediaSourceAdapter();
@@ -82,7 +82,7 @@
         }
 
         selectMode(requestedMode, puzzle) {
-            if (this.scheduler) this.scheduler.targetFrameMs = 16;
+            if (this.scheduler) this.scheduler.targetFrameMs = 1000 / 30;
             const normalizedMode = (requestedMode === "webgl" || requestedMode === "auto" || requestedMode === "canvas2d")
                 ? requestedMode
                 : "canvas2d";
@@ -345,7 +345,7 @@
         isMediaAnimated() {
             const status = this.media && this.media.getStatus ? this.media.getStatus() : null;
             const kind = status && status.kind ? status.kind : "image";
-            return kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded";
+            return kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded" || kind === "gif";
         }
 
         renderFrame(nowMs) {
@@ -371,19 +371,6 @@
                 }
             }
             if (!shouldRenderThisFrame) return;
-
-            if (this.media && puzzle && !mediaAdvanced) {
-                const status = this.media.getStatus ? this.media.getStatus() : null;
-                const kind = status && status.kind ? status.kind : "image";
-                const animated = kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded";
-                if (animated) {
-                    const frameSource = this.media.getFrameSource();
-                    if (frameSource && puzzle.applyMediaFrame && puzzle.applyMediaFrame(frameSource, nowMs)) {
-                        this.sceneState.markAllDirty();
-                        mediaAdvanced = true;
-                    }
-                }
-            }
 
             // Catch WebGL failures before dirty-skip can short-circuit fallback.
             if (this._isWebGLRuntimeFailed()) {
