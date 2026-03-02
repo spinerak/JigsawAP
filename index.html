@@ -380,12 +380,12 @@
       </section>
       <section class="cosmetic-window-card">
         <h4 class="cosmetic-window-title">Renderer &amp; performance</h4>
-        <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources). Canvas2D is the compatibility path and is used when WebGL is unavailable, blocked, or downgraded for this session.">
-          <label for="rendererModeSelect" title="Auto: preferred default. It attempts WebGL and falls back to Canvas2D when needed. WebGL: GPU path for best performance with large piece counts/animated media. Canvas2D: CPU single-canvas compatibility path.">Renderer backend</label>
-          <select id="rendererModeSelect" class="display-options-select" title="Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available. Canvas2D: compatibility path used when WebGL is unavailable/blocked.">
+        <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Canvas2D is the default (best compatibility). Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources).">
+          <label for="rendererModeSelect" title="Canvas2D is the default (best compatibility). Auto: tries WebGL first, then falls back to Canvas2D. WebGL: GPU path for best performance with large piece counts/animated media, but only works well on some machines.">Renderer backend</label>
+          <select id="rendererModeSelect" class="display-options-select" title="Canvas2D: default, compatibility path. Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available.">
+            <option value="canvas2d" selected>canvas2d</option>
             <option value="auto">auto</option>
             <option value="webgl">webgl</option>
-            <option value="canvas2d">canvas2d</option>
           </select>
         </div>
         <div class="display-options-slider renderer-mode-slider" title="Cap the render buffer resolution to improve performance. Layout; only the internal draw resolution is limited. Resolutions above 1080p can severely hinder performance, especially with animations.">

@@ -2,7 +2,7 @@
 
 (function initRenderScheduler(globalScope) {
     class RenderScheduler {
-        constructor({ targetFrameMs = 1000 / 30, maxRenderMs = 8 } = {}) {
+        constructor({ targetFrameMs = 1000 / 60, maxRenderMs = 8 } = {}) {
             this.targetFrameMs = targetFrameMs;
             this.maxRenderMs = maxRenderMs;
             this.lastFrameAt = 0;

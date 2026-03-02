@@ -54,7 +54,7 @@
 
         function setRendererMode(mode) {
             const cfg = deps.getRendererConfig() || {};
-            if (mode !== "canvas2d" && mode !== "webgl" && mode !== "auto") mode = "auto";
+            if (mode !== "canvas2d" && mode !== "webgl" && mode !== "auto") mode = "canvas2d";
             const modeStatus = getModeStatus();
             if (modeStatus.webglDowngraded === true && mode === "webgl") {
                 mode = "canvas2d";

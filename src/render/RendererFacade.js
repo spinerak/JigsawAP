@@ -27,7 +27,7 @@
             this.webglRenderer = null;
             this.activeRenderer = null;
             this.scheduler = new globalScope.JigsawRenderScheduler({
-                targetFrameMs: 1000 / 30
+                targetFrameMs: 1000 / 60
             });
             this.sceneState = new globalScope.JigsawPuzzleSceneState();
             this.media = new globalScope.JigsawMediaSourceAdapter();
@@ -82,7 +82,7 @@
         }
 
         selectMode(requestedMode, puzzle) {
-            if (this.scheduler) this.scheduler.targetFrameMs = 1000 / 30;
+            if (this.scheduler) this.scheduler.targetFrameMs = 1000 / 60;
             const normalizedMode = (requestedMode === "webgl" || requestedMode === "auto" || requestedMode === "canvas2d")
                 ? requestedMode
                 : "canvas2d";
