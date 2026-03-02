@@ -26,12 +26,10 @@
             }
 
             const webglOpt = rendererModeControl.select.querySelector('option[value="webgl"]');
-            const autoOpt = rendererModeControl.select.querySelector('option[value="auto"]');
             if (webglOpt) webglOpt.disabled = forceCanvas;
-            if (autoOpt) autoOpt.disabled = forceCanvas;
             rendererModeControl.select.title = webglDowngraded
                 ? "WebGL is disabled for this session after fallback/downgrade. Use Canvas2D. Refresh to retry WebGL."
-                : "Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU path when available. Canvas2D: most compatible fallback.";
+                : "Canvas2D: compatibility path. WebGL: fastest GPU path when available; downgrades to Canvas2D if blocked (e.g. CORS).";
 
             if (rendererModeControl.status && rendererModeControl.fallbackRow) {
                 const note = modeStatus.note || modeStatus.webglDowngradeReason || "";
@@ -54,7 +52,7 @@
 
         function setRendererMode(mode) {
             const cfg = deps.getRendererConfig() || {};
-            if (mode !== "canvas2d" && mode !== "webgl" && mode !== "auto") mode = "canvas2d";
+            if (mode !== "canvas2d" && mode !== "webgl") mode = "canvas2d";
             const modeStatus = getModeStatus();
             if (modeStatus.webglDowngraded === true && mode === "webgl") {
                 mode = "canvas2d";
@@ -97,7 +95,7 @@
                     const facade = deps.getRendererFacade();
                     const puzzle = deps.getPuzzle();
                     if (facade && puzzle && facade.retryWebGLAfterDowngrade) {
-                        const ok = facade.retryWebGLAfterDowngrade("auto");
+                        const ok = facade.retryWebGLAfterDowngrade("webgl");
                         if (!ok && typeof console !== "undefined" && console.warn) {
                             console.warn("[RendererModeControl] WebGL retry failed; staying on canvas2d.");
                         }
@@ -107,7 +105,7 @@
             }
             rendererModeControl = { control: null, select: select, status: status, retryBtn: retryBtn || null, fallbackRow: fallbackRow || null };
             // Apply dropdown value so HTML default (e.g. canvas2d) is the actual mode on first load
-            const initialMode = (select.value === "webgl" || select.value === "auto" || select.value === "canvas2d") ? select.value : "canvas2d";
+            const initialMode = (select.value === "webgl" || select.value === "canvas2d") ? select.value : "canvas2d";
             const currentCfg = deps.getRendererConfig() || {};
             if ((currentCfg.mode || "canvas2d") !== initialMode) {
                 setRendererMode(initialMode);

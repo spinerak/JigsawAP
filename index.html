@@ -380,11 +380,10 @@
       </section>
       <section class="cosmetic-window-card">
         <h4 class="cosmetic-window-title">Renderer &amp; performance</h4>
-        <div class="display-options-slider renderer-mode-slider" title="Renderer backend selector. Canvas2D is the default (best compatibility). Auto tries WebGL first, then falls back to Canvas2D. WebGL is the fastest path for many pieces and animated media but requires secure texture upload (CORS-safe sources).">
-          <label for="rendererModeSelect" title="Canvas2D is the default (best compatibility). Auto: tries WebGL first, then falls back to Canvas2D. WebGL: GPU path for best performance with large piece counts/animated media, but only works well on some machines.">Renderer backend</label>
-          <select id="rendererModeSelect" class="display-options-select" title="Canvas2D: default, compatibility path. Auto: attempts WebGL and falls back to Canvas2D. WebGL: fastest GPU compositing path when available.">
+        <div class="display-options-slider renderer-mode-slider" title="Renderer backend. Canvas2D is the default (best compatibility). WebGL is faster for many pieces and animated media but requires CORS-safe sources.">
+          <label for="rendererModeSelect" title="Canvas2D: default, compatibility path. WebGL: GPU path for best performance with large piece counts/animated media.">Renderer backend</label>
+          <select id="rendererModeSelect" class="display-options-select" title="Canvas2D: default, compatibility path. WebGL: fastest GPU path when available; downgrades to Canvas2D if blocked (e.g. CORS).">
             <option value="canvas2d" selected>canvas2d</option>
-            <option value="auto">auto</option>
             <option value="webgl">webgl</option>
           </select>
         </div>

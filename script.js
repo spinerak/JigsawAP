@@ -9,7 +9,7 @@ window.show_clue = true;
 window.rotations = 0;
 window.zero_list = [0,0];
 window.rendererConfig = {
-    mode: "canvas2d", // canvas2d | webgl | auto
+    mode: "canvas2d", // canvas2d | webgl
     media: "image", // image | gif | video | camera
     autoFallback: true,
     perfBudgetMs: 8

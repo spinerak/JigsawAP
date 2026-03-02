@@ -29,9 +29,11 @@
             return deps.getRendererFacade ? deps.getRendererFacade() : null;
         }
 
-        function isWebGLActive() {
-            const facade = getRendererFacade();
-            return !!(facade && facade.activeMode === "webgl");
+        /** Only show CORS popup when the user's chosen mode is WebGL. Not when they chose canvas2d. */
+        function shouldShowCorsPopupForChosenMode() {
+            const cfg = deps.getRendererConfig && deps.getRendererConfig();
+            const mode = (cfg && cfg.mode) || "canvas2d";
+            return mode === "webgl";
         }
 
         function getPuzzle() {
@@ -292,7 +294,7 @@
                 if (!puzzle._webglStartBlockedReason) puzzle._webglStartBlockedReason = "";
             } catch (_e) {
                 puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
-                if (isWebGLActive()) {
+                if (shouldShowCorsPopupForChosenMode()) {
                     showCorsDowngradeNotice("video", video && video.currentSrc ? video.currentSrc : video.src);
                 }
             }
@@ -373,7 +375,7 @@
                     puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
                     puzzle.imageLoaded = false;
                     puzzle.srcImage.src = imagePath;
-                    if (isWebGLActive()) {
+                    if (shouldShowCorsPopupForChosenMode()) {
                         if (puzzle.isGif) {
                             showGifAnimationUnavailableNotice(imagePath, "cors");
                         } else {
@@ -392,7 +394,7 @@
                         rendererFacade.setGifSource(imagePath, puzzle.srcImage).then((ok) => {
                             if (bindToken !== mediaBindToken) return;
                             if (!ok) {
-                                if (isWebGLActive()) {
+                                if (shouldShowCorsPopupForChosenMode()) {
                                     let reason = "";
                                     try {
                                         const st = rendererFacade && rendererFacade.media && rendererFacade.media.getStatus
@@ -406,7 +408,7 @@
                             }
                         }).catch(() => {
                             if (bindToken !== mediaBindToken) return;
-                            if (isWebGLActive()) {
+                            if (shouldShowCorsPopupForChosenMode()) {
                                 const reason = isCrossOriginHttpUrl(imagePath) ? "cors" : "decode";
                                 showGifAnimationUnavailableNotice(imagePath, reason);
                             }
@@ -508,6 +510,7 @@
             if (!detail || !detail.webglDowngraded) return;
             const reason = (detail.webglDowngradeReason || "").toLowerCase();
             if (reason.indexOf("cors") === -1) return;
+            if (!shouldShowCorsPopupForChosenMode()) return;
             const cfg = deps.getRendererConfig && deps.getRendererConfig();
             const mediaKind = (cfg && cfg.media === "video") ? "video" : "image";
             let sourceUrl = "";
