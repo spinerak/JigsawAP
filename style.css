@@ -110,9 +110,11 @@
     .login-container {
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
+      overflow-y: auto;
+      padding: 20px 0;
+      box-sizing: border-box;
     }
     .login-form {
         background-color: #1f1f1fa2;
@@ -124,6 +126,8 @@
         flex-direction: column;
         align-items: center;
         /* Center horizontally */
+        margin-top: auto;
+        margin-bottom: auto;
     }
     .login-heading {
         margin-top: 0px;
