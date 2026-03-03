@@ -27,13 +27,13 @@
             this.webglRenderer = null;
             this.activeRenderer = null;
             this.scheduler = new globalScope.JigsawRenderScheduler({
-                targetFrameMs: 1000 / 30
+                targetFrameMs: 1000 / 60
             });
             this.sceneState = new globalScope.JigsawPuzzleSceneState();
             this.media = new globalScope.JigsawMediaSourceAdapter();
             this.hitTest = new globalScope.JigsawHitTestService();
             this.mode = "canvas2d";
-            this.requestedMode = "auto";
+            this.requestedMode = "canvas2d";
             this.activeMode = "none";
             this.modeNote = "";
             this.webglDowngraded = false;
@@ -82,8 +82,8 @@
         }
 
         selectMode(requestedMode, puzzle) {
-            if (this.scheduler) this.scheduler.targetFrameMs = 1000 / 30;
-            const normalizedMode = (requestedMode === "webgl" || requestedMode === "auto" || requestedMode === "canvas2d")
+            if (this.scheduler) this.scheduler.targetFrameMs = 1000 / 60;
+            const normalizedMode = (requestedMode === "webgl" || requestedMode === "canvas2d")
                 ? requestedMode
                 : "canvas2d";
             this.requestedMode = normalizedMode;
@@ -126,8 +126,6 @@
                 useCanvas();
             } else if (this.requestedMode === "webgl") {
                 if (!tryWebGL() && this.config.autoFallback !== false) useCanvas();
-            } else if (this.requestedMode === "auto") {
-                if (!tryWebGL()) useCanvas();
             } else {
                 useCanvas();
             }
@@ -177,7 +175,7 @@
             return false;
         }
 
-        retryWebGLAfterDowngrade(preferredMode = "auto") {
+        retryWebGLAfterDowngrade(preferredMode = "webgl") {
             const puzzle = this.sceneState ? this.sceneState.puzzle : null;
             if (!puzzle) return false;
             if (puzzle._webglStartBlockedReason) {
@@ -192,7 +190,7 @@
             }
             this.webglDowngraded = false;
             this.webglDowngradeReason = "";
-            const mode = (preferredMode === "webgl" || preferredMode === "auto") ? preferredMode : "auto";
+            const mode = (preferredMode === "webgl" || preferredMode === "canvas2d") ? preferredMode : "canvas2d";
             this.selectMode(mode, puzzle);
             if (this.activeMode === "webgl" && this.ensureStartRendererCompatibility() === true) {
                 if (this.activeRenderer && this.activeRenderer.renderDirtyPieces) {
@@ -220,7 +218,7 @@
 
         getModeStatus() {
             return {
-                requested: this.requestedMode || "auto",
+                requested: this.requestedMode || "canvas2d",
                 active: this.activeMode || "none",
                 note: this.modeNote || "",
                 webglDowngraded: this.webglDowngraded === true,

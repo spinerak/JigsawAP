@@ -29,6 +29,13 @@
             return deps.getRendererFacade ? deps.getRendererFacade() : null;
         }
 
+        /** Only show CORS popup when the user's chosen mode is WebGL. Not when they chose canvas2d. */
+        function shouldShowCorsPopupForChosenMode() {
+            const cfg = deps.getRendererConfig && deps.getRendererConfig();
+            const mode = (cfg && cfg.mode) || "canvas2d";
+            return mode === "webgl";
+        }
+
         function getPuzzle() {
             return deps.getPuzzle ? deps.getPuzzle() : null;
         }
@@ -39,7 +46,7 @@
             if (!puzzle || !facade || !facade.webglDowngraded) return;
             if (puzzle._webglStartBlockedReason) return;
             const cfg = deps.getRendererConfig && deps.getRendererConfig();
-            const preferredMode = (cfg && cfg.mode) || "auto";
+            const preferredMode = (cfg && cfg.mode) || "canvas2d";
             if (typeof facade.retryWebGLAfterDowngrade === "function") {
                 facade.retryWebGLAfterDowngrade(preferredMode);
             }
@@ -287,7 +294,9 @@
                 if (!puzzle._webglStartBlockedReason) puzzle._webglStartBlockedReason = "";
             } catch (_e) {
                 puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
-                showCorsDowngradeNotice("video", video && video.currentSrc ? video.currentSrc : video.src);
+                if (shouldShowCorsPopupForChosenMode()) {
+                    showCorsDowngradeNotice("video", video && video.currentSrc ? video.currentSrc : video.src);
+                }
             }
         }
 
@@ -366,10 +375,12 @@
                     puzzle._webglStartBlockedReason = "secure texture upload blocked (CORS)";
                     puzzle.imageLoaded = false;
                     puzzle.srcImage.src = imagePath;
-                    if (puzzle.isGif) {
-                        showGifAnimationUnavailableNotice(imagePath, "cors");
-                    } else {
-                        showCorsDowngradeNotice("image", imagePath);
+                    if (shouldShowCorsPopupForChosenMode()) {
+                        if (puzzle.isGif) {
+                            showGifAnimationUnavailableNotice(imagePath, "cors");
+                        } else {
+                            showCorsDowngradeNotice("image", imagePath);
+                        }
                     }
                 };
                 puzzle.srcImage.addEventListener("error", fallbackOnError, { once: true });
@@ -383,20 +394,24 @@
                         rendererFacade.setGifSource(imagePath, puzzle.srcImage).then((ok) => {
                             if (bindToken !== mediaBindToken) return;
                             if (!ok) {
-                                let reason = "";
-                                try {
-                                    const st = rendererFacade && rendererFacade.media && rendererFacade.media.getStatus
-                                        ? rendererFacade.media.getStatus()
-                                        : null;
-                                    reason = st && st.failureReason ? String(st.failureReason) : "";
-                                } catch (_e) {}
-                                showGifAnimationUnavailableNotice(imagePath, reason);
+                                if (shouldShowCorsPopupForChosenMode()) {
+                                    let reason = "";
+                                    try {
+                                        const st = rendererFacade && rendererFacade.media && rendererFacade.media.getStatus
+                                            ? rendererFacade.media.getStatus()
+                                            : null;
+                                        reason = st && st.failureReason ? String(st.failureReason) : "";
+                                    } catch (_e) {}
+                                    showGifAnimationUnavailableNotice(imagePath, reason);
+                                }
                                 rendererFacade.setMediaSource(puzzle.srcImage, "gif");
                             }
                         }).catch(() => {
                             if (bindToken !== mediaBindToken) return;
-                            const reason = isCrossOriginHttpUrl(imagePath) ? "cors" : "decode";
-                            showGifAnimationUnavailableNotice(imagePath, reason);
+                            if (shouldShowCorsPopupForChosenMode()) {
+                                const reason = isCrossOriginHttpUrl(imagePath) ? "cors" : "decode";
+                                showGifAnimationUnavailableNotice(imagePath, reason);
+                            }
                             rendererFacade.setMediaSource(puzzle.srcImage, "gif");
                         });
                     } else {
@@ -490,6 +505,23 @@
             setImagePath(globalScope.defaultImagePath);
         }
 
+        function onRendererStatusChange(evt) {
+            const detail = evt && evt.detail;
+            if (!detail || !detail.webglDowngraded) return;
+            const reason = (detail.webglDowngradeReason || "").toLowerCase();
+            if (reason.indexOf("cors") === -1) return;
+            if (!shouldShowCorsPopupForChosenMode()) return;
+            const cfg = deps.getRendererConfig && deps.getRendererConfig();
+            const mediaKind = (cfg && cfg.media === "video") ? "video" : "image";
+            let sourceUrl = "";
+            if (activeCustomVideoEl) {
+                sourceUrl = activeCustomVideoEl.currentSrc || activeCustomVideoEl.src || "";
+            } else if (deps.getImagePath) {
+                sourceUrl = deps.getImagePath() || "";
+            }
+            if (sourceUrl) showCorsDowngradeNotice(mediaKind, sourceUrl);
+        }
+
         function buildLoadFileHandler() {
             const elFile = document.createElement("input");
             elFile.setAttribute("type", "file");
@@ -518,6 +550,8 @@
                 elFile.click();
             };
         }
+
+        globalScope.addEventListener("jigsaw-renderer-status-change", onRendererStatusChange);
 
         return {
             isGifSource: isGifSource,

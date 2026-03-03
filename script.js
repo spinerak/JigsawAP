@@ -9,7 +9,7 @@ window.show_clue = true;
 window.rotations = 0;
 window.zero_list = [0,0];
 window.rendererConfig = {
-    mode: "auto", // canvas2d | webgl | auto
+    mode: "canvas2d", // canvas2d | webgl
     media: "image", // image | gif | video | camera
     autoFallback: true,
     perfBudgetMs: 8
@@ -2559,7 +2559,7 @@ let lastSyncedPreviewAt = 0;
 let hasDrawnStaticSyncedPreview = false;
 let prestartPreviewDirty = true; // only redraw prestart when dirty or media animated
 let lastPrestartPreviewAt = 0; // throttle animated prestart by framerate
-const TARGET_FRAME_MS_ACTIVE = 1000 / 30;
+const TARGET_FRAME_MS_ACTIVE = 1000 / 60;
 const TARGET_FRAME_MS_STATIC = 1000 / 15;
 const TARGET_FRAME_MS_HIDDEN = 1000;
 let lastLoopTickMs = 0;
@@ -4068,7 +4068,7 @@ puzzle = new Puzzle({ container: "forPuzzle" });
 if (window.JigsawRendererFacade) {
     rendererFacade = new window.JigsawRendererFacade({
         container: document.getElementById("forPuzzle"),
-        config: window.rendererConfig || { mode: "auto", media: "image" },
+        config: window.rendererConfig || { mode: "canvas2d", media: "image" },
         getPuzzleResolution: getPuzzleResolution
     });
     rendererFacade.init(puzzle);
