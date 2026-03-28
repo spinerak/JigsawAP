@@ -17,7 +17,7 @@
     }
 
     class HitTestService {
-        findTopPieceAt(puzzle, eventX, eventY) {
+        findTopPieceAt(puzzle, eventX, eventY, sceneState = null) {
             if (!puzzle || !puzzle.polyPieces || !puzzle.polyPieces.length) return null;
             const perf = globalScope && globalScope.jigsawPerf;
             const startedAt = (perf && typeof perf.nowMs === "function")
@@ -25,16 +25,20 @@
                 : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
             let tested = 0;
 
-            const version = puzzle._zOrderVersion || 0;
-            const useCache = puzzle._sortedPolyPiecesByZ && puzzle._sortedPolyPiecesVersion === version
-                && puzzle._sortedPolyPiecesByZ.length === puzzle.polyPieces.length;
-            const sorted = useCache ? puzzle._sortedPolyPiecesByZ : puzzle.polyPieces
-                .slice()
-                .sort((a, b) => {
-                    const za = (a._zIndex != null) ? a._zIndex : 0;
-                    const zb = (b._zIndex != null) ? b._zIndex : 0;
-                    return za - zb;
-                });
+            const sorted = (sceneState && typeof sceneState.getOrderedPieces === "function")
+                ? sceneState.getOrderedPieces(puzzle)
+                : (() => {
+                    const version = puzzle._zOrderVersion || 0;
+                    const useCache = puzzle._sortedPolyPiecesByZ && puzzle._sortedPolyPiecesVersion === version
+                        && puzzle._sortedPolyPiecesByZ.length === puzzle.polyPieces.length;
+                    return useCache ? puzzle._sortedPolyPiecesByZ : puzzle.polyPieces
+                        .slice()
+                        .sort((a, b) => {
+                            const za = (a._zIndex != null) ? a._zIndex : 0;
+                            const zb = (b._zIndex != null) ? b._zIndex : 0;
+                            return za - zb;
+                        });
+                })();
 
             const ctx = getSharedHitTestContext();
             for (let k = sorted.length - 1; k >= 0; k--) {

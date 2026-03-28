@@ -62,15 +62,15 @@
             const facade = deps.getRendererFacade();
             const puzzle = deps.getPuzzle();
             if (facade && puzzle) {
-                facade.selectMode(mode, puzzle);
+                facade.selectMode(mode, puzzle, { reason: "ui-mode-switch" });
                 facade.onResize(
                     puzzle.contWidth || puzzle.container.clientWidth || 1,
                     puzzle.contHeight || puzzle.container.clientHeight || 1
                 );
-                if (puzzle.polyPieces && puzzle.polyPieces.length) {
-                    for (const pp of puzzle.polyPieces) deps.queuePolyPieceSetup(pp, false, true);
-                    facade.renderDirtyPieces();
+                if (facade.sceneState && facade.sceneState.markAllDirty) {
+                    facade.sceneState.markAllDirty();
                 }
+                facade.renderDirtyPieces();
             }
             refreshRendererModeControl();
         }
@@ -153,32 +153,83 @@
             }
         }
 
-        function runRendererPerfBench(durationMs = 5000) {
+        function runRendererPerfBench(durationOrOptions = 5000) {
+            const options = (typeof durationOrOptions === "number")
+                ? { durationMs: durationOrOptions }
+                : (durationOrOptions || {});
+            const durationMs = Math.max(250, options.durationMs || 5000);
+            const label = options.label || "bench";
+            const sampleEveryMs = Math.max(16, options.sampleEveryMs || 50);
+            const includeFullSamples = options.includeFullSamples === true;
+            const resetPerf = options.resetPerf !== false;
+            if (resetPerf && globalScope.jigsawPerf && typeof globalScope.jigsawPerf.reset === "function") {
+                globalScope.jigsawPerf.reset();
+            }
+            const facade = deps.getRendererFacade ? deps.getRendererFacade() : null;
             const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-            const targetEnd = start + Math.max(250, durationMs);
+            const targetEnd = start + durationMs;
+            const startSnapshot = globalScope.captureRendererPerfSnapshot ? globalScope.captureRendererPerfSnapshot(label + ":start") : null;
             const samples = [];
+            let lastSampleAt = 0;
+            let maxFrameMs = 0;
+            let maxDrawCalls = 0;
+            let maxMediaUploads = 0;
+            let maxDirtyPieceCount = 0;
+            let maxQueueDepth = 0;
             return new Promise((resolve) => {
                 const step = () => {
                     const now = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-                    if (globalScope.rendererPerf) {
-                        samples.push({
+                    if ((now - lastSampleAt) >= sampleEveryMs || now >= targetEnd) {
+                        lastSampleAt = now;
+                        const perf = globalScope.rendererPerf || {};
+                        const sceneMetrics = perf.sceneMetrics || (facade && facade.sceneState && facade.sceneState.getMetricsSnapshot ? facade.sceneState.getMetricsSnapshot() : null) || {};
+                        const jigsawPerf = globalScope.jigsawPerf && typeof globalScope.jigsawPerf.snapshot === "function"
+                            ? globalScope.jigsawPerf.snapshot()
+                            : null;
+                        const sample = {
                             t: now,
-                            frameMs: globalScope.rendererPerf.lastFrameMs || 0,
-                            drawCalls: globalScope.rendererPerf.lastDrawCalls || 0,
-                            mediaUploads: globalScope.rendererPerf.lastMediaUploads || 0
-                        });
+                            frameMs: perf.lastFrameMs || 0,
+                            drawCalls: perf.lastDrawCalls || 0,
+                            mediaUploads: perf.lastMediaUploads || 0,
+                            dirtyPieceCount: sceneMetrics.dirtyPieceCount || perf.sceneDirtyPieceCount || 0,
+                            queueDepth: jigsawPerf && jigsawPerf.queue ? (jigsawPerf.queue.lastDepth || 0) : 0,
+                            staticRebuilt: !!(perf.activeRendererStats && perf.activeRendererStats.lastStaticRebuilt),
+                            visiblePieces: perf.activeRendererStats && perf.activeRendererStats.lastVisiblePieces || 0,
+                            previewStats: perf.previewStats || null
+                        };
+                        samples.push(sample);
+                        if (sample.frameMs > maxFrameMs) maxFrameMs = sample.frameMs;
+                        if (sample.drawCalls > maxDrawCalls) maxDrawCalls = sample.drawCalls;
+                        if (sample.mediaUploads > maxMediaUploads) maxMediaUploads = sample.mediaUploads;
+                        if (sample.dirtyPieceCount > maxDirtyPieceCount) maxDirtyPieceCount = sample.dirtyPieceCount;
+                        if (sample.queueDepth > maxQueueDepth) maxQueueDepth = sample.queueDepth;
                     }
                     if (now >= targetEnd) {
                         const n = samples.length || 1;
                         const totalFrameMs = samples.reduce((a, s) => a + s.frameMs, 0);
                         const totalDrawCalls = samples.reduce((a, s) => a + s.drawCalls, 0);
                         const totalUploads = samples.reduce((a, s) => a + s.mediaUploads, 0);
+                        const totalDirtyPieceCount = samples.reduce((a, s) => a + (s.dirtyPieceCount || 0), 0);
+                        const totalStaticRebuilds = samples.reduce((a, s) => a + (s.staticRebuilt ? 1 : 0), 0);
                         const summary = {
+                            label,
+                            requestedMode: options.mode || null,
+                            activeMode: facade && facade.activeMode ? facade.activeMode : null,
                             samples: samples.length,
                             avgFrameMs: totalFrameMs / n,
+                            maxFrameMs,
                             avgDrawCalls: totalDrawCalls / n,
-                            avgMediaUploads: totalUploads / n
+                            maxDrawCalls,
+                            avgMediaUploads: totalUploads / n,
+                            maxMediaUploads,
+                            avgDirtyPieceCount: totalDirtyPieceCount / n,
+                            maxDirtyPieceCount,
+                            staticRebuildSampleCount: totalStaticRebuilds,
+                            maxQueueDepth,
+                            startSnapshot,
+                            endSnapshot: globalScope.captureRendererPerfSnapshot ? globalScope.captureRendererPerfSnapshot(label + ":end") : null
                         };
+                        if (includeFullSamples) summary.fullSamples = samples;
                         console.log("[RendererPerfBench]", summary);
                         resolve(summary);
                         return;
