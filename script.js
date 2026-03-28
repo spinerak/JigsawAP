@@ -2551,221 +2551,30 @@ function queueGameEvent(evt) {
 
 syncLegacyViewGlobals();
 
-let tmpImage;
-let tmpPreviewCtx = null;
-let syncedPreviewCanvas = null;
-let syncedPreviewCtx = null;
-let lastSyncedPreviewAt = 0;
-let hasDrawnStaticSyncedPreview = false;
-let prestartPreviewDirty = true; // only redraw prestart when dirty or media animated
-let lastPrestartPreviewAt = 0; // throttle animated prestart by framerate
+let previewSurfaceManager = null;
+
+function ensurePreviewSurfaceManager() {
+    if (!previewSurfaceManager && window.JigsawPreviewSurfaceManager) {
+        previewSurfaceManager = new window.JigsawPreviewSurfaceManager({
+            getPuzzle: () => puzzle,
+            getRendererFacade: () => rendererFacade,
+            getViewState: () => viewState,
+            getApDimensions: () => ({ apnx, apny })
+        });
+    }
+    return previewSurfaceManager;
+}
+
 const TARGET_FRAME_MS_ACTIVE = 1000 / 60;
 const TARGET_FRAME_MS_STATIC = 1000 / 15;
 const TARGET_FRAME_MS_HIDDEN = 1000;
 let lastLoopTickMs = 0;
-let grayscaleReferenceCanvas = null;
-let grayscaleReferenceCtx = null;
-let lastGrayscaleUpdateMs = 0;
-const GRAYSCALE_VIDEO_INTERVAL_MS = 120;
-
-const PREVIEW_OUTLINE_STROKE_PX = 3;
-
-function updateGrayscaleReferenceCanvas() {
-    if (!puzzle || !puzzle.container) return;
-    const showGrayscale = !!viewState.showGrayscaleReference;
-    const showOutline = !!viewState.showPreviewOutline;
-    if (!showGrayscale && !showOutline) {
-        if (grayscaleReferenceCanvas && grayscaleReferenceCanvas.parentNode) {
-            grayscaleReferenceCanvas.parentNode.removeChild(grayscaleReferenceCanvas);
-        }
-        grayscaleReferenceCanvas = null;
-        grayscaleReferenceCtx = null;
-        return;
-    }
-    if (!puzzle.gameCanvas || !puzzle.gameCtx || typeof puzzle.gameWidth !== "number" || puzzle.gameWidth <= 0 || typeof puzzle.gameHeight !== "number" || puzzle.gameHeight <= 0) return;
-    const w = Math.max(1, Math.round(puzzle.gameWidth));
-    const h = Math.max(1, Math.round(puzzle.gameHeight));
-    const contentW = (typeof puzzle._mediaContentWidth === "number" && puzzle._mediaContentWidth > 0)
-        ? puzzle._mediaContentWidth
-        : ((puzzle.nx && puzzle.ny) ? puzzle.nx * puzzle.scalex : w);
-    const contentH = (typeof puzzle._mediaContentHeight === "number" && puzzle._mediaContentHeight > 0)
-        ? puzzle._mediaContentHeight
-        : ((puzzle.nx && puzzle.ny) ? puzzle.ny * puzzle.scaley : h);
-    const displayW = Math.max(1, Math.round(contentW));
-    const displayH = Math.max(1, Math.round(contentH));
-    const halfRes = 2;
-    const bufW = Math.max(1, Math.floor(w / halfRes));
-    const bufH = Math.max(1, Math.floor(h / halfRes));
-    if (!grayscaleReferenceCanvas) {
-        grayscaleReferenceCanvas = document.createElement("canvas");
-        grayscaleReferenceCtx = grayscaleReferenceCanvas.getContext("2d");
-        grayscaleReferenceCanvas.className = "grayscale-reference-canvas";
-        grayscaleReferenceCanvas.style.position = "absolute";
-        grayscaleReferenceCanvas.style.pointerEvents = "none";
-        grayscaleReferenceCanvas.style.zIndex = "99999997";
-    }
-    // Only resize when dimensions change; setting width/height clears the canvas and causes
-    // flicker when grayscale is throttled (video/camera) because we clear every frame but draw only every 120ms.
-    if (grayscaleReferenceCanvas.width !== bufW || grayscaleReferenceCanvas.height !== bufH) {
-        grayscaleReferenceCanvas.width = bufW;
-        grayscaleReferenceCanvas.height = bufH;
-    }
-    grayscaleReferenceCanvas.style.width = displayW + "px";
-    grayscaleReferenceCanvas.style.height = displayH + "px";
-    const grayscaleLeft = (puzzle.contWidth != null && puzzle.contHeight != null) ? (puzzle.contWidth - displayW) / 2 : (puzzle.offsx || 0);
-    const grayscaleTop = (puzzle.contWidth != null && puzzle.contHeight != null) ? (puzzle.contHeight - displayH) / 2 : (puzzle.offsy || 0);
-    grayscaleReferenceCanvas.style.left = grayscaleLeft + "px";
-    grayscaleReferenceCanvas.style.top = grayscaleTop + "px";
-    if (!grayscaleReferenceCtx) return;
-
-    if (showGrayscale) {
-        const nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-        const frameSource = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getFrameSource === "function") ? rendererFacade.media.getFrameSource() : null;
-        const mediaStatus = (typeof rendererFacade !== "undefined" && rendererFacade && rendererFacade.media && typeof rendererFacade.media.getStatus === "function") ? rendererFacade.media.getStatus() : null;
-        const kind = mediaStatus && mediaStatus.kind ? mediaStatus.kind : "image";
-        const isVideoSource = !!(frameSource && typeof frameSource.videoWidth === "number" && typeof frameSource.videoHeight === "number");
-        const isAnimated = isVideoSource || kind === "gif-decoded";
-        if (!isAnimated || (nowMs - lastGrayscaleUpdateMs) >= GRAYSCALE_VIDEO_INTERVAL_MS) {
-            if (isAnimated) lastGrayscaleUpdateMs = nowMs;
-            grayscaleReferenceCtx.filter = "grayscale(1) contrast(0.5)";
-            if (isVideoSource && frameSource && puzzle._gifDraw) {
-                const g = puzzle._gifDraw;
-                const vw = Math.max(1, frameSource.videoWidth || 1);
-                const vh = Math.max(1, frameSource.videoHeight || 1);
-                const dx = g.dx / halfRes;
-                const dy = g.dy / halfRes;
-                const dw = g.dw / halfRes;
-                const dh = g.dh / halfRes;
-                const baseW = Math.max(1, g.sourceW || vw);
-                const baseH = Math.max(1, g.sourceH || vh);
-                const sx = Math.max(0, Math.min(vw - 1, Math.round((g.sx || 0) * (vw / baseW))));
-                const sy = Math.max(0, Math.min(vh - 1, Math.round((g.sy || 0) * (vh / baseH))));
-                const sw = Math.max(1, Math.min(vw - sx, Math.round((g.sw || baseW) * (vw / baseW))));
-                const sh = Math.max(1, Math.min(vh - sy, Math.round((g.sh || baseH) * (vh / baseH))));
-                grayscaleReferenceCtx.drawImage(frameSource, sx, sy, sw, sh, dx, dy, dw, dh);
-            } else if (kind === "gif-decoded" && frameSource && typeof frameSource.width === "number" && typeof frameSource.height === "number") {
-                grayscaleReferenceCtx.drawImage(frameSource, 0, 0, frameSource.width, frameSource.height, 0, 0, bufW, bufH);
-            } else {
-                grayscaleReferenceCtx.drawImage(puzzle.gameCanvas, 0, 0, w, h, 0, 0, bufW, bufH);
-            }
-            grayscaleReferenceCtx.filter = "none";
-        }
-    } else {
-        grayscaleReferenceCtx.clearRect(0, 0, bufW, bufH);
-    }
-
-    if (showOutline) {
-        const L = PREVIEW_OUTLINE_STROKE_PX;
-        grayscaleReferenceCtx.strokeStyle = "rgba(0,0,0,0.45)";
-        grayscaleReferenceCtx.lineWidth = L;
-        let ox, oy, ow, oh;
-        if (puzzle._gifDraw && typeof puzzle._gifDraw.dx === "number" && typeof puzzle._gifDraw.dw === "number") {
-            const g = puzzle._gifDraw;
-            ox = (g.dx || 0) / halfRes;
-            oy = (g.dy || 0) / halfRes;
-            ow = Math.min(g.dw, w) / halfRes;
-            oh = Math.min(g.dh, h) / halfRes;
-        } else {
-            ox = 0;
-            oy = 0;
-            ow = bufW;
-            oh = bufH;
-        }
-        grayscaleReferenceCtx.strokeRect(ox + L / 2, oy + L / 2, Math.max(0, ow - L), Math.max(0, oh - L));
-    }
-
-    if (!grayscaleReferenceCanvas.parentNode) {
-        puzzle.container.insertBefore(grayscaleReferenceCanvas, puzzle.container.firstChild);
-    }
-}
-window.updateGrayscaleReferenceCanvas = updateGrayscaleReferenceCanvas;
-
-let dropLocationTarget = null;
-let dropTargetDragState = null;
-
-function applyDropLocationTargetColor(el) {
-    if (!el || !viewState.dropLocationColor) return;
-    const hex = viewState.dropLocationColor.replace(/^#/, "");
-    const r = hex.length === 3 ? (parseInt(hex[0] + hex[0], 16)) : parseInt(hex.slice(0, 2), 16);
-    const g = hex.length === 3 ? (parseInt(hex[1] + hex[1], 16)) : parseInt(hex.slice(2, 4), 16);
-    const b = hex.length === 3 ? (parseInt(hex[2] + hex[2], 16)) : parseInt(hex.slice(4, 6), 16);
-    el.style.borderColor = viewState.dropLocationColor;
-    el.style.background = "rgba(" + r + "," + g + "," + b + ",0.2)";
-}
-
-function createDropLocationTarget() {
-    if (dropLocationTarget) return dropLocationTarget;
-    const el = document.createElement("div");
-    el.id = "dropLocationTarget";
-    el.className = "drop-location-target";
-    el.setAttribute("aria-label", "Drop location for new pieces (drag to move)");
-    el.title = "Drag to set where new pieces appear";
-    el.style.cssText = "position:absolute;width:48px;height:48px;border-radius:50%;border:3px solid;transform:translate(-50%,-50%);pointer-events:auto;z-index:2147483646;box-sizing:border-box;";
-    applyDropLocationTargetColor(el);
-    function clampNorm(v) { return Math.max(0.02, Math.min(0.98, v)); }
-    function updatePositionFromClient(clientX, clientY) {
-        if (!puzzle || !puzzle.container) return;
-        const br = puzzle.container.getBoundingClientRect();
-        if (br.width <= 0 || br.height <= 0) return;
-        const normX = clampNorm((clientX - br.left) / br.width);
-        const normY = clampNorm((clientY - br.top) / br.height);
-        viewState.customDropNormX = normX;
-        viewState.customDropNormY = normY;
-        el.style.left = (normX * 100) + "%";
-        el.style.top = (normY * 100) + "%";
-    }
-    function onPointerMove(e) {
-        if (!dropTargetDragState || !dropTargetDragState.active) return;
-        e.preventDefault();
-        const clientX = e.clientX != null ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-        const clientY = e.clientY != null ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
-        updatePositionFromClient(clientX, clientY);
-    }
-    function onPointerUp() {
-        if (!dropTargetDragState) return;
-        dropTargetDragState.active = false;
-        document.removeEventListener("pointermove", onPointerMove, true);
-        document.removeEventListener("pointerup", onPointerUp, true);
-        document.removeEventListener("pointercancel", onPointerUp, true);
-    }
-    el.addEventListener("pointerdown", function (e) {
-        if (!viewState.useCustomDropLocation || !puzzle || !puzzle.container) return;
-        e.preventDefault();
-        e.stopPropagation();
-        dropTargetDragState = { active: true };
-        updatePositionFromClient(e.clientX, e.clientY);
-        document.addEventListener("pointermove", onPointerMove, true);
-        document.addEventListener("pointerup", onPointerUp, true);
-        document.addEventListener("pointercancel", onPointerUp, true);
-    });
-    dropLocationTarget = el;
-    return el;
-}
-
-function updateDropLocationTarget() {
-    if (!viewState.useCustomDropLocation) {
-        if (dropLocationTarget) {
-            dropLocationTarget.style.display = "none";
-            dropLocationTarget.style.pointerEvents = "none";
-        }
-        return;
-    }
-    if (!puzzle || !puzzle.container) return;
-    const el = createDropLocationTarget();
-    const nx = viewState.customDropNormX != null ? viewState.customDropNormX : 0.1;
-    const ny = viewState.customDropNormY != null ? viewState.customDropNormY : 0.1;
-    el.style.left = (nx * 100) + "%";
-    el.style.top = (ny * 100) + "%";
-    el.style.display = "block";
-    el.style.pointerEvents = "auto";
-    applyDropLocationTargetColor(el);
-    if (el.parentNode !== puzzle.container) {
-        puzzle.container.appendChild(el);
-    }
-}
-window.updateDropLocationTarget = updateDropLocationTarget;
 
 function getPreviewSourceDimensions(source) {
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.getPreviewSourceDimensions === "function") {
+        return manager.getPreviewSourceDimensions(source);
+    }
     if (!source) return { w: 0, h: 0 };
     const w = source.videoWidth || source.naturalWidth || source.width || 0;
     const h = source.videoHeight || source.naturalHeight || source.height || 0;
@@ -2773,6 +2582,10 @@ function getPreviewSourceDimensions(source) {
 }
 
 function resolvePrestartPreviewSource() {
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.resolvePrestartPreviewSource === "function") {
+        return manager.resolvePrestartPreviewSource();
+    }
     if (rendererFacade && rendererFacade.media && rendererFacade.media.getFrameSource) {
         const src = rendererFacade.media.getFrameSource();
         if (src) return src;
@@ -2781,88 +2594,63 @@ function resolvePrestartPreviewSource() {
 }
 
 function ensurePreviewPuzzleDimensions() {
-    if (!puzzle || typeof puzzle.computenxAndny !== "function") return;
-    if (!(Number.isFinite(apnx) && Number.isFinite(apny) && apnx > 0 && apny > 0)) return;
-    if (puzzle.nx !== apnx || puzzle.ny !== apny) {
-        puzzle.computenxAndny(apnx, apny);
-        puzzle._previewDimsChanged = true;
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.ensurePreviewPuzzleDimensions === "function") {
+        manager.ensurePreviewPuzzleDimensions();
     }
 }
 
 function getPrestartPreviewDisplaySize() {
-    if (!puzzle) return { w: 1, h: 1 };
-    const w = (typeof puzzle._mediaContentWidth === "number" && puzzle._mediaContentWidth > 0)
-        ? puzzle._mediaContentWidth
-        : ((typeof puzzle.gameWidth === "number" && puzzle.gameWidth > 0) ? puzzle.gameWidth : (puzzle.contWidth || 1));
-    const h = (typeof puzzle._mediaContentHeight === "number" && puzzle._mediaContentHeight > 0)
-        ? puzzle._mediaContentHeight
-        : ((typeof puzzle.gameHeight === "number" && puzzle.gameHeight > 0) ? puzzle.gameHeight : (puzzle.contHeight || 1));
-    return { w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) };
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.getPrestartPreviewDisplaySize === "function") {
+        return manager.getPrestartPreviewDisplaySize();
+    }
+    return { w: 1, h: 1 };
 }
 
 function layoutPrestartPreviewCanvas() {
-    if (!tmpImage || !puzzle) return;
-    const display = getPrestartPreviewDisplaySize();
-    tmpImage.style.position = "absolute";
-    tmpImage.style.width = display.w + "px";
-    tmpImage.style.height = display.h + "px";
-    tmpImage.style.top = "50%";
-    tmpImage.style.left = "50%";
-    tmpImage.style.transform = "translate(-50%,-50%)";
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.layoutPrestartPreviewCanvas === "function") {
+        manager.layoutPrestartPreviewCanvas();
+    }
 }
 
 function drawSyncedPreviewWindowFrame() {
-    if (!syncedPreviewCanvas) {
-        syncedPreviewCanvas = document.getElementById("prevsync");
-        if (!syncedPreviewCanvas) return;
-        syncedPreviewCtx = syncedPreviewCanvas.getContext("2d");
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.drawSyncedPreviewWindowFrame === "function") {
+        manager.drawSyncedPreviewWindowFrame();
     }
-    if (!syncedPreviewCtx) return;
-    const parent = syncedPreviewCanvas.parentElement;
-    if (parent && parent.style && parent.style.display === "none") return;
-    const source = resolvePrestartPreviewSource();
-    if (!source) return;
-    if (source.tagName === "VIDEO" && source.readyState < 2) return;
-    const dims = getPreviewSourceDimensions(source);
-    if (dims.w <= 0 || dims.h <= 0) return;
-    let resized = false;
-    if (syncedPreviewCanvas.width !== dims.w || syncedPreviewCanvas.height !== dims.h) {
-        syncedPreviewCanvas.width = dims.w;
-        syncedPreviewCanvas.height = dims.h;
-        resized = true;
-    }
-    syncedPreviewCtx.clearRect(0, 0, syncedPreviewCanvas.width, syncedPreviewCanvas.height);
-    syncedPreviewCtx.drawImage(source, 0, 0, syncedPreviewCanvas.width, syncedPreviewCanvas.height);
-    if (resized && typeof window.requestPreviewSyncResize === "function") {
-        window.requestPreviewSyncResize();
+}
+window.drawSyncedPreviewWindowFrame = drawSyncedPreviewWindowFrame;
+
+function drawPrestartPreviewFrame() {
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.drawPrestartPreviewFrame === "function") {
+        manager.drawPrestartPreviewFrame();
     }
 }
 
-function drawPrestartPreviewFrame() {
-    if (!tmpImage || tmpImage.tagName !== "CANVAS" || !tmpPreviewCtx) return;
-    const source = resolvePrestartPreviewSource();
-    if (!source) return;
-    if (source.tagName === "VIDEO" && source.readyState < 2) return;
-    if (!puzzle) return;
-    ensurePreviewPuzzleDimensions();
-    if (puzzle._previewDimsChanged || !(puzzle.gameWidth > 0) || !(puzzle.gameHeight > 0)) {
-        puzzle._previewDimsChanged = false;
-        if (typeof puzzle.puzzle_scale === "function") puzzle.puzzle_scale();
+function updateGrayscaleReferenceCanvas() {
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.updateGrayscaleReferenceCanvas === "function") {
+        manager.updateGrayscaleReferenceCanvas();
     }
-    const internalW = Math.max(1, Math.round(puzzle.gameWidth || 1));
-    const internalH = Math.max(1, Math.round(puzzle.gameHeight || 1));
-    if (tmpImage.width !== internalW || tmpImage.height !== internalH) {
-        tmpImage.width = internalW;
-        tmpImage.height = internalH;
-    }
-    layoutPrestartPreviewCanvas();
-    if (typeof puzzle.renderSourceToGameCanvas === "function") puzzle.renderSourceToGameCanvas(source);
-    tmpPreviewCtx.clearRect(0, 0, tmpImage.width, tmpImage.height);
-    if (puzzle.gameCanvas) {
-        tmpPreviewCtx.drawImage(puzzle.gameCanvas, 0, 0, tmpImage.width, tmpImage.height);
-    } else {
-        tmpPreviewCtx.drawImage(source, 0, 0, tmpImage.width, tmpImage.height);
-    }
+}
+window.updateGrayscaleReferenceCanvas = updateGrayscaleReferenceCanvas;
+
+function hasPrestartPreviewCanvas() {
+    const manager = ensurePreviewSurfaceManager();
+    return !!(manager && typeof manager.hasPrestartCanvas === "function" && manager.hasPrestartCanvas());
+}
+
+function markPrestartPreviewDirty() {
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.markPrestartDirty === "function") manager.markPrestartDirty();
+}
+
+function resetSyncedPreviewCache() {
+    const manager = ensurePreviewSurfaceManager();
+    if (manager && typeof manager.resetSyncedPreviewCache === "function") manager.resetSyncedPreviewCache();
 }
 
 function loadImageFunction(){
@@ -2884,12 +2672,8 @@ function loadImageFunction(){
         }
     }
     puzzle.container.innerHTML = ""; // forget contents
-    tmpImage = document.createElement("canvas");
-    tmpPreviewCtx = tmpImage.getContext("2d");
-    const source = resolvePrestartPreviewSource();
-    const dims = getPreviewSourceDimensions(source);
-    tmpImage.width = Math.max(1, dims.w || (puzzle.srcImage.naturalWidth | 0) || 1);
-    tmpImage.height = Math.max(1, dims.h || (puzzle.srcImage.naturalHeight | 0) || 1);
+    const previewManager = ensurePreviewSurfaceManager();
+    if (previewManager && typeof previewManager.resetCadence === "function") previewManager.resetCadence();
     // console.log(puzzle.srcImage.src)
     if (window.puzzleAreaScale && typeof puzzle.sizeContainerByAspectRatio === "function") {
         const ar = getEffectivePuzzleAreaAspectRatio(puzzle.srcImage);
@@ -2900,13 +2684,10 @@ function loadImageFunction(){
     ensurePreviewPuzzleDimensions();
     if (typeof puzzle.puzzle_scale === "function") puzzle.puzzle_scale();
     layoutPrestartPreviewCanvas();
-    
-    tmpImage.style.boxShadow = `${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px rgba(0, 0, 0, 0.5)`;
-    
-    puzzle.container.appendChild(tmpImage);
-    drawPrestartPreviewFrame();
-    prestartPreviewDirty = false;
-
+    const shadow = `${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px ${0.02 * puzzle.contWidth}px rgba(0, 0, 0, 0.5)`;
+    if (previewManager && typeof previewManager.setupPrestartPreviewCanvas === "function") {
+        previewManager.setupPrestartPreviewCanvas({ boxShadow: shadow });
+    }
     puzzle.prevWidth = puzzle.contWidth;
     puzzle.prevHeight = puzzle.contHeight;
 }
@@ -2932,6 +2713,10 @@ let moving; // for information about moved piece
 function setMovingState(nextMoving) {
     moving = nextMoving;
     window.moving = nextMoving || null;
+    const previewManager = ensurePreviewSurfaceManager();
+    if (previewManager && typeof previewManager.setInteractionActive === "function") {
+        previewManager.setInteractionActive(!!(nextMoving && nextMoving.pp));
+    }
     if (!nextMoving && window.jigsawPerf && typeof window.jigsawPerf.cancelPendingPickup === "function") {
         window.jigsawPerf.cancelPendingPickup();
     }
@@ -3154,32 +2939,15 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             if (perfMonitor && typeof perfMonitor.recordRender === "function") {
                 perfMonitor.recordRender(jigsawPerfNow() - renderStartedAt);
             }
-            if (state < 50) hasDrawnStaticSyncedPreview = false;
             const animated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
-            if (animated) {
-                const previewIntervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE;
-                if (nowMs - lastSyncedPreviewAt >= previewIntervalMs) {
-                    drawSyncedPreviewWindowFrame();
-                    lastSyncedPreviewAt = nowMs;
-                }
-                hasDrawnStaticSyncedPreview = false;
-            } else if (state >= 50 && !hasDrawnStaticSyncedPreview) {
-                drawSyncedPreviewWindowFrame();
-                hasDrawnStaticSyncedPreview = true;
-            }
-            if (state === 15) {
-                const prestartAnimated = rendererFacade && typeof rendererFacade.isMediaAnimated === "function" && rendererFacade.isMediaAnimated();
-                if (prestartPreviewDirty) {
-                    drawPrestartPreviewFrame();
-                    prestartPreviewDirty = false;
-                    lastPrestartPreviewAt = nowMs;
-                } else if (prestartAnimated) {
-                    const intervalMs = (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE;
-                    if (nowMs - lastPrestartPreviewAt >= intervalMs) {
-                        drawPrestartPreviewFrame();
-                        lastPrestartPreviewAt = nowMs;
-                    }
-                }
+            const previewManager = ensurePreviewSurfaceManager();
+            if (previewManager && typeof previewManager.onRenderPhase === "function") {
+                previewManager.onRenderPhase(nowMs, state, {
+                    previewIntervalMs: (rendererFacade && rendererFacade.scheduler) ? rendererFacade.scheduler.targetFrameMs : TARGET_FRAME_MS_ACTIVE,
+                    mediaAnimated: !!animated,
+                    interactionActive: !!(moving && moving.pp),
+                    documentHidden: typeof document !== "undefined" ? !!document.hidden : false
+                });
             }
         }
 
@@ -3188,11 +2956,11 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
         if (event && event.event === "puzzleAreaScaleChanged" && puzzle) {
             const srcImg = puzzle.srcImage || null;
             const ar = getEffectivePuzzleAreaAspectRatio(srcImg);
-            if (state === 15 && tmpImage) {
+            if (state === 15 && hasPrestartPreviewCanvas()) {
                 puzzle.sizeContainerByAspectRatio(ar);
                 puzzle.puzzle_scale();
                 layoutPrestartPreviewCanvas();
-                prestartPreviewDirty = true;
+                markPrestartPreviewDirty();
             } else if (state >= 25) {
                 puzzle.puzzle_scale();
                 if (rendererFacade) maybeOnResize(puzzle, rendererFacade);
@@ -3219,7 +2987,7 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
             if (state == 15 || state > 60) { // resize initial or final picture
                 puzzle.puzzle_scale();
                 layoutPrestartPreviewCanvas();
-                if (state == 15) prestartPreviewDirty = true;
+                if (state == 15) markPrestartPreviewDirty();
             }
             else if (state >= 25) { // resize pieces
                 puzzle.puzzle_scale();
@@ -3555,19 +3323,15 @@ document.addEventListener("gestureend", preventZoomWhileHoldingPiece, { passive:
                 for (let pp of puzzle.polyPieces) {
                     queuePolyPieceSetup(pp, false, false);
                 }
-                if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) {
-                    pieceSetupQueueApi.processPieceSetupQueue();
+                if (pieceSetupQueueApi && pieceSetupQueueApi.flushAllPieceSetup) {
+                    pieceSetupQueueApi.flushAllPieceSetup();
+                } else if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) {
+                    pieceSetupQueueApi.processPieceSetupQueue({ flushAll: true });
+                }
+                if (rendererFacade && rendererFacade.sceneState && rendererFacade.sceneState.markAllDirty) {
+                    rendererFacade.sceneState.markAllDirty();
                 }
                 if (rendererFacade) rendererFacade.renderDirtyPieces();
-                if (downgradedAtStart && rendererFacade) {
-                    if (pieceSetupQueueApi && pieceSetupQueueApi.processPieceSetupQueue) {
-                        pieceSetupQueueApi.processPieceSetupQueue();
-                    }
-                    if (rendererFacade.sceneState && rendererFacade.sceneState.markAllDirty) {
-                        rendererFacade.sceneState.markAllDirty();
-                    }
-                    rendererFacade.renderDirtyPieces();
-                }
                 refreshRendererModeControl();
                 puzzle.gameCanvas.style.top = puzzle.offsy + "px";
                 puzzle.gameCanvas.style.left = puzzle.offsx + "px";
@@ -4500,11 +4264,59 @@ function setRendererMode(mode) {
 }
 window.setRendererMode = setRendererMode;
 
-window.runRendererPerfBench = function runRendererPerfBench(durationMs = 5000) {
+window.captureRendererPerfSnapshot = function captureRendererPerfSnapshot(label = "snapshot") {
+    const facade = rendererFacade && typeof rendererFacade.getPerfSnapshot === "function"
+        ? rendererFacade.getPerfSnapshot()
+        : null;
+    return {
+        label,
+        takenAt: (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now(),
+        jigsawPerf: window.jigsawPerf && typeof window.jigsawPerf.snapshot === "function"
+            ? window.jigsawPerf.snapshot()
+            : null,
+        facade
+    };
+};
+
+window.runRendererPerfBench = function runRendererPerfBench(durationOrOptions = 5000) {
     if (rendererModeApi && rendererModeApi.runRendererPerfBench) {
-        return rendererModeApi.runRendererPerfBench(durationMs);
+        return rendererModeApi.runRendererPerfBench(durationOrOptions);
     }
     return Promise.resolve({ samples: 0, avgFrameMs: 0, avgDrawCalls: 0, avgMediaUploads: 0 });
+};
+
+window.runRendererPerfSuite = async function runRendererPerfSuite(options = {}) {
+    const modes = Array.isArray(options.modes) && options.modes.length ? options.modes : ["canvas2d", "webgl"];
+    const durationMs = Math.max(250, options.durationMs || 2500);
+    const settleMs = Math.max(0, options.settleMs || 250);
+    const originalMode = (rendererFacade && rendererFacade.activeMode) || window.rendererConfig.mode || "canvas2d";
+    const results = [];
+    for (const mode of modes) {
+        if (mode !== "canvas2d" && mode !== "webgl") continue;
+        if (rendererModeApi && rendererModeApi.setRendererMode) {
+            rendererModeApi.setRendererMode(mode);
+        }
+        if (settleMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, settleMs));
+        }
+        const summary = await window.runRendererPerfBench({ durationMs, label: mode, mode });
+        results.push(summary);
+        const modeStatus = rendererFacade && rendererFacade.getModeStatus ? rendererFacade.getModeStatus() : null;
+        if (mode === "webgl" && modeStatus && modeStatus.active !== "webgl") {
+            break;
+        }
+    }
+    if (rendererModeApi && rendererModeApi.setRendererMode) {
+        rendererModeApi.setRendererMode(originalMode);
+    }
+    const suiteSummary = {
+        durationMs,
+        settleMs,
+        originalMode,
+        results
+    };
+    console.log("[RendererPerfSuite]", suiteSummary);
+    return suiteSummary;
 };
 
 let pending_actions = [];
