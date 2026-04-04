@@ -4,6 +4,8 @@
     function create(deps) {
         const queue = [];
         let batchSize = 18;
+        let totalProcessed = 0;
+        let flushCount = 0;
 
         function queuePolyPieceSetup(pp, ignoreRedraw = false, highPriority = false, onDone = null) {
             if (!pp) return;
@@ -22,14 +24,15 @@
             else queue.push(pp);
         }
 
-        function processPieceSetupQueue() {
-            if (!queue.length) return;
+        function processPieceSetupQueue(options = null) {
+            if (!queue.length) return 0;
+            const flushAll = options === true || !!(options && options.flushAll === true);
             const perf = (typeof performance !== "undefined" && performance.now) ? performance : null;
             const cfg = deps.getRendererConfig ? deps.getRendererConfig() : null;
             const budgetMs = (cfg && cfg.perfBudgetMs) ? cfg.perfBudgetMs : 8;
             const startedAt = perf ? perf.now() : 0;
             let processed = 0;
-            while (queue.length && processed < batchSize) {
+            while (queue.length && (flushAll || processed < batchSize)) {
                 const pp = queue.shift();
                 pp._setupQueued = false;
                 const ignoreRedraw = pp._pendingSetupIgnoreRedraw === undefined ? false : pp._pendingSetupIgnoreRedraw;
@@ -47,21 +50,45 @@
                     }
                 } catch (_e) {}
                 processed++;
-                if (perf && (perf.now() - startedAt) >= budgetMs) break;
+                if (!flushAll && perf && (perf.now() - startedAt) >= budgetMs) break;
             }
             if (perf) {
                 const elapsed = perf.now() - startedAt;
-                if (elapsed > budgetMs * 1.1) {
-                    batchSize = Math.max(4, batchSize - 2);
-                } else if (elapsed < budgetMs * 0.5 && processed >= batchSize) {
-                    batchSize = Math.min(64, batchSize + 2);
+                if (!flushAll) {
+                    if (elapsed > budgetMs * 1.1) {
+                        batchSize = Math.max(4, batchSize - 2);
+                    } else if (elapsed < budgetMs * 0.5 && processed >= batchSize) {
+                        batchSize = Math.min(64, batchSize + 2);
+                    }
                 }
+                totalProcessed += processed;
+                if (flushAll) flushCount += 1;
                 if (globalScope.rendererPerf) {
                     globalScope.rendererPerf.setupQueueLength = queue.length;
                     globalScope.rendererPerf.setupBatchSize = batchSize;
                     globalScope.rendererPerf.setupLastElapsedMs = elapsed;
+                    globalScope.rendererPerf.setupLastProcessed = processed;
+                    globalScope.rendererPerf.setupTotalProcessed = totalProcessed;
+                    globalScope.rendererPerf.setupFlushCount = flushCount;
                 }
             }
+            return processed;
+        }
+
+        function flushAllPieceSetup() {
+            let processedTotal = 0;
+            let safety = 0;
+            while (queue.length && safety < 100000) {
+                const processed = processPieceSetupQueue({ flushAll: true });
+                processedTotal += processed;
+                safety++;
+                if (processed <= 0) break;
+            }
+            return processedTotal;
+        }
+
+        function hasPendingSetup() {
+            return queue.length > 0;
         }
 
         function startLoop() {
@@ -74,6 +101,8 @@
         return {
             queuePolyPieceSetup: queuePolyPieceSetup,
             processPieceSetupQueue: processPieceSetupQueue,
+            flushAllPieceSetup: flushAllPieceSetup,
+            hasPendingSetup: hasPendingSetup,
             startLoop: startLoop
         };
     }
