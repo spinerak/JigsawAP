@@ -81,7 +81,7 @@
             this.selectMode(this.config.mode || "canvas2d", puzzle);
         }
 
-        selectMode(requestedMode, puzzle) {
+        selectMode(requestedMode, puzzle, options = null) {
             if (this.scheduler) this.scheduler.targetFrameMs = 1000 / 60;
             const normalizedMode = (requestedMode === "webgl" || requestedMode === "canvas2d")
                 ? requestedMode
@@ -132,7 +132,10 @@
 
             if (this.activeRenderer) this.activeRenderer.setVisible(true);
             if (this.activeRenderer && puzzle && puzzle.polyPieces && puzzle.polyPieces.length) {
-                for (const pp of puzzle.polyPieces) pp.polypiece_drawImage(true);
+                const forcePieceSetup = !!(options && options.forcePieceSetup === true);
+                if (forcePieceSetup) {
+                    for (const pp of puzzle.polyPieces) pp.polypiece_drawImage(true);
+                }
                 if (this.sceneState && this.sceneState.markAllDirty) this.sceneState.markAllDirty();
             }
             this._emitStatusChange();
@@ -346,6 +349,27 @@
             return kind === "video" || kind === "camera" || kind === "display" || kind === "gif-decoded" || kind === "gif";
         }
 
+        getPerfSnapshot() {
+            const perf = globalScope.rendererPerf || null;
+            const mediaStatus = (this.media && typeof this.media.getStatus === "function") ? this.media.getStatus() : null;
+            return {
+                modeStatus: this.getModeStatus(),
+                mediaAnimated: this.isMediaAnimated(),
+                mediaStatus,
+                rendererPerf: perf ? Object.assign({}, perf) : null,
+                sceneState: (this.sceneState && typeof this.sceneState.getMetricsSnapshot === "function")
+                    ? this.sceneState.getMetricsSnapshot()
+                    : null,
+                activeRenderer: this.activeRenderer ? {
+                    kind: this.activeMode || this.mode || "none",
+                    lastDrawCount: this.activeRenderer.lastDrawCount || 0,
+                    lastMediaUploads: this.activeRenderer.lastMediaUploads || 0,
+                    lastVisiblePieces: this.activeRenderer.lastVisiblePieces || 0,
+                    lastStaticRebuilt: !!this.activeRenderer.lastStaticRebuilt
+                } : null
+            };
+        }
+
         renderFrame(nowMs) {
             if (!this.activeRenderer) return;
             const shouldRenderThisFrame = this.scheduler.shouldRender(nowMs);
@@ -376,10 +400,25 @@
             }
 
             if (!mediaAdvanced && this.sceneState && this.sceneState.hasDirtyPieces && !this.sceneState.hasDirtyPieces()) {
-                if (perf) perf.skippedFrames += 1;
+                if (perf) {
+                    perf.skippedFrames += 1;
+                    perf.activeMode = this.activeMode || this.mode || "none";
+                    perf.requestedMode = this.requestedMode || this.mode || "canvas2d";
+                    perf.mediaAnimated = this.isMediaAnimated();
+                    perf.sceneDirtyPieceCount = this.sceneState && this.sceneState.dirtyPieceCount ? this.sceneState.dirtyPieceCount() : 0;
+                    perf.sceneZOrderDirty = !!(this.sceneState && this.sceneState.zOrderDirty);
+                }
                 return;
             }
             if (this.sceneState) this.sceneState.mediaContentDirty = mediaAdvanced;
+            if (perf) {
+                perf.activeMode = this.activeMode || this.mode || "none";
+                perf.requestedMode = this.requestedMode || this.mode || "canvas2d";
+                perf.mediaAnimated = this.isMediaAnimated();
+                perf.sceneDirtyPieceCount = this.sceneState && this.sceneState.dirtyPieceCount ? this.sceneState.dirtyPieceCount() : 0;
+                perf.sceneZOrderDirty = !!(this.sceneState && this.sceneState.zOrderDirty);
+                perf.sceneVersion = this.sceneState ? this.sceneState.version || 0 : 0;
+            }
             const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
             this.activeRenderer.renderFrame(nowMs, this.sceneState);
             if (this.activeRenderer === this.canvasRenderer && this.sceneState && typeof this.sceneState.consumeDirtyPieces === "function") {
@@ -402,6 +441,21 @@
                 perf.lastFrameMs = Math.max(0, t1 - t0);
                 perf.lastDrawCalls = this.activeRenderer.lastDrawCount || 0;
                 perf.lastMediaUploads = this.activeRenderer.lastMediaUploads || 0;
+                perf.activeMode = this.activeMode || this.mode || "none";
+                perf.requestedMode = this.requestedMode || this.mode || "canvas2d";
+                perf.mediaAnimated = this.isMediaAnimated();
+                perf.sceneDirtyPieceCount = this.sceneState && this.sceneState.dirtyPieceCount ? this.sceneState.dirtyPieceCount() : 0;
+                perf.sceneZOrderDirty = !!(this.sceneState && this.sceneState.zOrderDirty);
+                perf.sceneVersion = this.sceneState ? this.sceneState.version || 0 : 0;
+                perf.sceneMetrics = (this.sceneState && typeof this.sceneState.getMetricsSnapshot === "function")
+                    ? this.sceneState.getMetricsSnapshot()
+                    : null;
+                perf.activeRendererStats = this.activeRenderer ? {
+                    lastDrawCount: this.activeRenderer.lastDrawCount || 0,
+                    lastMediaUploads: this.activeRenderer.lastMediaUploads || 0,
+                    lastVisiblePieces: this.activeRenderer.lastVisiblePieces || 0,
+                    lastStaticRebuilt: !!this.activeRenderer.lastStaticRebuilt
+                } : null;
             }
         }
 
@@ -412,7 +466,7 @@
         }
 
         findTopPieceAt(puzzle, x, y) {
-            return this.hitTest.findTopPieceAt(puzzle, x, y);
+            return this.hitTest.findTopPieceAt(puzzle, x, y, this.sceneState);
         }
 
         destroy() {
