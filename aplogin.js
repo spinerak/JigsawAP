@@ -16,6 +16,8 @@ document.getElementById('password').value = getUrlParameter('password') || '';
 
 document.getElementById("loginbutton").addEventListener("click", pressed_login);
 
+document.getElementById("helpbutton").addEventListener("click", pressed_help);
+
 document.getElementById("solobutton").addEventListener("click", pressed_solo);
 document.getElementById("solobutton2").addEventListener("click", () => {
     window.rotations = 90;
@@ -74,6 +76,10 @@ function pressed_login(){
     localStorage.setItem("name", document.getElementById("name").value);
 
     login();
+}
+
+function pressed_help(){
+    open("https://github.com/spineraks-org/ArchipelagoJigsaw/blob/main/worlds/jigsaw/docs/setup_en.md")
 }
 
 window.play_solo = false;
