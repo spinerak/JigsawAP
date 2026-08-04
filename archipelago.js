@@ -199,10 +199,10 @@ class DataPackageManager {
   #packages = new Map;
   #checksums = new Map;
   #games = new Set;
+  #cache = null;
   constructor(client) {
     this.#client = client;
     this.#client.socket.on("roomInfo", (packet) => {
-      this.#packages.clear();
       this.#checksums.clear();
       this.#games.clear();
       this.#packages.set("Archipelago", this.#preloadArchipelago());
@@ -215,6 +215,9 @@ class DataPackageManager {
   findPackage(game) {
     return this.#packages.get(game) ?? null;
   }
+  setCache(cache) {
+    this.#cache = cache;
+  }
   async fetchPackage(games = [], update = true) {
     if (games.length === 0) {
       games = Array.from(this.#games);
@@ -226,6 +229,22 @@ class DataPackageManager {
         return true;
       return false;
     });
+    if (this.#cache) {
+        const data = { games: {} };
+        const notFoundGames = [];
+        for (const game of games) {
+            const cachedPackage = await this.#cache.getPackage(game, this.#checksums.get(game));
+            if (cachedPackage) {
+                data.games[game] = cachedPackage;
+            } else {
+                notFoundGames.push(game);
+            }
+        }
+        if (update) {
+            this.importPackage(data);
+        }
+        games = notFoundGames;
+    }
     const data = { games: {} };
     for (const game of games) {
       const request = { cmd: "GetDataPackage", games: [game] };
@@ -245,7 +264,7 @@ class DataPackageManager {
   }
   exportPackage() {
     return {
-      games: this.#packages.entries().reduce((games, [game, pkg]) => {
+      games: [...this.#packages.entries()].reduce((games, [game, pkg]) => {
         games[game] = pkg.exportPackage();
         return games;
       }, {})
