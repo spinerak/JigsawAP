@@ -89,13 +89,13 @@ function toggleFullscreen() {
     if (!document.fullscreenElement) {
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) { 
+        } else if (document.documentElement.webkitRequestFullscreen) {
             document.documentElement.webkitRequestFullscreen(); // Safari
         }
     } else {
         if (document.exitFullscreen) {
             document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) { 
+        } else if (document.webkitExitFullscreen) {
             document.webkitExitFullscreen(); // Safari
         }
     }
@@ -195,7 +195,7 @@ function pressed_solo(){
     if (tbv) tbv.style.display = "flex";
     if (tbc) tbc.style.display = "flex";
 
-    
+
     const messages = [
         "When will you add deathlink?",
         "When will you add trap items?",
@@ -287,7 +287,7 @@ function connectToServer(firsttime = true) {
     client.socket.on("connected", connectedListener);
     client.socket.on("disconnected", disconnectedListener);
     client.socket.on("bounced", bouncedListener);
-    
+
     client.messages.on("message", jsonListener);
     client.deathLink.on("deathReceived", deathListener)
     
@@ -304,7 +304,7 @@ function connectToServer(firsttime = true) {
             let errorMessage = "Failed: " + error;
 
             document.getElementById('error-label').innerText = errorMessage + "\n Common remedies: refresh room and check login info.";
-            
+
             document.getElementById('loginbutton').style.backgroundColor = "#4caf50";
             document.getElementById('loginbutton').value = "Login & Connect again";
             
@@ -394,13 +394,13 @@ const connectedListener = (packet) => {
             localStorage.setItem("1referredTo090", true);
         }
     }
-    
+
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
-    
+
 
     document.getElementById("m6").innerText = apstatus;
-    
+
 
     console.log("Connected packet:",packet);
     window.set_puzzle_dim(packet.slot_data.nx, packet.slot_data.ny);
@@ -442,7 +442,7 @@ const connectedListener = (packet) => {
         }
         shapeSelect.value = String(shapeValue);
     }
-    
+
     puzzlePieceOrder = packet.slot_data.piece_order;
     console.log(puzzlePieceOrder);
 
@@ -471,7 +471,7 @@ const connectedListener = (packet) => {
     }
     window.defaultImagePath = imagePath;
 
-    console.log("Start loading image", apworld)  
+    console.log("Start loading image", apworld)
     if(apworld == "0.2.0" || apworld == "0.3.0"){
         const overrideImage = getUrlParameter('image');
         if (overrideImage !== '') {
@@ -489,7 +489,7 @@ const connectedListener = (packet) => {
         }
     }else{
 
-        console.log("Start loading image")    
+        console.log("Start loading image")
         const overrideImage = getUrlParameter('image');
         if (overrideImage !== '') {
             imagePath = overrideImage;
@@ -539,7 +539,7 @@ const connectedListener = (packet) => {
     }
 
 
-    
+
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
@@ -551,7 +551,7 @@ const connectedListener = (packet) => {
     if (tc) tc.style.display = "flex";
 
 
-    
+
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
     }
@@ -799,7 +799,7 @@ window.sendGoal = sendGoal;
 
 function cleanLog() {
     var logTextarea = document.getElementById("log");
-    
+
     // Check if logTextarea has more than 2000 children (assumed to be <span> elements)
     if (logTextarea.children.length > 2000) {
         for (var i = 0; i < 1000; i++) {
@@ -837,13 +837,13 @@ var classaddcolor = [
     "rgba(155, 89, 182, 1)",
     "rgba(128, 255, 128, 1)"]
 var classaddtext = ["...", "!!", "!", "!!!", "@#!", "!?!", "@!!", "?!@"]
-var classadddesc = ["Item class: normal", 
-    "Item class: progression", 
-    "Item class: useful", 
-    "Item class: progression, useful", 
-    "Item class: trap", 
-    "Item class: progression, trap", 
-    "Item class: useful, trap", 
+var classadddesc = ["Item class: normal",
+    "Item class: progression",
+    "Item class: useful",
+    "Item class: progression, useful",
+    "Item class: trap",
+    "Item class: progression, trap",
+    "Item class: useful, trap",
     "progression, useful, trap"]
 var classothercolors = [
     "rgba(100, 149, 237, 1)",
@@ -892,7 +892,7 @@ function jsonListener(text, nodes) {
 
     // Plaintext to console, because why not?
     const messageElement = document.createElement("div");
-  
+
     let is_relevant = false;
     let contains_player = false;
 
@@ -930,13 +930,13 @@ function jsonListener(text, nodes) {
                 nodeElement.title = "Game: " + node.player.game;
                 break;
 
-            case "item": 
+            case "item":
                 nodeElement.style.fontWeight = "bold";
                 let typenumber = node.item.progression + 2 * node.item.useful + 4 * node.item.trap
                 nodeElement.style.color = adjustColorBrightness(classaddcolor[typenumber], adjustColor);
                 nodeElement.title = classadddesc[typenumber];
                 break;
-            
+
 
             // no special coloring needed
             case "text":
