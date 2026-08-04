@@ -289,8 +289,10 @@ function connectToServer(firsttime = true) {
     client.socket.on("bounced", bouncedListener);
 
     client.messages.on("message", jsonListener);
-    client.deathLink.on("deathReceived", deathListener)
-    
+    client.deathLink.on("deathReceived", deathListener);
+
+    client.package.setCache({ getPackage: getDataPackageFromCache });
+
     client
     .login(connectionInfo.hostport, connectionInfo.name, connectionInfo.game, {password: connectionInfo.password, tags: ["DeathLink"]})
         .then(() => {
@@ -298,19 +300,112 @@ function connectToServer(firsttime = true) {
             document.getElementById('loginbutton').value = "Connected to the server";
 
             closeMenus();
+
+            const dataPackages = client.package.exportPackage();
+            syncDataPackagesToCache(dataPackages.games);
         })
         .catch((error) => {
-            console.log("Failed to connect", error)
+            console.log("Failed to connect", error);
             let errorMessage = "Failed: " + error;
 
             document.getElementById('error-label').innerText = errorMessage + "\n Common remedies: refresh room and check login info.";
 
             document.getElementById('loginbutton').style.backgroundColor = "#4caf50";
             document.getElementById('loginbutton').value = "Login & Connect again";
-            
         });
+}
 
+function getDataPackageFromCache(gameName, checksum) {
+    if (!checksum) {
+        console.error('Tried to get data package from cache without providing checksum.');
+        return Promise.resolve(null);
+    }
 
+    return new Promise((resolve, reject) => {
+        withCacheStore('readonly', (store) => {
+            const getRequest = store.get(`${gameName}-${checksum}`);
+
+            getRequest.onsuccess = () => {
+                if (getRequest.result === undefined || getRequest.result.name !== gameName) {
+                    resolve(null);
+                } else {
+                    resolve(getRequest.result.package);
+                }
+            };
+        }, () => {
+            console.error('Failed to get datapackage from cache.');
+            resolve(null);
+        });
+    });
+}
+
+function syncDataPackagesToCache(dataPackagesToSync) {
+    withCacheStore('readwrite', (store) => {
+        for (const [gameName, gamePackage] of Object.entries(dataPackagesToSync)) {
+            const getRequest = store.get(`${gameName}-${gamePackage.checksum}`);
+
+            getRequest.onsuccess = () => {
+                if (getRequest.result === undefined) {
+                    const addRequest = store.add(
+                        { name: gameName, package: gamePackage },
+                        `${gameName}-${gamePackage.checksum}`,
+                    );
+                    addRequest.onerror = (event) => {
+                        // Continue with the rest of the transaction even if one insert fails.
+                        event.preventDefault();
+                        console.error(`Failed to add package ${gameName} (${gamePackage.checksum}) to cache:`, event.target.error);
+                    };
+                }
+            };
+        };
+    }, () => {
+        console.error('Failed to sync datapackages to cache.');
+    });
+}
+
+const CACHE_DB_NAME = 'DataPackageCacheDatabase';
+const CACHE_DB_VERSION = 1;
+const CACHE_STORE_NAME = 'dataPackageCache';
+
+function withCacheStore(accessmode, callback, onError) {
+    if (!window.indexedDB) {
+        console.error("IndexedDB not supported.");
+        onError();
+        return;
+    }
+
+    const dbRequest = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VERSION);
+
+    dbRequest.onerror = (event) => {
+        console.error("IndexedDB connection failed:", event.target.error);
+        onError();
+    };
+
+    dbRequest.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(CACHE_STORE_NAME)) {
+            db.createObjectStore(CACHE_STORE_NAME);
+        }
+    };
+
+    dbRequest.onsuccess = (event) => {
+        const db = event.target.result;
+
+        const transaction = db.transaction(CACHE_STORE_NAME, accessmode);
+        const store = transaction.objectStore(CACHE_STORE_NAME);
+
+        transaction.onerror = (event) => {
+            console.error("IndexedDB transaction error:", event.target.error);
+            db.close();
+            onError();
+        };
+
+        transaction.oncomplete = () => {
+            db.close();
+        };
+
+        callback(store);
+    };
 }
 
 const receiveditemsListener = (items, index) => {
