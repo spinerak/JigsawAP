@@ -119,7 +119,10 @@
                 value="Loading website...." placeholder="Example: Yachty">
             <label for="name" class="login-label">Password</label>
             <input type="password" id="password" name="password" class="login-input" value="" placeholder="Leave blank if no password">
-            <input type="submit" value="Login & Connect" id="loginbutton" class="login-submit">
+            <div style="display: flex; gap: 10px;">
+              <input type="submit" value="Login & Connect" id="loginbutton" class="login-submit">
+              <input type="submit" value="?" id="helpbutton" class="help-submit">
+            </div>
             <label id="error-label" class="login-label" style="color: red;"></label>
           </div>
           <div style="margin-top: 5px; font-size: 0.9em; color: white; border: 2px solid #4dabf74d; padding: 10px; text-align: center; border-radius: 10px;">
