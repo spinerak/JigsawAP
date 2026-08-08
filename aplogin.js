@@ -264,7 +264,7 @@ function login() {
 // server stuff:
 import {
     Client
-} from "./archipelago.js";
+} from "./archipelago.min.js";
 
 var client = null;
 var apstatus = "?";
