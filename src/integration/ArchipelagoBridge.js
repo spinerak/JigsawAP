@@ -64,8 +64,14 @@
                 }
             } else {
                 const client = globalScope.getAPClient();
+                // console.log("Bouncing counter", window.bounce_counter);
                 if (!globalScope.bounceTimeout) {
-                    client.bounce({ "slots": [globalScope.slot] }, [key, value]);
+                    if(window.bounce_counter > 0){
+                        client.bounce({ "slots": [globalScope.slot] }, [key, value]);
+                        window.bounce_counter -= 120;
+                    }else{
+                        window.bounce_counter += 5;
+                    }
                     globalScope.bounceTimeout = setTimeout(() => {
                         globalScope.bounceTimeout = null;
                     }, 1000);

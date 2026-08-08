@@ -337,6 +337,7 @@ function getDataPackageFromCache(gameName, checksum) {
                     resolve(null);
                 } else {
                     resolve(getRequest.result.package);
+                    console.log(`Retrieved package ${gameName} (${checksum}) from cache.`);
                 }
             };
         }, () => {
@@ -751,12 +752,14 @@ function setImage(url){
     });
 }
 
+window.bounce_counter = 10;
 const bouncedListener = (packet) => {
-    console.log("Bounced packet:", packet);
+    // console.log("Bounced packet:", packet);
     if(packet){
         if (packet.data) {
             console.log(packet.data);
             if (typeof packet.data[0] === "number") {
+                window.bounce_counter = Math.min(window.bounce_counter+70, 200);
                 window.move_piece_bounced(packet.data);
             }else{
                 gotRandomNumber(packet.data[0], packet.data[1]);

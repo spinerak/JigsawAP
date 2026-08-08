@@ -2272,7 +2272,7 @@ class Puzzle {
             this._mediaContentHeight = this.ny * this.scaley;
         }
 
-        console.log(this.diff_scalex, this.gameWidth * window.downsize_to_fit * image_enlarge_x, this.nx)
+        // console.log(this.diff_scalex, this.gameWidth * window.downsize_to_fit * image_enlarge_x, this.nx)
 
         // Draw source into buffer at buffer size (gameWidth x gameHeight); display scale is from _logicalGame*.
         const srcDims = this._getSourceDimensions(this.srcImage);
