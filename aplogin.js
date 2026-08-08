@@ -81,6 +81,13 @@ document.getElementById('name').addEventListener('keypress', function(event) {
     }
 });
 
+
+function pressed_help(){
+    open("https://github.com/spineraks-org/ArchipelagoJigsaw/blob/main/worlds/jigsaw/docs/setup_en.md")
+}
+
+document.getElementById("helpbutton").addEventListener("click", pressed_help);
+
 function isMobile() {
     return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 }
