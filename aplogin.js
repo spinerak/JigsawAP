@@ -47,13 +47,13 @@ function toggleFullscreen() {
     if (!document.fullscreenElement) {
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) { 
+        } else if (document.documentElement.webkitRequestFullscreen) {
             document.documentElement.webkitRequestFullscreen(); // Safari
         }
     } else {
         if (document.exitFullscreen) {
             document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) { 
+        } else if (document.webkitExitFullscreen) {
             document.webkitExitFullscreen(); // Safari
         }
     }
@@ -85,7 +85,7 @@ function pressed_help(){
 window.play_solo = false;
 function pressed_solo(){
     window.play_solo = true;
-    
+
     if(window.pieceSides == 6){
         window.possible_merges = [];
         window.actual_possible_merges = [];
@@ -164,7 +164,7 @@ function pressed_solo(){
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
 
-    
+
     const messages = [
         "When will you add deathlink?",
         "When will you add trap items?",
@@ -233,7 +233,7 @@ function login() {
 // server stuff:
 import {
     Client
-} from "./archipelago.js";
+} from "./archipelago.min.js";
 
 var client = null;
 var apstatus = "?";
@@ -256,10 +256,12 @@ function connectToServer(firsttime = true) {
     client.socket.on("connected", connectedListener);
     client.socket.on("disconnected", disconnectedListener);
     client.socket.on("bounced", bouncedListener);
-    
+
     client.messages.on("message", jsonListener);
-    client.deathLink.on("deathReceived", deathListener)
-    
+    client.deathLink.on("deathReceived", deathListener);
+
+    client.package.setCache({ getPackage: getDataPackageFromCache });
+
     client
     .login(connectionInfo.hostport, connectionInfo.name, connectionInfo.game, {password: connectionInfo.password, tags: ["DeathLink"]})
         .then(() => {
@@ -267,19 +269,112 @@ function connectToServer(firsttime = true) {
             document.getElementById('loginbutton').value = "Connected to the server";
 
             closeMenus();
+
+            const dataPackages = client.package.exportPackage();
+            syncDataPackagesToCache(dataPackages.games);
         })
         .catch((error) => {
-            console.log("Failed to connect", error)
+            console.log("Failed to connect", error);
             let errorMessage = "Failed: " + error;
 
             document.getElementById('error-label').innerText = errorMessage + "\n Common remedies: refresh room and check login info.";
-            
+
             document.getElementById('loginbutton').style.backgroundColor = "#4caf50";
             document.getElementById('loginbutton').value = "Login & Connect again";
-            
         });
+}
 
+function getDataPackageFromCache(gameName, checksum) {
+    if (!checksum) {
+        console.error('Tried to get data package from cache without providing checksum.');
+        return Promise.resolve(null);
+    }
 
+    return new Promise((resolve, reject) => {
+        withCacheStore('readonly', (store) => {
+            const getRequest = store.get(`${gameName}-${checksum}`);
+
+            getRequest.onsuccess = () => {
+                if (getRequest.result === undefined || getRequest.result.name !== gameName) {
+                    resolve(null);
+                } else {
+                    resolve(getRequest.result.package);
+                }
+            };
+        }, () => {
+            console.error('Failed to get datapackage from cache.');
+            resolve(null);
+        });
+    });
+}
+
+function syncDataPackagesToCache(dataPackagesToSync) {
+    withCacheStore('readwrite', (store) => {
+        for (const [gameName, gamePackage] of Object.entries(dataPackagesToSync)) {
+            const getRequest = store.get(`${gameName}-${gamePackage.checksum}`);
+
+            getRequest.onsuccess = () => {
+                if (getRequest.result === undefined) {
+                    const addRequest = store.add(
+                        { name: gameName, package: gamePackage },
+                        `${gameName}-${gamePackage.checksum}`,
+                    );
+                    addRequest.onerror = (event) => {
+                        // Continue with the rest of the transaction even if one insert fails.
+                        event.preventDefault();
+                        console.error(`Failed to add package ${gameName} (${gamePackage.checksum}) to cache:`, event.target.error);
+                    };
+                }
+            };
+        };
+    }, () => {
+        console.error('Failed to sync datapackages to cache.');
+    });
+}
+
+const CACHE_DB_NAME = 'DataPackageCacheDatabase';
+const CACHE_DB_VERSION = 1;
+const CACHE_STORE_NAME = 'dataPackageCache';
+
+function withCacheStore(accessmode, callback, onError) {
+    if (!window.indexedDB) {
+        console.error("IndexedDB not supported.");
+        onError();
+        return;
+    }
+
+    const dbRequest = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VERSION);
+
+    dbRequest.onerror = (event) => {
+        console.error("IndexedDB connection failed:", event.target.error);
+        onError();
+    };
+
+    dbRequest.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(CACHE_STORE_NAME)) {
+            db.createObjectStore(CACHE_STORE_NAME);
+        }
+    };
+
+    dbRequest.onsuccess = (event) => {
+        const db = event.target.result;
+
+        const transaction = db.transaction(CACHE_STORE_NAME, accessmode);
+        const store = transaction.objectStore(CACHE_STORE_NAME);
+
+        transaction.onerror = (event) => {
+            console.error("IndexedDB transaction error:", event.target.error);
+            db.close();
+            onError();
+        };
+
+        transaction.oncomplete = () => {
+            db.close();
+        };
+
+        callback(store);
+    };
 }
 
 const receiveditemsListener = (items, index) => {
@@ -364,13 +459,13 @@ const connectedListener = (packet) => {
             localStorage.setItem("1referredTo090", true);
         }
     }
-    
+
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
-    
+
 
     document.getElementById("m6").innerText = apstatus;
-    
+
 
     console.log("Connected packet:",packet);
     window.set_puzzle_dim(packet.slot_data.nx, packet.slot_data.ny);
@@ -409,7 +504,7 @@ const connectedListener = (packet) => {
             }
         }
     }
-    
+
     puzzlePieceOrder = packet.slot_data.piece_order;
     console.log(puzzlePieceOrder);
 
@@ -438,7 +533,7 @@ const connectedListener = (packet) => {
     }
     window.defaultImagePath = imagePath;
 
-    console.log("Start loading image", apworld)  
+    console.log("Start loading image", apworld)
     if(apworld == "0.2.0" || apworld == "0.3.0"){
         const overrideImage = getUrlParameter('image');
         if (overrideImage !== '') {
@@ -456,7 +551,7 @@ const connectedListener = (packet) => {
         }
     }else{
 
-        console.log("Start loading image")    
+        console.log("Start loading image")
         const overrideImage = getUrlParameter('image');
         if (overrideImage !== '') {
             imagePath = overrideImage;
@@ -506,13 +601,13 @@ const connectedListener = (packet) => {
     }
 
 
-    
+
     document.getElementById('taskbar1').style.display = "flex";
     document.getElementById('taskbar2').style.display = "flex";
     document.getElementById('taskbar3').style.display = "flex";
 
 
-    
+
     if(getUrlParameter("go") == "LS"){
         window.LoginStart = true;
     }
@@ -550,7 +645,7 @@ function setImage(url){
         img.onerror = () => callback(false); // Image failed to load
         img.src = url;
     }
-            
+
     checkImage(url, (isValid) => {
         if (isValid) {
             imagePath = url;
@@ -559,7 +654,7 @@ function setImage(url){
             console.log("Image is a dead link.");
         }
         window.setImagePath(imagePath);
-        
+
         window.choose_ap_image = true;
         window.set_ap_image = true;
     });
@@ -715,7 +810,7 @@ window.sendGoal = sendGoal;
 
 function cleanLog() {
     var logTextarea = document.getElementById("log");
-    
+
     // Check if logTextarea has more than 2000 children (assumed to be <span> elements)
     if (logTextarea.children.length > 2000) {
         for (var i = 0; i < 1000; i++) {
@@ -736,13 +831,13 @@ var classaddcolor = [
     "rgba(155, 89, 182, 1)",
     "rgba(128, 255, 128, 1)"]
 var classaddtext = ["...", "!!", "!", "!!!", "@#!", "!?!", "@!!", "?!@"]
-var classadddesc = ["Item class: normal", 
-    "Item class: progression", 
-    "Item class: useful", 
-    "Item class: progression, useful", 
-    "Item class: trap", 
-    "Item class: progression, trap", 
-    "Item class: useful, trap", 
+var classadddesc = ["Item class: normal",
+    "Item class: progression",
+    "Item class: useful",
+    "Item class: progression, useful",
+    "Item class: trap",
+    "Item class: progression, trap",
+    "Item class: useful, trap",
     "progression, useful, trap"]
 var classothercolors = [
     "rgba(100, 149, 237, 1)",
@@ -791,7 +886,7 @@ function jsonListener(text, nodes) {
 
     // Plaintext to console, because why not?
     const messageElement = document.createElement("div");
-  
+
     let is_relevant = false;
     let contains_player = false;
 
@@ -829,13 +924,13 @@ function jsonListener(text, nodes) {
                 nodeElement.title = "Game: " + node.player.game;
                 break;
 
-            case "item": 
+            case "item":
                 nodeElement.style.fontWeight = "bold";
                 let typenumber = node.item.progression + 2 * node.item.useful + 4 * node.item.trap
                 nodeElement.style.color = adjustColorBrightness(classaddcolor[typenumber], adjustColor);
                 nodeElement.title = classadddesc[typenumber];
                 break;
-            
+
 
             // no special coloring needed
             case "text":
@@ -850,12 +945,12 @@ function jsonListener(text, nodes) {
 
     var isScrolledToBottom = logTextarea.scrollHeight - logTextarea.clientHeight <= logTextarea.scrollTop + 1;
     logTextarea.appendChild(messageElement);
-    
+
     cleanLog();
     if (isScrolledToBottom) {
         logTextarea.scrollTop = logTextarea.scrollHeight - logTextarea.clientHeight;
     }
-    
+
 }
 window.jsonListener = jsonListener;
 
