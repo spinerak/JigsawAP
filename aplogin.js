@@ -308,6 +308,10 @@ function connectToServer(firsttime = true) {
 
             closeMenus();
 
+            client.scout(client.room.missingLocations, 0).then(scoutsResult => {
+                scouts = scoutsResult
+            });
+
             const dataPackages = client.package.exportPackage();
             syncDataPackagesToCache(dataPackages.games);
         })
@@ -423,6 +427,7 @@ const receiveditemsListener = (items, index) => {
 
 let puzzlePieceOrder = [];
 let receive_death_link = false;
+let scouts = [];
 
 const connectedListener = (packet) => {
     apstatus = "AP: Connected";
@@ -497,7 +502,6 @@ const connectedListener = (packet) => {
             localStorage.setItem("1referredTo090", true);
         }
     }
-
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
 
@@ -892,7 +896,15 @@ window.playNewGameSound = playNewGameSound;
 
 function sendCheck(numberOfMerges){
     if(window.is_connected){
-        client.check(234782000 + numberOfMerges);
+        const locationId = 234782000 + numberOfMerges;
+        if (client.room.missingLocations.includes(locationId)) {
+            client.check(locationId);
+
+            const scout = scouts.find(item => item.locationId == locationId);
+            if (scout) {
+                floatText(`Sent ${scout.name} to ${scout.receiver.alias}`);
+            }
+        }
     }
 }
 function sendGoal(){
@@ -1144,6 +1156,41 @@ function sendText(message){
     }
 }
 window.sendText = sendText;
+
+let currentMouseX = 0;
+let currentMouseY = 0;
+document.addEventListener("mousemove", e => {
+    currentMouseX = e.clientX;
+    currentMouseY = e.clientY;
+})
+
+function floatText(message) {
+    const start = [currentMouseX, currentMouseY];
+
+    const div = document.createElement("div");
+    div.innerText = message;
+    div.classList.add("floater");
+    div.style.left = `${start[0]}px`;
+    div.style.top = `${start[1]}px`;
+    document.body.appendChild(div);
+
+    const animation = div.animate([{
+        opacity: 1,
+        top: `${start[1]}px`,
+        offset: 0
+    }, {
+        opacity: 1,
+        top: `${start[1] - 80}px`,
+        offset: 0.8
+    }, {
+        opacity: 0,
+        top: `${start[1] - 100}px`,
+        offset: 1
+    }], 5000)
+    animation.finished.then(() => {
+        document.body.removeChild(div);
+    })
+}
 
 if(getUrlParameter("go") == "SS"){
     window.start_solo_immediately = true;
