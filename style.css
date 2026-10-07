@@ -79,7 +79,7 @@
       max-width: calc(177.78vh * var(--scale-factor)); /* Maintain 16:9 aspect ratio */
       top: 50%;
       left: 0;
-      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%) 
+      transform: translate(calc(-50% * (1 - 1 / var(--scale-factor))), -50%)
                   scale(calc(1 / var(--scale-factor)))
 
                   translate(0%, 0%) /* for zoom */
@@ -200,17 +200,17 @@
       pointer-events: none; /* Ignore mouse events */
     }
 
-    #draggable1 { 
+    #draggable1 {
       display: inline-block; /* Ensure the element wraps around its content */
       width: 300px; /* Adjust width to fit the image */
       height: 200px; /* Adjust height to fit the image */
-      background: #444; 
-      position: absolute; 
-      top: 50px; 
-      left: 50px; 
-      border-radius: 8px; 
+      background: #444;
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      border-radius: 8px;
       padding: 0; /* Remove extra padding */
-      cursor: grab; 
+      cursor: grab;
       user-select: none; /* Prevent text selection */
       z-index: 99;
     }
@@ -233,13 +233,13 @@
       display: inline-block; /* Ensure the element wraps around its content */
       width: auto; /* Adjust width to fit the image */
       height: auto; /* Adjust height to fit the image */
-      background: #aaa; 
+      background: #aaa;
       position: absolute; 
       top: 50px; 
       left: 50px; 
-      border-radius: 8px; 
+      border-radius: 8px;
       padding: 0; /* Remove extra padding */
-      cursor: grab; 
+      cursor: grab;
       user-select: none; /* Prevent text selection */
       z-index: 99;
       padding: 10px;
@@ -257,7 +257,7 @@
 
 
 
-    #taskbar2 { 
+    #taskbar2 {
         width: 50px; height: 30px; background: #444; color: #fff;
         position: absolute; bottom: 50px; right: 10px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
@@ -302,7 +302,7 @@
       bottom: 3vh;
       left: 3vw;
       width: 100%;
-      height: calc(100% - 27px);    
+      height: calc(100% - 27px);
       font-size: max(1vw, 2vh);
       color: rgba(255, 255, 255, 0.9);
       /* pointer-events: none; */
@@ -348,4 +348,11 @@
       animation: myAnim 10s ease 0s infinite normal forwards; */
       filter: drop-shadow(0px 0px 5px red) drop-shadow(0px 0px 5px red) drop-shadow(0px 0px 5px red) drop-shadow(0px 0px 5px red);
         
+    }
+
+    .floater {
+        position: fixed;
+        z-index: 100;
+        text-shadow: 0 0 8px white, 0 0 8px white, 0 0 8px white, 0 0 8px white, 0 0 8px white;
+        pointer-events: none;
     }
