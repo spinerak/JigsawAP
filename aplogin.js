@@ -808,7 +808,15 @@ function sendCheck(numberOfMerges){
 
             const scout = scouts.find(item => item.locationId == locationId);
             if (scout) {
-                floatText(`Sent ${scout.name} to ${scout.receiver.alias}`);
+                let color = "black";
+                if (scout.trap) {
+                    color = "red";
+                } else if (scout.progression) {
+                    color = "purple";
+                } else if (scout.useful) {
+                    color = "green";
+                }
+                floatText(`Sent ${scout.name} to ${scout.receiver.alias}`, color);
             }
         }
     }
@@ -1058,7 +1066,7 @@ document.addEventListener("mousemove", e => {
     currentMouseY = e.clientY;
 })
 
-function floatText(message) {
+function floatText(message, color) {
     const start = [currentMouseX, currentMouseY];
 
     const div = document.createElement("div");
@@ -1066,6 +1074,7 @@ function floatText(message) {
     div.classList.add("floater");
     div.style.left = `${start[0]}px`;
     div.style.top = `${start[1]}px`;
+    div.style.color = color;
     document.body.appendChild(div);
 
     const animation = div.animate([{
@@ -1085,6 +1094,7 @@ function floatText(message) {
         document.body.removeChild(div);
     })
 }
+window.floatText = floatText;
 
 if(getUrlParameter("go") == "SS"){
     window.start_solo_immediately = true;
