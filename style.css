@@ -353,6 +353,6 @@
     .floater {
         position: fixed;
         z-index: 100;
-        text-shadow: 0 0 8px white, 0 0 8px white, 0 0 8px white, 0 0 8px white, 0 0 8px white;
+        text-shadow: 0 0 8px black, 0 0 8px black, 0 0 8px black, 0 0 8px black, 0 0 8px black;
         pointer-events: none;
     }
