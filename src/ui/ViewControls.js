@@ -181,6 +181,14 @@
                     if (typeof globalScope.updateDropLocationTarget === "function") globalScope.updateDropLocationTarget();
                 });
             }
+            const showSentCheckbox = document.getElementById("showSentItem");
+            if (showSentCheckbox) {
+                showSentCheckbox.checked = !!viewState.showSent;
+                showSentCheckbox.addEventListener("change", function () {
+                    viewState.showSent = showSentCheckbox.checked;
+                    try { localStorage.setItem("showSent", String(showSentCheckbox.checked)); } catch (_e) {}
+                });
+            }
         }
 
         function applyBackgroundColor() {

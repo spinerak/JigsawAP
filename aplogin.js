@@ -1193,6 +1193,14 @@ function popFloater() {
         return;
     }
 
+    if (localStorage.getItem("showSent") == "false") {
+        // Clear out the floater queue because the user doesn't want to see sent items
+        while (floaterQueue.length > 0) {
+            floaterQueue.shift();
+        }
+        return;
+    }
+
     const [element, coordinates] = floaterQueue.shift();
 
     const div = document.createElement("div");
