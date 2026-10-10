@@ -308,6 +308,7 @@ const viewState = {
     showGrayscaleReference: false,
     showPreviewOutline: false,
     useCustomDropLocation: false,
+    showSent: true,
     customDropNormX: 0.1,
     customDropNormY: 0.1,
     dropLocationColor: "#FC8"
@@ -319,6 +320,10 @@ try {
 try {
     const storedRef = localStorage.getItem("showGrayscaleReference");
     if (storedRef === "true") viewState.showGrayscaleReference = true;
+} catch (_e) {}
+try {
+    const storedShowSent = localStorage.getItem("showSent");
+    if (storedShowSent === "false") viewState.showSent = false;
 } catch (_e) {}
 try {
     const storedOutline = localStorage.getItem("showPreviewOutline");

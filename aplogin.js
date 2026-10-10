@@ -296,6 +296,7 @@ function connectToServer(firsttime = true) {
     client.socket.on("bounced", bouncedListener);
 
     client.messages.on("message", jsonListener);
+    client.messages.on("itemSent", itemSentListener);
     client.deathLink.on("deathReceived", deathListener);
 
     client.package.setCache({ getPackage: getDataPackageFromCache });
@@ -497,7 +498,6 @@ const connectedListener = (packet) => {
             localStorage.setItem("1referredTo090", true);
         }
     }
-
 
     console.log("This apworld version should work", packet.slot_data.ap_world_version, packet.slot_data.ap_world_version_2)
 
@@ -890,9 +890,16 @@ function playNewGameSound() {
 }
 window.playNewGameSound = playNewGameSound;
 
+const mouseLocations = [];
+
 function sendCheck(numberOfMerges){
     if(window.is_connected){
-        client.check(234782000 + numberOfMerges);
+        const locationId = 234782000 + numberOfMerges;
+        if (client.room.missingLocations.includes(locationId)) {
+            client.check(locationId);
+
+            mouseLocations.push([locationId, [currentMouseX, currentMouseY]]);
+        }
     }
 }
 function sendGoal(){
@@ -993,6 +1000,19 @@ function adjustColorBrightness(color, amount) {
 }
 
 function jsonListener(text, nodes) {
+    appendToChatLog(createElement(nodes));
+}
+window.jsonListener = jsonListener;
+
+function itemSentListener(text, item, jsonMessage) {
+    if (client.players.self.slot == item.sender.slot && client.players.self.team == item.sender.team) {
+        const mouseCoordinates = mouseLocations.find(([locationId]) => locationId == item.locationId)?.[1] ?? [100, window.visualViewport.height - 100];
+
+        floatText(createElement(jsonMessage), mouseCoordinates);
+    }
+}
+
+function createElement(nodes) {
     const adjustColor = 1;
 
     // Plaintext to console, because why not?
@@ -1052,9 +1072,8 @@ function jsonListener(text, nodes) {
         messageElement.appendChild(nodeElement);
     }
 
-    appendToChatLog(messageElement);
+    return messageElement;
 }
-window.jsonListener = jsonListener;
 
 // Pending traps: name -> { random, fromName?, fromGame? }. random is used to compare with other player so only one trap fires when both trigger.
 var trapPending = {};
@@ -1144,6 +1163,72 @@ function sendText(message){
     }
 }
 window.sendText = sendText;
+
+let currentMouseX = 0;
+let currentMouseY = 0;
+document.addEventListener("mouseup", e => {
+    currentMouseX = e.clientX;
+    currentMouseY = e.clientY;
+}, {
+    capture: true
+})
+
+const floaterQueue = [];
+let floaterTimeout = null;
+
+function floatText(element, coordinates) {
+    floaterQueue.push([element, coordinates]);
+    if (!floaterTimeout) {
+        popFloater();
+    }
+}
+window.floatText = floatText;
+
+function popFloater() {
+    floaterTimeout = null;
+    if (floaterQueue.length == 0) {
+        // Stop.
+        return;
+    }
+
+    if (localStorage.getItem("showSent") == "false") {
+        // Clear out the floater queue because the user doesn't want to see sent items
+        while (floaterQueue.length > 0) {
+            floaterQueue.shift();
+        }
+        return;
+    }
+
+    const [element, coordinates] = floaterQueue.shift();
+
+    const div = document.createElement("div");
+    div.classList.add("floater");
+    div.style.left = `${coordinates[0]}px`;
+    div.style.top = `${coordinates[1]}px`;
+
+    div.appendChild(element);
+
+    // div.style.color = color;
+    document.body.appendChild(div);
+
+    const animation = div.animate([{
+        opacity: 1,
+        top: `${coordinates[1]}px`,
+        offset: 0
+    }, {
+        opacity: 1,
+        top: `${coordinates[1] - 80}px`,
+        offset: 0.8
+    }, {
+        opacity: 0,
+        top: `${coordinates[1] - 100}px`,
+        offset: 1
+    }], 5000)
+    animation.finished.then(() => {
+        document.body.removeChild(div);
+    })
+    floaterTimeout = window.setTimeout(popFloater, 2000);
+}
 
 if(getUrlParameter("go") == "SS"){
     window.start_solo_immediately = true;
