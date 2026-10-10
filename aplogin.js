@@ -309,10 +309,6 @@ function connectToServer(firsttime = true) {
 
             closeMenus();
 
-            client.scout(client.room.missingLocations, 0).then(scoutsResult => {
-                scouts = scoutsResult
-            });
-
             const dataPackages = client.package.exportPackage();
             syncDataPackagesToCache(dataPackages.games);
         })
@@ -1170,9 +1166,11 @@ window.sendText = sendText;
 
 let currentMouseX = 0;
 let currentMouseY = 0;
-document.addEventListener("mousemove", e => {
+document.addEventListener("mouseup", e => {
     currentMouseX = e.clientX;
     currentMouseY = e.clientY;
+}, {
+    capture: true
 })
 
 const floaterQueue = [];
