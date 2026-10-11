@@ -1281,3 +1281,10 @@
       border-radius: 6px;
       cursor: pointer;
     }
+
+    .floater {
+        position: fixed;
+        z-index: 100;
+        text-shadow: 0 0 8px black, 0 0 8px black, 0 0 8px black, 0 0 8px black, 0 0 8px black;
+        pointer-events: none;
+    }
