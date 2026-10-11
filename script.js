@@ -54,8 +54,7 @@ allowTextBtn.addEventListener('click', function() {
     localStorage.setItem("showSent", allow_text);
     allowTextBtn.innerHTML = allow_text ? 'Item send text ✅' : 'Item send text ❌';
 });
-
-
+allowTextBtn.innerHTML = allow_text ? 'Item send text ✅' : 'Item send text ❌';
 
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
