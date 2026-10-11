@@ -47,6 +47,15 @@ zoomBtn.addEventListener('click', function() {
     zoomBtn.innerHTML = allow_zoom ? '🔍✅' : '🔍❌';
 });
 
+let allow_text = localStorage.getItem("showSent") != "false";
+const allowTextBtn = document.getElementById('m11b');
+allowTextBtn.addEventListener('click', function() {
+    allow_text = !allow_text;
+    localStorage.setItem("showSent", allow_text);
+    allowTextBtn.innerHTML = allow_text ? 'Item send text ✅' : 'Item send text ❌';
+});
+
+
 
 window.save_loaded = false;
 window.ignore_bounce_pieces = [];
